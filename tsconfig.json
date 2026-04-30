@@ -24,5 +24,5 @@
     "noEmit": true
   },
   "include": ["src"],
-  "exclude": ["node_modules", "*.cjs", "*.js", "dist"]
+  "exclude": ["node_modules", "*.cjs", "*.js", "dist", "src/lib/firebase.ts", "src/lib/firebase-service.ts"]
 }

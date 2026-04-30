@@ -62,7 +62,7 @@ interface VisitDetailProps {
   onSetGeneratedMessage: (message: string) => void;
 }
 
-export default function VisitDetail({ user, visit, lead, remarks: initialRemarks, callLogs, followUps, onUpdateFollowUp, onUpdateVisit, onUpdateLead, onAddRemark, onAddFollowUp, onCall, onLogCallOutcome, onNavigate, onSetGeneratedMessage }: VisitDetailProps) {
+export default function VisitDetail({ user, visit, lead, remarks: initialRemarks, callLogs, followUps, onUpdateFollowUp, onUpdateVisit, onUpdateLead, onAddRemark, onAddFollowUp, onAddVisit, onCall, onLogCallOutcome, onNavigate, onSetGeneratedMessage }: VisitDetailProps) {
   const [syncedRemarks, setSyncedRemarks] = useState<Remark[]>(initialRemarks);
   const [syncedActivities, setSyncedActivities] = useState<Activity[]>([]);
   const [syncedWhatsApp, setSyncedWhatsApp] = useState<WhatsAppMessage[]>([]);
@@ -199,7 +199,9 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
         date: completionData.nextDate,
         purpose: 'Follow up post-visit',
         status: 'pending',
-        assigned_to: user.id,
+        userId: user.id,
+        userName: user.name,
+        method: 'call',
         created_at: new Date().toISOString()
       };
       onAddFollowUp(newFollowUp);

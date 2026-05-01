@@ -89,17 +89,33 @@ export default function SettingsPage({
     }
   };
 
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  
   const handleAddUser = () => {
-    if (!newUser.username || !newUser.password || !newUser.name || !newUser.projectId) {
+    if (!newUser.username || (!editingUserId && !newUser.password) || !newUser.name || !newUser.projectId) {
       toast.error('All fields are required');
       return;
     }
     const newUserObj: User = {
-      id: Date.now(),
+      id: editingUserId || Date.now(),
       ...newUser
     };
     onAddUser(newUserObj);
     setNewUser({ username: '', password: '', name: '', projectId: projects[0]?.id || '', role: 'user' });
+    setEditingUserId(null);
+    toast.success(editingUserId ? 'User updated successfully' : 'User added successfully');
+  };
+
+  const handleEditUser = (u: User) => {
+    setNewUser({
+      username: u.username,
+      password: '', // Keep blank unless changing
+      name: u.name,
+      projectId: u.projectId || projects[0]?.id || '',
+      role: u.role as any
+    });
+    setEditingUserId(u.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleRemoveUser = (id: number) => {
@@ -394,20 +410,21 @@ export default function SettingsPage({
             <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center gap-2">
                 <UserIcon className="text-[#C9A84C]" size={18} />
-                <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00]">User Management</h3>
+                <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00]">{editingUserId ? 'Edit User' : 'User Management'}</h3>
               </div>
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <input 
                     type="text" 
                     placeholder="Username"
+                    disabled={!!editingUserId}
                     value={newUser.username}
                     onChange={(e) => setNewUser({...newUser, username: e.target.value})}
-                    className="bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                    className="bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C] disabled:opacity-50"
                   />
                   <input 
                     type="password" 
-                    placeholder="Password"
+                    placeholder={editingUserId ? "Leave blank to keep same" : "Password"}
                     value={newUser.password}
                     onChange={(e) => setNewUser({...newUser, password: e.target.value})}
                     className="bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
@@ -435,21 +452,42 @@ export default function SettingsPage({
                     <option value="user">User</option>
                     <option value="admin">Admin</option>
                   </select>
-                  <button 
-                    onClick={handleAddUser}
-                    className="bg-[#C9A84C] text-white font-bold px-4 py-2 rounded-lg hover:bg-[#B0923D] transition-all text-sm"
-                  >
-                    Add User
-                  </button>
+                  <div className="flex gap-2 col-span-2">
+                    <button 
+                      onClick={handleAddUser}
+                      className="flex-1 bg-[#C9A84C] text-white font-bold px-4 py-2 rounded-lg hover:bg-[#B0923D] transition-all text-sm"
+                    >
+                      {editingUserId ? 'Update User' : 'Add User'}
+                    </button>
+                    {editingUserId && (
+                      <button 
+                        onClick={() => {
+                          setEditingUserId(null);
+                          setNewUser({ username: '', password: '', name: '', projectId: projects[0]?.id || '', role: 'user' });
+                        }}
+                        className="bg-gray-500 text-white font-bold px-4 py-2 rounded-lg hover:bg-gray-600 transition-all text-sm"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                   {users.map(u => (
                     <div key={u.id} className="p-3 bg-white border border-[#E6D8B8] rounded-lg space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold">{u.name}</span>
-                        <button onClick={() => handleRemoveUser(u.id)} className="text-red-500 hover:text-red-700">
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => handleEditUser(u)}
+                            className="text-[#C9A84C] hover:text-[#B0923D] p-1"
+                          >
+                            <Key size={16} />
+                          </button>
+                          <button onClick={() => handleRemoveUser(u.id)} className="text-red-500 hover:text-red-700 p-1">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between text-[11px] text-[#9A8262]">
                         <span>@{u.username} • {u.role}</span>

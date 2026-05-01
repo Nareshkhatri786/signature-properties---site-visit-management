@@ -328,15 +328,13 @@ async function startServer() {
         );
       } else if (col === "users") {
         const d = stringifyJsonFields(data, JSON_FIELDS_USERS);
-        if (data.password && !data.password.startsWith("$2")) {
-          data.password = await bcrypt.hash(data.password, 10);
-        }
-        const passwordUpdate = (data.password && data.password.trim() !== "") ? ",password=VALUES(password)" : "";
+        const passwordUpdate = (data.password && data.password.trim() !== "" && !data.password.startsWith("$2")) ? ",password=VALUES(password)" : "";
+        const passwordValue = (data.password && data.password.trim() !== "" && !data.password.startsWith("$2")) ? await bcrypt.hash(data.password, 10) : (data.password || "");
         await pool.execute(
           `INSERT INTO users (id,username,password,name,role,projectId,assignedProjectIds,workingHours,assignedLocation)
            VALUES (?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE username=VALUES(username),name=VALUES(name),role=VALUES(role),projectId=VALUES(projectId),assignedProjectIds=VALUES(assignedProjectIds),workingHours=VALUES(workingHours),assignedLocation=VALUES(assignedLocation)${passwordUpdate}`,
-          [d.id,d.username,d.password||"",d.name,d.role||"user",d.projectId||null,d.assignedProjectIds||null,d.workingHours||null,d.assignedLocation||null]
+          [d.id,d.username,passwordValue,d.name,d.role||"user",d.projectId||null,d.assignedProjectIds||null,d.workingHours||null,d.assignedLocation||null]
         );
       } else if (col === "projects") {
         await pool.execute(

@@ -348,14 +348,24 @@ export default function App() {
     if (!user) return [];
     if (isAdminRole) return leads;
     if (isManagerRole) return leads.filter(l => managedProjectIds.includes(l.projectId));
-    return leads.filter(l => (l.projectId === user.projectId || l.projectId === 'p1') && (l.assignedTo === user.id || !l.assignedTo));
+    
+    return leads.filter(l => {
+      const isAssignedToMe = String(l.assignedTo) === String(user.id);
+      const isMyProject = l.projectId === user.projectId || l.projectId === 'p1';
+      return isAssignedToMe || (isMyProject && !l.assignedTo);
+    });
   }, [leads, user, isAdminRole, isManagerRole, managedProjectIds]);
 
   const filteredVisits = useMemo(() => {
     if (!user) return [];
     if (isAdminRole) return visits;
     if (isManagerRole) return visits.filter(v => managedProjectIds.includes(v.projectId));
-    return visits.filter(v => (v.projectId === user.projectId || v.projectId === 'p1') && (v.assignedTo === user.id || !v.assignedTo));
+    
+    return visits.filter(v => {
+      const isAssignedToMe = String(v.assigned_to) === String(user.id);
+      const isMyProject = v.projectId === user.projectId || v.projectId === 'p1';
+      return isAssignedToMe || (isMyProject && !v.assigned_to);
+    });
   }, [visits, user, isAdminRole, isManagerRole, managedProjectIds]);
 
   const filteredFollowups = useMemo(() => {

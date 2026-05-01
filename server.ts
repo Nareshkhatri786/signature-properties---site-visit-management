@@ -171,7 +171,8 @@ async function startServer() {
     
     try {
       const u = (req as any).user;
-      const isAdmin = u.role === "admin" || u.role === "ADM";
+      const uRole = u.role?.toLowerCase();
+      const isAdmin = uRole === "admin" || uRole === "adm";
       const projectFilter = isAdmin ? "" : "AND projectId = ?";
       const projectParams = isAdmin ? [] : [u.projectId];
 
@@ -205,7 +206,8 @@ async function startServer() {
     
     try {
       const u = (req as any).user;
-      const isAdmin = u.role === "admin" || u.role === "ADM";
+      const uRole = u.role?.toLowerCase();
+      const isAdmin = uRole === "admin" || uRole === "adm";
       const projectFilter = isAdmin ? "" : "AND projectId = ?";
       const projectParams = isAdmin ? [] : [u.projectId];
 
@@ -220,7 +222,8 @@ async function startServer() {
   app.get("/api/stats", authMiddleware, async (req, res) => {
     try {
       const u = (req as any).user;
-      const isAdmin = u.role === "admin" || u.role === "ADM";
+      const uRole = u.role?.toLowerCase();
+      const isAdmin = uRole === "admin" || uRole === "adm";
       const filter = isAdmin ? "" : "WHERE projectId = ?";
       const params = isAdmin ? [] : [u.projectId];
 
@@ -241,7 +244,8 @@ async function startServer() {
     // ... existing logic but limited to 100 records for performance
     try {
       const u = (req as any).user;
-      const isAdmin = u.role === "admin" || u.role === "ADM";
+      const uRole = u.role?.toLowerCase();
+      const isAdmin = uRole === "admin" || uRole === "adm";
       const projectFilter = isAdmin ? "" : "WHERE projectId = ?";
       const projectParams = isAdmin ? [] : [u.projectId];
 

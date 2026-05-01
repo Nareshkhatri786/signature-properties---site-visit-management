@@ -380,6 +380,22 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
           >
             <ArrowRightLeft size={18} /> Transfer
           </button>
+          
+          {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'adm') && (
+            <button 
+              onClick={() => {
+                if (window.confirm("Are you sure you want to delete this lead and all its history? This cannot be undone.")) {
+                  apiService.delete('leads', lead.id).then(() => {
+                    toast.success('Lead deleted successfully');
+                    onNavigate('leads');
+                  }).catch(() => toast.error('Failed to delete lead'));
+                }
+              }}
+              className="bg-red-500/10 border border-red-500/30 text-red-600 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-red-500 hover:text-white transition-all text-sm"
+            >
+              <XCircle size={18} /> Delete Lead
+            </button>
+          )}
         </div>
       </div>
 

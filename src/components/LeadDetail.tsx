@@ -208,7 +208,31 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
                 <span className="text-green-600 font-bold text-sm">{lead.mobile}</span>
               )}
               <span className="text-[#9A8262] text-xs">• Source: {lead.source}</span>
-              <span className="text-[#9A8262] text-xs">• Assigned: {users.find(u => u.id === lead.assignedTo)?.name || 'Unassigned'}</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[#9A8262] text-xs">• Assigned:</span>
+                {user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'adm' ? (
+                  <select
+                    value={lead.assignedTo || ''}
+                    onChange={(e) => {
+                      const newUserId = e.target.value === '' ? null : Number(e.target.value);
+                      const newUserObj = users.find(u => u.id === newUserId);
+                      onUpdateLead({ ...lead, assignedTo: newUserId as any });
+                      logActivity('lead_updated', `Reassigned to ${newUserObj?.name || 'Unassigned'}`);
+                      toast.success(`Lead assigned to ${newUserObj?.name || 'Unassigned'}`);
+                    }}
+                    className="text-[#C9A84C] font-bold text-[11px] bg-transparent border-none focus:ring-0 cursor-pointer hover:underline"
+                  >
+                    <option value="">Unassigned</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="text-[#C9A84C] font-bold text-xs ml-1">
+                    {users.find(u => u.id === lead.assignedTo)?.name || 'Unassigned'}
+                  </span>
+                )}
+              </div>
             </div>
             {/* Follow-up & Scheduled Visit Highlight */}
             <div className="mt-3 flex flex-wrap items-center gap-3">

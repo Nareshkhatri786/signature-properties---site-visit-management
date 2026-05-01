@@ -103,7 +103,7 @@ export default function Login({ onLogin, users }: LoginProps) {
         </form>
 
         <p className="text-center text-[#C9A84C]/35 text-[11px] mt-8">
-          Default: admin / admin123
+          Powered by Signature CRM
         </p>
       </motion.div>
     </div>

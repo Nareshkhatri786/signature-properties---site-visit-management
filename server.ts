@@ -262,6 +262,8 @@ async function startServer() {
         query("SELECT * FROM workflows"),
       ]);
 
+      console.log(`[Data Debug] User: ${u.username}, Role: ${u.role}, Leads: ${leads.length}, Users: ${users.length}, Projects: ${projects.length}`);
+
       const settingsRow = await queryOne("SELECT * FROM settings WHERE id = 'main'");
       const settings = settingsRow ? parseJsonFields(settingsRow, JSON_FIELDS_SETTINGS) : {};
 

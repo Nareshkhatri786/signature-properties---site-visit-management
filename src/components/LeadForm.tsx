@@ -223,7 +223,10 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
                 className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
               >
                 <option value="">Unassigned</option>
-                {users.filter(u => u.projectId === projectId || u.role === 'admin').map(u => (
+                {users.filter(u => {
+                  const isAdmin = currentUser.role.toLowerCase() === 'admin' || currentUser.role.toLowerCase() === 'adm';
+                  return isAdmin || u.projectId === projectId;
+                }).map(u => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>

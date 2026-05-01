@@ -313,11 +313,49 @@ export const AttendanceSettings: React.FC<AttendanceSettingsProps> = ({ users, p
                     />
                   </div>
                 </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        toast.loading("Detecting your location...");
+                        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+                          navigator.geolocation.getCurrentPosition(resolve, reject);
+                        });
+                        setEditForm({
+                          ...editForm,
+                          assignedLocation: {
+                            ...editForm.assignedLocation!,
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                            address: editForm.assignedLocation?.address || 'Current Location'
+                          }
+                        });
+                        toast.dismiss();
+                        toast.success("Location captured!");
+                      } catch (err) {
+                        toast.dismiss();
+                        toast.error("Could not detect location. Please allow GPS access.");
+                      }
+                    }}
+                    className="flex-1 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-amber-500 hover:text-black transition-all"
+                  >
+                    <MapPin size={12} className="inline mr-2" />
+                    Pin My Current Location
+                  </button>
+                  <div className="flex-1 space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-amber-200/40 font-mono">Radius (meters)</label>
+                    <input
+                      type="number"
+                      value={editForm.assignedLocation?.radius}
+                      onChange={e => setEditForm({ ...editForm, assignedLocation: { ...editForm.assignedLocation!, radius: parseInt(e.target.value) } })}
+                      className="w-full bg-[#1C1207] border border-[#3D2B1A] rounded-lg p-2.5 text-white font-mono focus:ring-1 focus:ring-amber-500 outline-none"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest text-amber-200/40 font-mono flex items-center justify-between">
-                    <span>Allowed Radius (Meters)</span>
-                    <span className="text-amber-500">{editForm.assignedLocation?.radius || 100}m</span>
-                  </label>
                   <input
                     type="range"
                     min="50"

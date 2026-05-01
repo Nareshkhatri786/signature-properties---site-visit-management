@@ -216,8 +216,11 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
                     onChange={(e) => {
                       const newUserId = e.target.value === '' ? null : Number(e.target.value);
                       const newUserObj = users.find(u => u.id === newUserId);
-                      onUpdateLead({ ...lead, assignedTo: newUserId as any });
-                      logActivity('lead_updated', `Reassigned to ${newUserObj?.name || 'Unassigned'}`);
+                      onUpdateLead({ 
+                        ...lead, 
+                        assignedTo: newUserId as any,
+                        assignedToName: newUserObj?.name || 'Unassigned' 
+                      });
                       toast.success(`Lead assigned to ${newUserObj?.name || 'Unassigned'}`);
                     }}
                     className="text-[#C9A84C] font-bold text-[11px] bg-transparent border-none focus:ring-0 cursor-pointer hover:underline"
@@ -550,11 +553,23 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
                 <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Assign To</label>
                 <select 
                   value={lead.assignedTo || ''}
-                  onChange={(e) => onUpdateLead({ ...lead, assignedTo: e.target.value ? Number(e.target.value) : undefined, updated_at: new Date().toISOString() })}
+                  onChange={(e) => {
+                    const newUserId = e.target.value ? Number(e.target.value) : undefined;
+                    const newUserObj = users.find(u => u.id === newUserId);
+                    onUpdateLead({ 
+                      ...lead, 
+                      assignedTo: newUserId as any,
+                      assignedToName: newUserObj?.name || 'Unassigned',
+                      updated_at: new Date().toISOString() 
+                    });
+                  }}
                   className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
                 >
                   <option value="">Unassigned</option>
-                  {users.filter(u => u.projectId === lead.projectId || u.role === 'admin').map(u => (
+                  {users.filter(u => {
+                    const isAdmin = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'adm';
+                    return isAdmin || u.projectId === lead.projectId;
+                  }).map(u => (
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>

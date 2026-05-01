@@ -15,7 +15,6 @@ const PUBLIC_VAPID_KEY = process.env.PUBLIC_VAPID_KEY || "BLraqx6JI2_b6uK3Q83waV
 const PRIVATE_VAPID_KEY = process.env.PRIVATE_VAPID_KEY || "6d9cRb3i51P9Qw0niJSkTQ5_mGuK-Dqz2Wcj-itMUPQ";
 webPush.setVapidDetails("mailto:admin@diyacrm.com", PUBLIC_VAPID_KEY, PRIVATE_VAPID_KEY);
 
-const JWT_SECRET = process.env.JWT_SECRET || "diyacrm_secret_change_in_prod";
 const JSON_FIELDS_LEADS = ["stats"];
 const JSON_FIELDS_VISITS = ["reminders_sent", "reschedule_log"];
 const JSON_FIELDS_USERS = ["workingHours", "assignedLocation", "assignedProjectIds"];
@@ -24,6 +23,17 @@ const JSON_FIELDS_SETTINGS = ["sources", "budgets", "propertyInterests"];
 const JSON_FIELDS_ATTENDANCE = ["checkIn", "checkOut"];
 const JSON_FIELDS_NOTIF = ["metadata"];
 const JSON_FIELDS_WORKFLOWS = ["conditions", "actions"];
+const JWT_SECRET = process.env.JWT_SECRET || "diyacrm_secret_change_in_prod";
+
+// Helper to format ISO dates for MySQL
+function formatMySQLDate(isoString: string | null) {
+  if (!isoString) return null;
+  try {
+    return new Date(isoString).toISOString().slice(0, 19).replace('T', ' ');
+  } catch {
+    return null;
+  }
+}
 
 function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const header = req.headers.authorization;
@@ -235,6 +245,8 @@ async function startServer() {
       const projectFilter = isAdmin ? "" : "WHERE projectId = ?";
       const projectParams = isAdmin ? [] : [u.projectId];
 
+      console.log(`[Data Debug] User: ${u.username}, Role: ${u.role}, isAdmin: ${isAdmin}`);
+
       const [users, projects, leads, visits, followups, activities, call_logs, templates, webhook_configs, notifications, attendance, workflows] = await Promise.all([
         query("SELECT * FROM users"),
         query("SELECT * FROM projects"),
@@ -280,7 +292,7 @@ async function startServer() {
           `INSERT INTO leads (id,name,mobile,email,source,quality,status,budget,property_interest,priority,projectId,assignedTo,stats,created_at,updated_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE name=VALUES(name),mobile=VALUES(mobile),email=VALUES(email),source=VALUES(source),quality=VALUES(quality),status=VALUES(status),budget=VALUES(budget),property_interest=VALUES(property_interest),priority=VALUES(priority),assignedTo=VALUES(assignedTo),stats=VALUES(stats),updated_at=NOW()`,
-          [d.id,d.name,d.mobile||null,d.email||null,d.source||null,d.quality||"pending",d.status||"new",d.budget||null,d.property_interest||null,d.priority||0,d.projectId||null,d.assignedTo||null,d.stats||null,d.created_at||new Date().toISOString(),new Date().toISOString()]
+          [d.id,d.name,d.mobile||null,d.email||null,d.source||null,d.quality||"pending",d.status||"new",d.budget||null,d.property_interest||null,d.priority||0,d.projectId||null,d.assignedTo||null,d.stats||null,formatMySQLDate(d.created_at),new Date().toISOString().slice(0, 19).replace('T', ' ')]
         );
 
         // AUTO FOLLOW-UP LOGIC: Only create a welcome call if NO follow-ups exist for this lead

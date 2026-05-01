@@ -29,7 +29,8 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, onClose, currentPage, onNavigate, onLogout, user }: SidebarProps) {
-  const isAdmin = user?.role?.toLowerCase() === 'admin';
+  const userRole = user?.role?.toLowerCase();
+  const isAdmin = userRole === 'admin' || userRole === 'adm';
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Main' },
     { id: 'leads', label: 'Leads', icon: Users, section: 'Main' },

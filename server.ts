@@ -171,6 +171,8 @@ async function startServer() {
         query(`SELECT * FROM followups WHERE created_at > ? ${projectFilter}`, [sinceTime, ...projectParams]),
         query(`SELECT * FROM notifications WHERE createdAt > ? AND (userId = ? OR isAdmin = 1)`, [sinceTime, u.id])
       ]);
+      
+      console.log(`[Sync Debug] User: ${u.username}, Role: ${u.role}, isAdmin: ${isAdmin}, Leads Found: ${leads.length}`);
 
       res.json({
         leads: leads.map((r: any) => parseJsonFields(r, JSON_FIELDS_LEADS)),

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Activity, ActivityType, Remark, CallLog, FollowUp } from '../types';
 import { cn } from '../lib/utils';
-import { format, isToday, isYesterday, startOfDay, subDays } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
 
 interface TimelineItem {
   id: string;
@@ -32,7 +32,7 @@ interface TimelineItem {
   icon: any;
   color: string;
   meta?: any;
-  count?: number; // For merged items
+  count?: number; 
   lastTimestamp?: string;
   subItems?: TimelineItem[];
 }
@@ -52,19 +52,24 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
   const processedItems = useMemo(() => {
     // 1. Combine all sources with cleaned types and titles
     const rawItems: TimelineItem[] = [
-      ...activities.map(a => ({
-        id: a.id,
-        type: 'activity',
-        originalType: a.type,
-        title: getTimelineTitle(a.type),
-        description: a.details || '',
-        timestamp: a.timestamp,
-        by: a.userName,
-        icon: getActivityIcon(a.type),
-        color: getActivityColor(a.type)
-      })),
+      ...activities
+        .filter(a => !a.userName.includes('System Migration') && !a.userName.includes('Repair'))
+        .map(a => ({
+          id: a.id,
+          type: 'activity',
+          originalType: a.type,
+          title: getTimelineTitle(a.type),
+          description: a.details || '',
+          timestamp: a.timestamp,
+          by: a.userName,
+          icon: getActivityIcon(a.type),
+          color: getActivityColor(a.type),
+          meta: { 
+             role: a.userName.toLowerCase().includes('admin') ? 'ADM' : 'SAL'
+          }
+        })),
       ...remarks
-        .filter(r => r.type !== 'visit_note')
+        .filter(r => r.type !== 'visit_note' && !r.text.includes('[System]'))
         .map(r => ({
           id: r.id,
           type: 'remark',
@@ -75,96 +80,84 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
           by: r.by,
           icon: MessageSquare,
           color: 'gold',
-          meta: { category: r.category, sentiment: r.sentiment }
+          meta: { category: r.category, sentiment: r.sentiment, role: r.by.toLowerCase().includes('admin') ? 'ADM' : 'SAL' }
         })),
       ...callLogs.map(c => ({
         id: c.id,
         type: 'call',
         originalType: 'call_activity',
-        title: 'Call Attempted',
+        title: 'Call Session',
         description: `Outcome: ${c.outcome.replace('_', ' ')}${c.note ? ` | Note: ${c.note}` : ''}`,
         timestamp: c.timestamp,
         by: c.by,
         icon: PhoneCall,
-        color: c.outcome === 'answered' ? 'green' : 'orange'
-      })),
-      ...followUps
-        .filter(f => f.status === 'completed' || f.status === 'cancelled')
-        .map(f => ({
-          id: f.id,
-          type: 'followup',
-          originalType: f.status === 'completed' ? 'followup_done' : 'followup_cancelled',
-          title: 'Follow-up',
-          description: `Scheduled: ${format(new Date(f.date), 'dd MMM, hh:mm a')} | Status: ${f.status.toUpperCase()}${f.purpose ? ` | Purpose: ${f.purpose}` : ''}${f.outcome_note ? ` | Note: ${f.outcome_note}` : ''}`,
-          timestamp: f.completed_at || f.created_at,
-          by: f.userName || 'System',
-          icon: Calendar,
-          color: f.status === 'completed' ? 'green' : 'gray'
-        }))
-    ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        color: c.outcome === 'answered' ? 'green' : 'orange',
+        meta: { role: c.by.toLowerCase().includes('admin') ? 'ADM' : 'SAL' }
+      }))
+    ];
 
-    // 2. Filter and Deduplicate
+    // 2. Filter & Sort (Prioritize Lead Created and Silence follow-up logs per user request)
     const importantTypes = [
       'lead_created', 'lead_status_changed', 'lead_quality_changed',
       'call_attempted', 'call_answered', 'call_activity',
       'visit_scheduled', 'visit_done', 'visit_cancelled',
-      'remark_added', 'followup_scheduled', 'followup_done', 'followup_cancelled', 'whatsapp_sent'
+      'remark_added', 'whatsapp_sent', 'followup_done', 'followup_rescheduled'
     ];
 
-    let filtered = rawItems.filter(item => importantTypes.includes(item.originalType));
+    let filtered = rawItems
+      .filter(item => importantTypes.includes(item.originalType))
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    // 3. Advanced Merge Logic
+    // 3. Process and Merge into Groups
     const merged: TimelineItem[] = [];
     const seenContent = new Set(); 
 
     filtered.forEach(item => {
-      // Deduplicate exact content within the same hour to avoid double-logging
-      const contentKey = `${item.description.trim().toLowerCase().substring(0, 50)}-${item.timestamp.substring(0, 13)}`;
+      const description = item.description || '';
+      const contentKey = `${description.trim().toLowerCase().substring(0, 50)}-${item.timestamp.substring(0, 13)}`;
       if (seenContent.has(contentKey)) return;
       seenContent.add(contentKey);
 
-      // Hide remarks that are just status changes already logged as activities
-      if (item.type === 'remark') {
-        const isStatusChange = /status changed|quality changed/i.test(item.description);
-        if (isStatusChange) return;
-      }
+      if (item.type === 'remark' && /status changed|quality changed/i.test(item.description)) return;
 
       const last = merged[merged.length - 1];
       if (last) {
-        const timeDiffMinutes = (new Date(last.timestamp).getTime() - new Date(item.timestamp).getTime()) / (1000 * 60);
+        const timeDiffMinutes = Math.abs(new Date(last.timestamp).getTime() - new Date(item.timestamp).getTime()) / (1000 * 60);
         const isSameUser = last.by === item.by;
-        const isCloseTime = timeDiffMinutes >= 0 && timeDiffMinutes <= 15; 
+        const isCloseTime = timeDiffMinutes <= 60;
 
-        if (isSameUser && isCloseTime) {
-          // If descriptions are very similar, just keep one
-          const isSimilar = last.description.includes(item.description) || item.description.includes(last.description);
-          if (isSimilar && last.type === item.type) return;
+        // Group actions within an hour session (but NEVER group lead_created)
+        const isSessionRelated = last.originalType !== 'lead_created' && 
+                                 ((last.type === 'call' && item.originalType === 'call_activity') ||
+                                 (last.type === 'activity' && item.type === 'remark'));
 
+        if (isSameUser && (isCloseTime || isSessionRelated)) {
           if (!last.subItems) {
             last.subItems = [{ ...last, subItems: undefined }];
+            last.lastTimestamp = last.timestamp;
           }
-          last.subItems.push({ ...item });
+          
+          const alreadyHasSub = last.subItems.some(s => s.originalType === item.originalType && s.description === item.description);
+          if (!alreadyHasSub) {
+            last.subItems.push({ ...item });
+          }
 
           const hierarchy: Record<string, number> = {
-            'lead_created': 1000,
-            'visit_done': 90,
-            'visit_scheduled': 85,
-            'followup_done': 70,
-            'followup_scheduled': 65,
-            'call_answered': 50,
-            'call_attempted': 40,
-            'remark_added': 10
+            'lead_created': 200,
+            'visit_done': 100,
+            'visit_scheduled': 95,
+            'followup_done': 90,
+            'followup_rescheduled': 85,
+            'call_activity': 80,
+            'remark_added': 50
           };
-          const lastScore = hierarchy[last.originalType] || 0;
-          const itemScore = hierarchy[item.originalType] || 0;
           
-          if (itemScore > lastScore) {
-            last.title = item.title;
-            last.originalType = item.originalType;
+          if ((hierarchy[item.originalType] || 0) > (hierarchy[last.originalType] || 0)) {
+            last.title = item.title === 'Call Session' ? 'Customer Interaction Session' : item.title;
             last.icon = item.icon;
             last.color = item.color;
           }
-          return; 
+          return;
         }
       }
 
@@ -194,7 +187,7 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
     };
 
     filteredItems.forEach((item, index) => {
-      if (index >= limit) return; // Apply global limit
+      if (index >= limit) return; 
 
       const date = new Date(item.timestamp);
       if (isToday(date)) groups['Today'].push(item);
@@ -209,7 +202,6 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
 
   return (
     <div className="space-y-6">
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 pb-4 border-b border-[#E6D8B8]/30">
         <div className="flex items-center gap-2 px-3 py-1.5 bg-[#F5F1E6] rounded-lg text-[#9A8262] text-[10px] font-bold uppercase tracking-wider">
           <FilterIcon size={12} /> Filter
@@ -251,7 +243,6 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                 <div className="space-y-6">
                   {groupedItems[group].map((item) => (
                     <div key={item.id} className="relative pl-12 group/item">
-                      {/* Timeline Dot & Icon */}
                       <div className={cn(
                         "absolute left-0 top-1 w-10 h-10 rounded-xl border-4 border-[#F2ECD8] flex items-center justify-center transition-all shadow-sm z-10 group-hover/item:scale-110",
                         getColorClass(item.color)
@@ -259,7 +250,6 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                         <item.icon size={16} />
                       </div>
 
-                      {/* Content Card */}
                       <div className="bg-white border border-[#E6D8B8] rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between gap-4 mb-3">
                           <div className="space-y-1">
@@ -277,12 +267,15 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                             <div className="flex items-center gap-3">
                               <time className="text-[10px] font-bold text-[#9A8262] flex items-center gap-1">
                                 <Clock size={10} />
-                                {format(new Date(item.timestamp), 'hh:mm a')}
-                                {item.lastTimestamp && ` (Last at ${format(new Date(item.lastTimestamp), 'hh:mm a')})`}
+                                {new Date(item.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}
+                                {item.lastTimestamp && ` (Last at ${new Date(item.lastTimestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })})`}
                               </time>
-                              <div className="flex items-center gap-1 text-[10px] font-bold text-[#9A8262]">
+                              <div className="flex items-center gap-2 text-[10px] font-bold text-[#9A8262]">
                                 <UserIcon size={10} />
                                 {item.by}
+                                {item.meta?.role && (
+                                  <span className="text-[8px] bg-[#C9A84C]/20 text-[#5C4820] px-1 rounded border border-[#C9A84C]/30 leading-none py-0.5">{item.meta.role}</span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -301,7 +294,12 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                                     <sub.icon size={14} />
                                   </div>
                                   <div className="flex-1">
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#9A8262] mb-0.5">{sub.title}</p>
+                                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#9A8262]">{sub.title}</p>
+                                      <span className="text-[9px] font-bold text-[#9A8262] opacity-50">
+                                        {new Date(sub.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}
+                                      </span>
+                                    </div>
                                     <p className="text-[#2A1C00] text-sm font-medium leading-relaxed">{sub.description}</p>
                                   </div>
                                 </div>
@@ -314,7 +312,7 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                                   <ArrowRightLeft size={14} className="text-[#C9A84C]" />
                                   <p className="text-sm">
                                     <span className="font-black text-[#2A1C00]">
-                                      New → {item.description.replace(/Changed (status|quality) to /i, '')}
+                                      New → {(item.description || '').replace(/Changed (status|quality) to /i, '')}
                                     </span>
                                   </p>
                                 </div>
@@ -323,18 +321,9 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                                   <Tag size={14} className="text-[#C9A84C]" />
                                   <p className="text-sm">
                                     <span className="font-black text-[#2A1C00]">
-                                      Quality → {item.description.replace(/Changed (status|quality) to /i, '')}
+                                      Quality → {(item.description || '').replace(/Changed (status|quality) to /i, '')}
                                     </span>
                                   </p>
-                                </div>
-                              ) : item.type === 'followup' ? (
-                                <div className="space-y-2">
-                                    <p className="text-[#2A1C00] text-sm font-bold">{item.description.split(' | ')[0]}</p>
-                                    {item.description.includes('| Outcome:') && (
-                                        <p className="text-xs text-green-600 font-medium italic border-t border-green-100 pt-1 mt-1">
-                                            Outcome: {item.description.split('| Outcome:')[1]}
-                                        </p>
-                                    )}
                                 </div>
                               ) : (
                                 <p className="text-[#2A1C00] text-sm font-medium leading-relaxed">
@@ -397,9 +386,8 @@ function getTimelineTitle(type: string): string {
     'visit_no_show': 'Visit No Show',
     'whatsapp_sent': 'WhatsApp Sent',
     'remark_added': 'Note Added',
-    'followup_scheduled': 'Follow-up',
-    'followup_done': 'Follow-up',
-    'followup_cancelled': 'Follow-up'
+    'followup_done': 'Follow-up Completed',
+    'followup_rescheduled': 'Follow-up Rescheduled'
   };
   return titles[type] || type.replace(/_/g, ' ');
 }
@@ -419,9 +407,8 @@ function getActivityIcon(type: string): any {
     case 'call_answered': return PhoneCall;
     case 'call_attempted': return PhoneCall;
     case 'remark_added': return MessageSquare;
-    case 'followup_scheduled': return Calendar;
     case 'followup_done': return CheckCircle2;
-    case 'followup_cancelled': return XCircle;
+    case 'followup_rescheduled': return Clock;
     default: return Zap;
   }
 }
@@ -438,8 +425,6 @@ function getActivityColor(type: string): string {
     case 'call_answered': return 'green';
     case 'call_attempted': return 'orange';
     case 'remark_added': return 'gold';
-    case 'followup_done': return 'green';
-    case 'followup_cancelled': return 'red';
     default: return 'gold';
   }
 }

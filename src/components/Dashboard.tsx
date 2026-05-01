@@ -50,10 +50,15 @@ interface DashboardProps {
   leads: Lead[];
   followUps: FollowUp[];
   user: User;
+  stats?: {
+    statusStats: { status: string, count: number }[];
+    qualityStats: { quality: string, count: number }[];
+    todayCount: number;
+  };
   onNavigate: (page: Page, id?: string, filters?: VisitFilters) => void;
 }
 
-export default React.memo(function Dashboard({ visits, leads, followUps, user, onNavigate }: DashboardProps) {
+export default React.memo(function Dashboard({ visits, leads, followUps, user, stats, onNavigate }: DashboardProps) {
   const [dateRange, setDateRange] = useState<DateRange>({
     type: 'today',
     start: startOfToday(),
@@ -216,6 +221,53 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, o
               <Plus className="text-blue-400" size={20} />
             </div>
           )}
+        </div>
+      )}
+
+      {stats && (
+        <div className="bg-[#2A1D0E] border border-[#3D2B1A] rounded-2xl p-6 shadow-xl overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+            <LayoutDashboard size={80} />
+          </div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-serif text-amber-500">Quick Pulse</h3>
+                <p className="text-amber-200/40 text-[10px] uppercase tracking-widest font-mono">Live Database Summary</p>
+              </div>
+              <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full">
+                <span className="text-xs font-bold text-amber-500">Today: +{stats.todayCount} Leads</span>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap gap-6">
+              <div className="space-y-3 min-w-[140px]">
+                <p className="text-[9px] text-amber-200/20 font-bold uppercase">By Status</p>
+                <div className="flex flex-wrap gap-2">
+                  {stats.statusStats?.map(s => (
+                    <div key={s.status} className="px-2 py-1 bg-white/5 rounded border border-white/10 flex items-center gap-2">
+                      <span className="text-[10px] text-amber-200/60 capitalize">{s.status?.replace('_', ' ') || 'Unknown'}</span>
+                      <span className="text-[10px] font-bold text-white">{s.count}</span>
+                    </div>
+                  ))}
+                  {(!stats.statusStats || stats.statusStats.length === 0) && <span className="text-[10px] text-white/30 italic">No status data</span>}
+                </div>
+              </div>
+
+              <div className="space-y-3 min-w-[140px]">
+                <p className="text-[9px] text-amber-200/20 font-bold uppercase">By Quality</p>
+                <div className="flex flex-wrap gap-2">
+                  {stats.qualityStats?.map(q => (
+                    <div key={q.quality} className="px-2 py-1 bg-white/5 rounded border border-white/10 flex items-center gap-2">
+                      <span className="text-[10px] text-amber-200/60 capitalize">{q.quality || 'Unknown'}</span>
+                      <span className="text-[10px] font-bold text-white">{q.count}</span>
+                    </div>
+                  ))}
+                  {(!stats.qualityStats || stats.qualityStats.length === 0) && <span className="text-[10px] text-white/30 italic">No quality data</span>}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

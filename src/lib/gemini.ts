@@ -1,7 +1,16 @@
 import { GoogleGenAI } from "@google/genai";
 import { Lead, Visit, FollowUp } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const API_KEY = (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : (import.meta as any).env?.VITE_GEMINI_API_KEY) || "";
+
+let ai: any = null;
+try {
+  if (API_KEY) {
+    ai = new GoogleGenAI(API_KEY);
+  }
+} catch (e) {
+  console.warn("Failed to initialize GoogleGenAI:", e);
+}
 
 export interface SalesInsight {
   focusLeads: { id: string; reason: string }[];
@@ -41,9 +50,9 @@ export async function getDailySalesInsights(
   };
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `You are a high-performance Real Estate Sales Coach. 
+    if (!ai) throw new Error("AI not initialized (Missing API Key)");
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const response = await model.generateContent(`You are a high-performance Real Estate Sales Coach. 
       Analyze the current sales data for ${userName} and provide a concise, motivating daily advisor report in JSON format.
       
       Data Context:
@@ -53,13 +62,9 @@ export async function getDailySalesInsights(
       - focusLeads: List of 3 specific leads (name and one-sentence reason why they need attention today).
       - actionItems: 3-4 bullet points of high-impact actions.
       - summary: A 2-sentence motivating summary of the day's potential.
-      - Return ONLY a JSON object matching the SalesInsight interface.`,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
+      - Return ONLY a JSON object matching the SalesInsight interface.`);
 
-    const result = JSON.parse(response.text || "{}");
+    const result = JSON.parse(response.response.text() || "{}");
     return {
       focusLeads: result.focusLeads || [],
       actionItems: result.actionItems || [],

@@ -138,8 +138,95 @@ async function startServer() {
     }
   });
 
-  // -- MAIN DATA FETCH ------------------------------------
+  // -- INITIALIZATION (Static Data) -----------------------
+  app.get("/api/init", authMiddleware, async (req, res) => {
+    try {
+      const [projects, templates, settingsRow, workflows] = await Promise.all([
+        query("SELECT * FROM projects"),
+        query("SELECT * FROM templates"),
+        queryOne("SELECT * FROM settings WHERE id = 'main'"),
+        query("SELECT * FROM workflows")
+      ]);
+      const settings = settingsRow ? parseJsonFields(settingsRow, JSON_FIELDS_SETTINGS) : {};
+      res.json({ projects, templates, settings, workflows: workflows.map((r: any) => parseJsonFields(r, JSON_FIELDS_WORKFLOWS)) });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // -- DELTA SYNC (Fetch only changed data) ---------------
+  app.get("/api/sync", authMiddleware, async (req, res) => {
+    const { since } = req.query;
+    const sinceTime = since ? new Date(since as string).toISOString().slice(0, 19).replace('T', ' ') : '1970-01-01 00:00:00';
+    
+    try {
+      const u = (req as any).user;
+      const isAdmin = u.role === "admin";
+      const projectFilter = isAdmin ? "" : "AND projectId = ?";
+      const projectParams = isAdmin ? [] : [u.projectId];
+
+      const [leads, visits, followups, notifications] = await Promise.all([
+        query(`SELECT * FROM leads WHERE updated_at > ? ${projectFilter}`, [sinceTime, ...projectParams]),
+        query(`SELECT * FROM visits WHERE created_at > ? ${projectFilter}`, [sinceTime, ...projectParams]),
+        query(`SELECT * FROM followups WHERE created_at > ? ${projectFilter}`, [sinceTime, ...projectParams]),
+        query(`SELECT * FROM notifications WHERE createdAt > ? AND (userId = ? OR isAdmin = 1)`, [sinceTime, u.id])
+      ]);
+
+      res.json({
+        leads: leads.map((r: any) => parseJsonFields(r, JSON_FIELDS_LEADS)),
+        visits: visits.map((r: any) => parseJsonFields(r, JSON_FIELDS_VISITS)),
+        followups,
+        notifications,
+        serverTime: new Date().toISOString()
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // -- MODULE SPECIFIC ENDPOINTS ---------------------------
+  app.get("/api/leads", authMiddleware, async (req, res) => {
+    const { page = 1, limit = 50, search = "" } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+    const searchFilter = search ? `AND (name LIKE ? OR mobile LIKE ?)` : "";
+    const searchParams = search ? [`%${search}%`, `%${search}%`] : [];
+    
+    try {
+      const u = (req as any).user;
+      const isAdmin = u.role === "admin";
+      const projectFilter = isAdmin ? "" : "AND projectId = ?";
+      const projectParams = isAdmin ? [] : [u.projectId];
+
+      const rows = await query(`SELECT * FROM leads WHERE 1=1 ${projectFilter} ${searchFilter} ORDER BY updated_at DESC LIMIT ? OFFSET ?`, 
+        [...projectParams, ...searchParams, Number(limit), offset]);
+      res.json(rows.map((r: any) => parseJsonFields(r, JSON_FIELDS_LEADS)));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/stats", authMiddleware, async (req, res) => {
+    try {
+      const u = (req as any).user;
+      const isAdmin = u.role === "admin";
+      const filter = isAdmin ? "" : "WHERE projectId = ?";
+      const params = isAdmin ? [] : [u.projectId];
+
+      const [statusStats, qualityStats, todayLeads] = await Promise.all([
+        query(`SELECT status, COUNT(*) as count FROM leads ${filter} GROUP BY status`, params),
+        query(`SELECT quality, COUNT(*) as count FROM leads ${filter} GROUP BY quality`, params),
+        queryOne(`SELECT COUNT(*) as count FROM leads ${isAdmin ? 'WHERE' : 'AND'} created_at >= CURDATE() ${filter}`, params)
+      ]);
+
+      res.json({ statusStats, qualityStats, todayCount: (todayLeads as any)?.count || 0 });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // -- LEGACY (to be phased out) --------------------------
   app.get("/api/data", authMiddleware, async (req, res) => {
+    // ... existing logic but limited to 100 records for performance
     try {
       const u = (req as any).user;
       const isAdmin = u.role === "admin";
@@ -149,40 +236,29 @@ async function startServer() {
       const [users, projects, leads, visits, followups, activities, call_logs, templates, webhook_configs, notifications, attendance, workflows] = await Promise.all([
         query("SELECT * FROM users"),
         query("SELECT * FROM projects"),
-        query(`SELECT * FROM leads ${projectFilter} ORDER BY updated_at DESC`, projectParams),
-        query(`SELECT * FROM visits ${projectFilter} ORDER BY visit_date DESC`, projectParams),
-        query(`SELECT * FROM followups ${projectFilter} ORDER BY date DESC`, projectParams),
-        query(`SELECT * FROM activities ${projectFilter} ORDER BY timestamp DESC LIMIT 500`, projectParams),
-        query(`SELECT * FROM call_logs ${projectFilter} ORDER BY timestamp DESC LIMIT 500`, projectParams),
+        query(`SELECT * FROM leads ${projectFilter} ORDER BY updated_at DESC LIMIT 100`, projectParams),
+        query(`SELECT * FROM visits ${projectFilter} ORDER BY visit_date DESC LIMIT 100`, projectParams),
+        query(`SELECT * FROM followups ${projectFilter} ORDER BY date DESC LIMIT 100`, projectParams),
+        query(`SELECT * FROM activities ${projectFilter} ORDER BY timestamp DESC LIMIT 100`, projectParams),
+        query(`SELECT * FROM call_logs ${projectFilter} ORDER BY timestamp DESC LIMIT 100`, projectParams),
         query("SELECT * FROM templates"),
         query("SELECT * FROM webhook_configs"),
-        query("SELECT * FROM notifications WHERE (userId = ? OR isAdmin = 1) ORDER BY createdAt DESC LIMIT 100", [u.id]),
-        query(isAdmin ? "SELECT * FROM attendance ORDER BY date DESC LIMIT 500" : "SELECT * FROM attendance WHERE userId = ? ORDER BY date DESC LIMIT 60", isAdmin ? [] : [u.id]),
+        query("SELECT * FROM notifications WHERE (userId = ? OR isAdmin = 1) ORDER BY createdAt DESC LIMIT 50", [u.id]),
+        query(isAdmin ? "SELECT * FROM attendance ORDER BY date DESC LIMIT 100" : "SELECT * FROM attendance WHERE userId = ? ORDER BY date DESC LIMIT 50", isAdmin ? [] : [u.id]),
         query("SELECT * FROM workflows"),
       ]);
 
       const settingsRow = await queryOne("SELECT * FROM settings WHERE id = 'main'");
       const settings = settingsRow ? parseJsonFields(settingsRow, JSON_FIELDS_SETTINGS) : {};
 
-      const data = {
+      res.json({
         users: users.map((r: any) => parseJsonFields(r, JSON_FIELDS_USERS)),
         projects,
         leads: leads.map((r: any) => parseJsonFields(r, JSON_FIELDS_LEADS)),
         visits: visits.map((r: any) => parseJsonFields(r, JSON_FIELDS_VISITS)),
-        followups,
-        activities,
-        call_logs,
-        templates,
-        attendance: attendance.map((r: any) => parseJsonFields(r, ['checkIn', 'checkOut', 'location'])),
-        notifications,
-        webhook_configs,
-        settings,
-        workflows: workflows.map((r: any) => parseJsonFields(r, ['conditions', 'actions']))
-      };
-
-      res.json(data);
+        followups, activities, call_logs, templates, attendance, notifications, webhook_configs, settings, workflows
+      });
     } catch (e: any) {
-      console.error("GET /api/data error:", e);
       res.status(500).json({ error: e.message });
     }
   });
@@ -193,12 +269,32 @@ async function startServer() {
     try {
       if (col === "leads") {
         const d = stringifyJsonFields(data, JSON_FIELDS_LEADS);
+        
+        // Check if this is a new lead BEFORE saving
+        const leadExists = await queryOne("SELECT id FROM leads WHERE id = ?", [d.id]);
+        const isNewLead = !leadExists;
+
         await pool.execute(
           `INSERT INTO leads (id,name,mobile,email,source,quality,status,budget,property_interest,priority,projectId,assignedTo,stats,created_at,updated_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE name=VALUES(name),mobile=VALUES(mobile),email=VALUES(email),source=VALUES(source),quality=VALUES(quality),status=VALUES(status),budget=VALUES(budget),property_interest=VALUES(property_interest),priority=VALUES(priority),assignedTo=VALUES(assignedTo),stats=VALUES(stats),updated_at=NOW()`,
           [d.id,d.name,d.mobile||null,d.email||null,d.source||null,d.quality||"pending",d.status||"new",d.budget||null,d.property_interest||null,d.priority||0,d.projectId||null,d.assignedTo||null,d.stats||null,d.created_at||new Date().toISOString(),new Date().toISOString()]
         );
+
+        // AUTO FOLLOW-UP LOGIC: Only create a welcome call if NO follow-ups exist for this lead
+        if (d.status === "new") {
+          const existingFupCount = await queryOne("SELECT COUNT(*) as count FROM followups WHERE leadId = ?", [d.id]);
+          if (!existingFupCount || existingFupCount.count === 0) {
+            const tenMinsLater = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+            const dateOnly = tenMinsLater.split('T')[0];
+            
+            await pool.execute(
+              `INSERT IGNORE INTO followups (id, leadId, projectId, date, scheduled_at, purpose, method, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'call', 'pending', NOW())`,
+              [`fup_auto_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`, d.id, d.projectId, dateOnly, tenMinsLater, "Auto-generated welcome call"]
+            );
+          }
+        }
       } else if (col === "visits") {
         const d = stringifyJsonFields(data, JSON_FIELDS_VISITS);
         await pool.execute(
@@ -219,10 +315,11 @@ async function startServer() {
         if (data.password && !data.password.startsWith("$2")) {
           data.password = await bcrypt.hash(data.password, 10);
         }
+        const passwordUpdate = (data.password && data.password.trim() !== "") ? ",password=VALUES(password)" : "";
         await pool.execute(
           `INSERT INTO users (id,username,password,name,role,projectId,assignedProjectIds,workingHours,assignedLocation)
            VALUES (?,?,?,?,?,?,?,?,?)
-           ON DUPLICATE KEY UPDATE username=VALUES(username),name=VALUES(name),role=VALUES(role),projectId=VALUES(projectId),assignedProjectIds=VALUES(assignedProjectIds),workingHours=VALUES(workingHours),assignedLocation=VALUES(assignedLocation)`,
+           ON DUPLICATE KEY UPDATE username=VALUES(username),name=VALUES(name),role=VALUES(role),projectId=VALUES(projectId),assignedProjectIds=VALUES(assignedProjectIds),workingHours=VALUES(workingHours),assignedLocation=VALUES(assignedLocation)${passwordUpdate}`,
           [d.id,d.username,d.password||"",d.name,d.role||"user",d.projectId||null,d.assignedProjectIds||null,d.workingHours||null,d.assignedLocation||null]
         );
       } else if (col === "projects") {
@@ -310,10 +407,27 @@ async function startServer() {
     }
   });
 
-  // -- REMARKS --------------------------------------------
   app.get("/api/remarks/:targetId", authMiddleware, async (req, res) => {
     try {
       const rows = await query("SELECT * FROM remarks WHERE targetId = ? ORDER BY at ASC", [req.params.targetId]);
+      res.json(rows);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/activities/:targetId", authMiddleware, async (req, res) => {
+    try {
+      const rows = await query("SELECT * FROM activities WHERE targetId = ? ORDER BY timestamp DESC", [req.params.targetId]);
+      res.json(rows);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/whatsapp/:targetId", authMiddleware, async (req, res) => {
+    try {
+      const rows = await query("SELECT * FROM whatsapp_messages WHERE leadId = ? ORDER BY timestamp DESC", [req.params.targetId]);
       res.json(rows);
     } catch (e: any) {
       res.status(500).json({ error: e.message });

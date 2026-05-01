@@ -1,49 +1,54 @@
-// REST API Service — replaces firebase-service.ts
-// All data goes through /api/* endpoints with JWT auth
+import { storage } from './storage';
 
-const getToken = () => localStorage.getItem("crm_token") || "";
-const headers = () => ({ "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` });
+async function apiFetch(url: string, options: RequestInit = {}) {
+  const token = localStorage.getItem('crm_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
 
-async function apiFetch(url: string, options?: RequestInit) {
-  const res = await fetch(url, { ...options, headers: { ...headers(), ...(options?.headers || {}) } });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
+  const response = await fetch(url, { ...options, headers });
+  if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('crm_token');
+      window.location.reload();
+    }
+    const error = await response.json().catch(() => ({ error: 'Network error' }));
+    throw new Error(error.error || `Error ${response.status}`);
   }
-  return res.json();
+  return response.json();
 }
 
 export const apiService = {
-  // -- AUTH ------------------------------------------------
-  login: async (username: string, password: string) => {
-    const res = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Login failed"); }
-    return res.json() as Promise<{ token: string; user: any }>;
-  },
+  login: (username: string, password: string): Promise<any> =>
+    apiFetch("/api/login", { method: "POST", body: JSON.stringify({ username, password }) }),
 
-  changePassword: (userId: number, currentPassword: string, newPassword: string) =>
-    apiFetch("/api/change-password", { method: "POST", body: JSON.stringify({ userId, currentPassword, newPassword }) }),
-
-  // -- DATA ------------------------------------------------
   getData: (): Promise<any> => apiFetch("/api/data"),
+  getInit: (): Promise<any> => apiFetch("/api/init"),
+  sync: (since?: string): Promise<any> => apiFetch(`/api/sync?since=${since || ''}`),
+  getStats: (): Promise<any> => apiFetch("/api/stats"),
+  getLeads: (page = 1, limit = 50, search = ""): Promise<any> => 
+    apiFetch(`/api/leads?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`),
 
-  // -- SAVE (upsert) ---------------------------------------
   save: (collection: string, data: any): Promise<any> =>
     apiFetch("/api/save", { method: "POST", body: JSON.stringify({ collection, data }) }),
 
-  // -- DELETE ----------------------------------------------
   delete: (collection: string, id: string): Promise<any> =>
     apiFetch("/api/delete", { method: "POST", body: JSON.stringify({ collection, id }) }),
 
-  // -- REMARKS ---------------------------------------------
-  getRemarks: (targetId: string): Promise<any[]> => apiFetch(`/api/remarks/${targetId}`),
+  // -- DETAILS FETCHING ------------------------------------
+  getRemarks: (targetId: string): Promise<any> =>
+    apiFetch(`/api/remarks/${targetId}`),
 
-  saveRemark: (targetId: string, remark: any): Promise<any> =>
-    apiFetch("/api/remarks", { method: "POST", body: JSON.stringify({ targetId, remark }) }),
+  getActivities: (targetId: string): Promise<any> =>
+    apiFetch(`/api/activities/${targetId}`),
+
+  getWhatsAppMessages: (targetId: string): Promise<any> =>
+    apiFetch(`/api/whatsapp/${targetId}`),
+
+  saveRemark: (targetId: string, data: any): Promise<any> =>
+    apiFetch("/api/remarks", { method: "POST", body: JSON.stringify({ targetId, remark: data }) }),
 
   // -- NOTIFICATIONS ---------------------------------------
   markNotifRead: (id: string): Promise<any> =>
@@ -59,7 +64,7 @@ export const apiService = {
   health: (): Promise<any> => apiFetch("/api/health"),
 };
 
-// Polling helper — replaces Firestore onSnapshot
+// Polling helper - replaces Firestore onSnapshot
 export function createPoller(intervalMs: number, fn: () => Promise<void>): () => void {
   let timer: ReturnType<typeof setInterval>;
   fn(); // immediate call

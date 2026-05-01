@@ -23,9 +23,10 @@ interface WhatsAppSenderProps {
   initialVisitId: string | null;
   initialMessage?: string | null;
   onLogActivity?: (targetId: string, targetName: string, details?: string) => void;
+  onSaveMessage?: (leadId: string, content: string) => void;
 }
 
-export default function WhatsAppSender({ visits, projects, templates, initialVisitId, initialMessage, onLogActivity }: WhatsAppSenderProps) {
+export default function WhatsAppSender({ visits, projects, templates, initialVisitId, initialMessage, onLogActivity, onSaveMessage }: WhatsAppSenderProps) {
   const [selectedVisitId, setSelectedVisitId] = useState(initialVisitId || '');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [message, setMessage] = useState(initialMessage || '');
@@ -78,8 +79,13 @@ export default function WhatsAppSender({ visits, projects, templates, initialVis
     const finalNum = num.length === 10 ? `91${num}` : num;
     window.open(`https://wa.me/${finalNum}?text=${encodeURIComponent(message)}`, '_blank');
     
-    if (onLogActivity && selectedVisit) {
-      onLogActivity(selectedVisit.id, selectedVisit.client_name, `Template: ${selectedTemplate?.name || 'Custom'}`);
+    if (selectedVisit) {
+      if (onLogActivity) {
+        onLogActivity(selectedVisit.id, selectedVisit.client_name, `Template: ${selectedTemplate?.name || 'Custom'}`);
+      }
+      if (onSaveMessage) {
+        onSaveMessage(selectedVisit.leadId || selectedVisit.id, message);
+      }
     }
   };
 

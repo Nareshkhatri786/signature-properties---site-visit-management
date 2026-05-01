@@ -105,7 +105,9 @@ export default function App() {
   const [followUpPromptData, setFollowUpPromptData] = useState<{ leadId?: string, visitId?: string, projectId: string, clientName: string } | null>(null);
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [preferredFollowUpMethod, setPreferredFollowUpMethod] = useState<FollowUpMethod>('call');
-
+  const [stats, setStats] = useState<any>(null);
+  const lastSyncTime = React.useRef<string | null>(null);
+  const isFetching = React.useRef(false);
   const repairRun = React.useRef(false);
 
   useEffect(() => {
@@ -163,44 +165,94 @@ export default function App() {
     }
   }, [isInitialLoadDone, user, visits, leads]);
 
-  // Load all data from REST API
-  const isFetching = React.useRef(false);
-  const lastFetchTime = React.useRef(0);
-
   const loadAllData = React.useCallback(async (force = false) => {
     const token = localStorage.getItem('crm_token');
     if (!token) return;
-    
-    // Prevent multiple simultaneous fetches and debounce (max 1 fetch per 2 seconds unless forced)
-    const now = Date.now();
     if (isFetching.current) return;
-    if (!force && (now - lastFetchTime.current < 2000)) return;
-
     isFetching.current = true;
-    lastFetchTime.current = now;
 
     try {
-      const data = await apiService.getData();
-      
-      // Smart updates to prevent unnecessary re-renders (More efficient than stringify)
-      if (data.leads && (data.leads.length !== leads.length || JSON.stringify(data.leads) !== JSON.stringify(leads))) setLeads(data.leads);
-      if (data.visits && (data.visits.length !== visits.length || JSON.stringify(data.visits) !== JSON.stringify(visits))) setVisits(data.visits);
-      
-      if (data.followups) setFollowups(data.followups);
-      if (data.templates) setTemplates(data.templates);
-      if (data.call_logs) setCallLogs(data.call_logs);
-      if (data.webhook_configs) setWebhookConfigs(data.webhook_configs.map((w: any) => ({ ...w, mapping: w.mapping || {}, assignedUserIds: w.assignedUserIds || [] })));
-      if (data.users)    setUsers(data.users);
-      if (data.projects) setProjects(data.projects);
-      if (data.activities) setActivities(data.activities);
-      if (data.settings) setSettings(data.settings);
-      if (data.attendance) setAttendance(data.attendance);
-      if (data.notifications) setNotifications(data.notifications);
-      if (data.workflows) setWorkflows(data.workflows);
+      if (!lastSyncTime.current || force) {
+        setInitStep('Fetching Global Data...');
+        const [initData, fullData] = await Promise.all([
+          apiService.getInit(),
+          apiService.getData()
+        ]);
+        
+        setProjects(initData.projects || []);
+        setTemplates(initData.templates || []);
+        setSettings(initData.settings || {});
+        setWorkflows(initData.workflows || []);
+        
+        setLeads(fullData.leads || []);
+        setVisits(fullData.visits || []);
+        setFollowups(fullData.followups || []);
+        setCallLogs(fullData.call_logs || []);
+        setActivities(fullData.activities || []);
+        setAttendance(fullData.attendance || []);
+        setNotifications(fullData.notifications || []);
+        setWebhookConfigs(fullData.webhook_configs || []);
+        setUsers(fullData.users || []);
+        
+        lastSyncTime.current = new Date().toISOString();
+        
+        // Fetch stats separately
+        apiService.getStats().then(setStats).catch(console.error);
+      } else {
+        const delta = await apiService.sync(lastSyncTime.current);
+        
+        if (delta.leads?.length > 0) {
+          setLeads(prev => {
+            const next = [...prev];
+            delta.leads.forEach((l: Lead) => {
+              const idx = next.findIndex(p => p.id === l.id);
+              if (idx > -1) next[idx] = l;
+              else next.unshift(l);
+            });
+            return next;
+          });
+        }
+        
+        if (delta.visits?.length > 0) {
+          setVisits(prev => {
+            const next = [...prev];
+            delta.visits.forEach((v: Visit) => {
+              const idx = next.findIndex(p => p.id === v.id);
+              if (idx > -1) next[idx] = v;
+              else next.unshift(v);
+            });
+            return next;
+          });
+        }
+
+        if (delta.followups?.length > 0) {
+          setFollowups(prev => {
+            const next = [...prev];
+            delta.followups.forEach((f: FollowUp) => {
+              const idx = next.findIndex(p => p.id === f.id);
+              if (idx > -1) next[idx] = f;
+              else next.unshift(f);
+            });
+            return next;
+          });
+        }
+
+        if (delta.notifications?.length > 0) {
+          setNotifications(prev => [...delta.notifications, ...prev].slice(0, 50));
+        }
+
+        lastSyncTime.current = delta.serverTime;
+        
+        // Refresh stats on changes
+        if (delta.leads?.length > 0) {
+          apiService.getStats().then(setStats).catch(console.error);
+        }
+      }
       
       setIsInitialLoadDone(true);
     } catch (e: any) {
-      console.error('[Data] Load failed:', e.message);
+      console.error('[Sync] Failed:', e.message);
+      if (e.message.includes('401')) handleLogout();
     } finally {
       isFetching.current = false;
     }
@@ -229,15 +281,15 @@ export default function App() {
       setIsInitialLoadDone(true);
     }
 
-    // Recursive polling (Safer than setInterval)
+    // Recursive polling (Faster for changes, lighter for server)
     let pollTimer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       const t = localStorage.getItem('crm_token');
       if (t) await loadAllData();
-      pollTimer = setTimeout(poll, 30000);
+      pollTimer = setTimeout(poll, 15000); // Poll every 15s for delta changes
     };
     
-    pollTimer = setTimeout(poll, 30000);
+    pollTimer = setTimeout(poll, 15000);
 
     return () => {
       clearTimeout(pollTimer);
@@ -522,19 +574,6 @@ export default function App() {
     const newActivities = [activity, ...activities];
     setActivities(newActivities);
     api.save('activities', activity);
-
-    // Automatically create a remark for certain activities
-    const remarkTypes: ActivityType[] = ['whatsapp_sent', 'lead_transferred', 'visit_cancelled', 'visit_done'];
-    if (remarkTypes.includes(type)) {
-      const remark: Remark = {
-        id: generateId(),
-        text: details ? `${type.replace('_', ' ').toUpperCase()}: ${details}` : `${type.replace('_', ' ').toUpperCase()}`,
-        by: user.name,
-        at: new Date().toISOString()
-      };
-      setRemarks(prev => ({ ...prev, [targetId]: [remark, ...(prev[targetId] || [])] }));
-      api.save('remarks', { ...remark, targetId });
-    }
   };
 
   const runWorkflowEngine = (trigger: WorkflowTrigger, targetLead: Lead): Lead => {
@@ -668,7 +707,7 @@ export default function App() {
         stats: {
           ...lead.stats,
           calls_attempted: lead.stats.calls_attempted + 1,
-          calls_answered: lead.stats.calls_answered + (outcome === 'answered' ? 1 : 0)
+          calls_answered: outcome === 'answered' ? lead.stats.calls_answered + 1 : lead.stats.calls_answered
         },
         updated_at: new Date().toISOString()
       };
@@ -676,16 +715,6 @@ export default function App() {
       const newLeads = leads.map(l => l.id === lead.id ? updatedLead : l);
       setLeads(newLeads);
       api.save('leads', updatedLead);
-
-      // Add remark for call outcome
-      const remark: Remark = {
-        id: generateId(),
-        text: `Call Outcome: ${outcome.replace('_', ' ')}${note ? ` - ${note}` : ''}${shouldMoveToCold ? ' (Auto-moved to Cold due to 3 switched off calls)' : ''}`,
-        by: user.name,
-        at: new Date().toISOString()
-      };
-      setRemarks(prev => ({ ...prev, [lead.id]: [remark, ...(prev[lead.id] || [])] }));
-      api.save('remarks', { ...remark, targetId: lead.id });
 
       if (shouldMoveToCold) {
         toast.error('Lead moved to Cold due to 3 consecutive Switched Off calls');
@@ -797,6 +826,19 @@ export default function App() {
 
     const num = lead.mobile.replace(/[^0-9]/g, '');
     const finalNum = num.length === 10 ? `91${num}` : num;
+    
+    // Save to whatsapp_messages for the WhatsApp tab history
+    const waMsg: WhatsAppMessage = {
+      id: 'msg_out_' + Date.now(),
+      leadId: lead.id,
+      senderName: user.name,
+      senderPhoneNumber: 'System',
+      content: message,
+      timestamp: new Date().toISOString(),
+      type: 'outgoing',
+      projectId: lead.projectId
+    };
+    api.save('whatsapp_messages', waMsg);
     
     window.open(`https://wa.me/${finalNum}?text=${encodeURIComponent(message)}`, '_blank');
     
@@ -928,6 +970,7 @@ export default function App() {
               leads={filteredLeads}
               followUps={filteredFollowups}
               user={user}
+              stats={stats}
               onNavigate={navigate} 
             />
           )}
@@ -952,15 +995,15 @@ export default function App() {
               onBulkScore={handleBulkAIScore}
                onUpdateStatus={(id, status) => {
                 const lead = leads.find(l => l.id === id);
-                if (lead) {
+                if (lead && lead.status !== status) {
                   const initialUpdate = { ...lead, status, updated_at: new Date().toISOString() };
                   
                   // Run workflow engine on the updated status
                   const processedLead = runWorkflowEngine('status_changed', initialUpdate);
                   
                   setLeads(leads.map(l => l.id === id ? processedLead : l));
-                  api.save('leads', processedLead);
-                  logActivity('lead_updated', id, lead.name, `Status changed to ${status}`);
+                  apiService.save('leads', processedLead);
+                  logActivity('lead_status_changed', id, lead.name, `Status changed from ${lead.status} to ${status}`);
                   toast.success('Lead status updated');
                 }
               }}
@@ -1321,6 +1364,20 @@ export default function App() {
               initialVisitId={selectedVisitId}
               initialMessage={generatedMessage}
               onLogActivity={(targetId, targetName, details) => logActivity('whatsapp_sent', targetId, targetName, details)}
+              onSaveMessage={(leadId, content) => {
+                const lead = leads.find(l => l.id === leadId);
+                const waMsg: WhatsAppMessage = {
+                  id: 'msg_out_' + Date.now(),
+                  leadId,
+                  senderName: user?.name || 'System',
+                  senderPhoneNumber: 'System',
+                  content,
+                  timestamp: new Date().toISOString(),
+                  type: 'outgoing',
+                  projectId: lead?.projectId || user?.projectId || ''
+                };
+                api.save('whatsapp_messages', waMsg);
+              }}
             />
           )}
           {currentPage === 'templates' && (

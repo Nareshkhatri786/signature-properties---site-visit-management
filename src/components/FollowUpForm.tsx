@@ -31,13 +31,22 @@ export default function FollowUpForm({
 }: FollowUpFormProps) {
   
   const [formData, setFormData] = useState({
-    date: followUp?.date || getLocalDateString(),
+    date: followUp?.date 
+      ? (typeof followUp.date === 'string' ? followUp.date.split('T')[0] : getLocalDateString(new Date(followUp.date)))
+      : getLocalDateString(),
     purpose: followUp?.purpose || '',
     method: followUp?.method || initialMethod || 'call' as FollowUpMethod,
     note: '',
   });
 
   const [isCompleting, setIsCompleting] = useState(false);
+
+  // Auto-reset note when entering completion mode to prevent repetition
+  React.useEffect(() => {
+    if (isCompleting) {
+      setFormData(prev => ({ ...prev, note: '' }));
+    }
+  }, [isCompleting]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

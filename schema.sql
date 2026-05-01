@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS followups (
   date         DATE,
   scheduled_at DATETIME,
   purpose      TEXT,
-  method       ENUM('call','whatsapp','WhatsApp','email','in_person') DEFAULT 'call',
+  method       ENUM('call','whatsapp','email','in_person') DEFAULT 'call',
   status       ENUM('pending','completed','cancelled') DEFAULT 'pending',
   created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
   completed_at DATETIME,
@@ -150,7 +150,8 @@ CREATE TABLE IF NOT EXISTS followups (
   INDEX idx_date (date),
   INDEX idx_status (status),
   FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE SET NULL,
-  FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL
+  FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL,
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ============================================================
@@ -167,7 +168,9 @@ CREATE TABLE IF NOT EXISTS call_logs (
   `by`      VARCHAR(255),
   INDEX idx_leadId (leadId),
   INDEX idx_projectId (projectId),
-  INDEX idx_timestamp (timestamp)
+  INDEX idx_timestamp (timestamp),
+  FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE SET NULL,
+  FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ============================================================
@@ -186,7 +189,9 @@ CREATE TABLE IF NOT EXISTS activities (
   INDEX idx_projectId (projectId),
   INDEX idx_userId (userId),
   INDEX idx_targetId (targetId),
-  INDEX idx_timestamp (timestamp)
+  INDEX idx_timestamp (timestamp),
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ============================================================
@@ -280,13 +285,14 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id          INT AUTO_INCREMENT PRIMARY KEY,
-  userId      VARCHAR(100) NOT NULL,
+  userId      INT NOT NULL,
   endpoint    VARCHAR(500) NOT NULL,
   auth        VARCHAR(100) NOT NULL,
   p256dh      VARCHAR(100) NOT NULL,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY unique_endpoint (endpoint),
-  INDEX idx_userId (userId)
+  INDEX idx_userId (userId),
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ============================================================

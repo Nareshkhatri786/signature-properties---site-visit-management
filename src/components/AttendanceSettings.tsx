@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Project } from '../types';
-import { MapPin, Clock, Save, X, Briefcase } from 'lucide-react';
+import { MapPin, Clock, Save, X, Briefcase, Users, Eye, EyeOff } from 'lucide-react';
 import { apiService } from '../lib/api-service';
 import toast from 'react-hot-toast';
 import { cn } from '../lib/utils';
@@ -13,16 +13,36 @@ interface AttendanceSettingsProps {
 export const AttendanceSettings: React.FC<AttendanceSettingsProps> = ({ users, projects }) => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleEdit = (user: User) => {
     setEditingUser(user);
     setEditForm({
+      name: user.name,
+      username: user.username,
       role: user.role || 'user',
       projectId: user.projectId,
       assignedProjectIds: user.assignedProjectIds || [],
       workingHours: user.workingHours || { start: '10:00', end: '19:00' },
       assignedLocation: user.assignedLocation || { lat: 0, lng: 0, address: '', radius: 100 }
     });
+    setShowPassword(false);
+  };
+
+  const handleAddNew = () => {
+    const newUser: User = {
+      id: 0, // 0 indicates a new user for auto-increment
+      name: '',
+      username: '',
+      password: 'changeme123',
+      role: 'user',
+      projectId: projects[0]?.id || 'p1',
+      workingHours: { start: '10:00', end: '19:00' },
+      assignedLocation: { lat: 0, lng: 0, address: '', radius: 100 }
+    };
+    setEditingUser(newUser);
+    setEditForm({ ...newUser });
+    setShowPassword(true);
   };
 
   const toggleProject = (projectId: string) => {
@@ -42,20 +62,36 @@ export const AttendanceSettings: React.FC<AttendanceSettingsProps> = ({ users, p
         ...editingUser,
         ...editForm
       };
-      await apiService.save("users", {...updatedUser, id: String(editingUser.id)});
-      toast.success(`Attendance settings updated for ${editingUser.name}`);
+      
+      // If id is 0, it's a new user, let server auto-increment
+      const savePayload = {
+        ...updatedUser,
+        id: editingUser.id === 0 ? null : editingUser.id
+      };
+
+      await apiService.save("users", savePayload);
+      toast.success(editingUser.id === 0 ? "New employee created successfully" : `User settings updated for ${updatedUser.name}`);
       setEditingUser(null);
     } catch (error) {
-      toast.error("Failed to update settings");
+      toast.error("Failed to save user");
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="bg-[#2A1D0E] border border-[#3D2B1A] rounded-2xl overflow-hidden shadow-xl">
-        <div className="p-6 border-b border-[#3D2B1A]">
-          <h3 className="text-xl font-serif text-amber-500">Employee Shift & Location</h3>
-          <p className="text-amber-200/40 text-sm mt-1">Set work schedules and geofence locations for your team.</p>
+        <div className="p-6 border-b border-[#3D2B1A] flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-serif text-amber-500">Employee Shift & Location</h3>
+            <p className="text-amber-200/40 text-sm mt-1">Set work schedules and geofence locations for your team.</p>
+          </div>
+          <button
+            onClick={handleAddNew}
+            className="px-4 py-2 bg-amber-500 text-black rounded-lg hover:bg-amber-400 transition-all text-sm font-bold flex items-center gap-2"
+          >
+            <Users size={16} />
+            Add New Employee
+          </button>
         </div>
 
         <div className="divide-y divide-[#3D2B1A]">
@@ -120,6 +156,48 @@ export const AttendanceSettings: React.FC<AttendanceSettingsProps> = ({ users, p
 
             <div className="p-6 space-y-6">
               <div className="space-y-4">
+                {/* Basic Details Section */}
+                <div className="grid grid-cols-2 gap-4 pb-4 border-b border-[#3D2B1A]">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-amber-200/40 font-mono">Full Name</label>
+                    <input
+                      type="text"
+                      value={editForm.name}
+                      onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                      className="w-full bg-[#1C1207] border border-[#3D2B1A] rounded-lg p-2.5 text-white focus:ring-1 focus:ring-amber-500 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-amber-200/40 font-mono">Username</label>
+                    <input
+                      type="text"
+                      value={editForm.username}
+                      onChange={e => setEditForm({ ...editForm, username: e.target.value })}
+                      className="w-full bg-[#1C1207] border border-[#3D2B1A] rounded-lg p-2.5 text-white focus:ring-1 focus:ring-amber-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 pb-4 border-b border-[#3D2B1A]">
+                  <label className="text-[10px] uppercase tracking-widest text-amber-200/40 font-mono">New Password (leave empty to keep current)</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter new password"
+                      value={editForm.password || ''}
+                      onChange={e => setEditForm({ ...editForm, password: e.target.value })}
+                      className="w-full bg-[#1C1207] border border-[#3D2B1A] rounded-lg p-2.5 pr-10 text-white focus:ring-1 focus:ring-amber-500 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-200/40 hover:text-amber-500 transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex flex-col gap-2 pb-4 border-b border-[#3D2B1A]">
                   <label className="text-[10px] uppercase tracking-widest text-amber-200/40 font-mono flex items-center gap-2">
                     <Briefcase size={12} /> System Permissions & Role
@@ -164,20 +242,19 @@ export const AttendanceSettings: React.FC<AttendanceSettingsProps> = ({ users, p
                   </div>
                 )}
 
-                {(editForm.role === 'user' || editForm.role === 'manager') && (
-                  <div className="space-y-2 pb-4 border-b border-[#3D2B1A]">
-                    <label className="text-[10px] uppercase tracking-widest text-amber-200/40 font-mono">Primary Project (Main)</label>
-                    <select
-                      value={editForm.projectId}
-                      onChange={e => setEditForm({ ...editForm, projectId: e.target.value })}
-                      className="w-full bg-[#1C1207] border border-[#3D2B1A] rounded-lg p-2.5 text-white focus:ring-1 focus:ring-amber-500 outline-none"
-                    >
-                      {projects.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <div className="space-y-2 pb-4 border-b border-[#3D2B1A]">
+                  <label className="text-[10px] uppercase tracking-widest text-amber-200/40 font-mono">Primary Project (Main)</label>
+                  <select
+                    value={editForm.projectId}
+                    onChange={e => setEditForm({ ...editForm, projectId: e.target.value })}
+                    className="w-full bg-[#1C1207] border border-[#3D2B1A] rounded-lg p-2.5 text-white focus:ring-1 focus:ring-amber-500 outline-none"
+                  >
+                    <option value="">No Project Assigned</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

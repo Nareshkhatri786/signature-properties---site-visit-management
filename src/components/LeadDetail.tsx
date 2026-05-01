@@ -32,7 +32,7 @@ import WhatsAppHistory from './WhatsAppHistory';
 import { toast } from 'react-hot-toast';
 import { generateId } from '../lib/storage';
 import { apiService } from '../lib/api-service';
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import { normalizePhoneNumber } from '../lib/phoneUtils';
 import { getLeadFollowUp, getFollowUpDisplayStatus } from '../lib/followupUtils';
 import { FollowUpStatusBadge } from './FollowUpStatusBadge';
@@ -66,8 +66,21 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
   const [activeTab, setActiveTab] = useState<'timeline' | 'whatsapp'>('timeline');
   
   useEffect(() => {
+    if (!lead.id) return;
+    
+    // Fetch Remarks
     apiService.getRemarks(lead.id).then((data: Remark[]) => {
       setSyncedRemarks(data.sort((a, b) => b.at.localeCompare(a.at)));
+    }).catch(console.error);
+
+    // Fetch Activities
+    apiService.getActivities(lead.id).then((data: Activity[]) => {
+      setSyncedActivities(data);
+    }).catch(console.error);
+
+    // Fetch WhatsApp Messages
+    apiService.getWhatsAppMessages(lead.id).then((data: WhatsAppMessage[]) => {
+      setSyncedWhatsApp(data);
     }).catch(console.error);
   }, [lead.id]);
 
@@ -102,8 +115,10 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
   const [remarkSentiment, setRemarkSentiment] = useState<RemarkSentiment>('neutral');
 
   const handleUpdateStatus = (field: 'status' | 'quality', value: string) => {
+    if (lead[field] === value) return;
+    const oldVal = lead[field];
     onUpdateLead({ ...lead, [field]: value, updated_at: new Date().toISOString() });
-    logActivity(field === 'status' ? 'lead_status_changed' : 'lead_quality_changed', `Changed ${field} to ${value}`);
+    logActivity(field === 'status' ? 'lead_status_changed' : 'lead_quality_changed', `Changed ${field} from ${oldVal} to ${value}`);
   };
 
   const handleAddRemark = () => {
@@ -248,10 +263,17 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
                   return;
                 }
                 const finalLead = { ...editedLead, mobile: normalizedMobile, updated_at: new Date().toISOString() };
+                const changedFields = [];
+                if (lead.name !== finalLead.name) changedFields.push(`Name to ${finalLead.name}`);
+                if (lead.mobile !== finalLead.mobile) changedFields.push(`Mobile to ${finalLead.mobile}`);
+                if (lead.priority !== finalLead.priority) changedFields.push(`Priority to ${finalLead.priority}`);
+                
                 onUpdateLead(finalLead);
                 setIsEditMode(false);
                 toast.success('Lead updated');
-                logActivity('lead_updated', `Details updated (Mobile: ${normalizedMobile})`);
+                if (changedFields.length > 0) {
+                  logActivity('lead_updated', `Changed: ${changedFields.join(', ')}`);
+                }
               }}
               className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-green-700 transition-all text-sm"
             >
@@ -609,12 +631,44 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
             </div>
 
             {activeTab === 'timeline' ? (
-              <ActivityTimeline 
-                activities={syncedActivities} 
-                remarks={syncedRemarks}
-                callLogs={callLogs}
-                followUps={followUps}
-              />
+              <div className="space-y-6">
+                {nextFollowUp && nextFollowUp.status === 'pending' && (
+                  <div className="bg-[#FFFDF6] border-2 border-amber-200 rounded-2xl p-5 shadow-sm relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                      <Clock size={40} className="text-amber-600" />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-600">Priority Follow-up</h4>
+                        </div>
+                        <span className="text-[10px] font-mono text-amber-500 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                          Due {isToday(new Date(nextFollowUp.date)) ? 'Today' : format(new Date(nextFollowUp.date), 'dd MMM')}
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold text-[#2A1C00] mb-2">{nextFollowUp.purpose || 'Follow-up regarding property interest'}</p>
+                      <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-[#9A8262] capitalize">Via: {nextFollowUp.method}</span>
+                         </div>
+                         <button 
+                           onClick={() => setIsFollowUpModalOpen(true)}
+                           className="text-xs font-bold text-amber-600 hover:underline flex items-center gap-1"
+                         >
+                           Action Required <ArrowRightLeft size={12} className="rotate-45" />
+                         </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <ActivityTimeline 
+                  activities={syncedActivities} 
+                  remarks={syncedRemarks}
+                  callLogs={callLogs}
+                  followUps={followUps}
+                />
+              </div>
             ) : (
               <WhatsAppHistory messages={syncedWhatsApp} />
             )}
@@ -647,6 +701,8 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
               completed_at: new Date().toISOString(),
               outcome_note: note
             });
+            // Immediately log locally for instant UI update
+            logActivity('followup_done', `Outcome: ${note || 'Completed'}`);
             setIsFollowUpModalOpen(false);
           }}
           onClose={() => setIsFollowUpModalOpen(false)}

@@ -160,7 +160,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
                </div>
                <div className="bg-white/50 border border-[#E6D8B8] rounded-lg p-2 text-center">
                  <div className="text-[9px] font-black text-[#9A8262] uppercase mb-1">Royal Rudraksha</div>
-                 <div className="text-[10px] text-[#2A1C00] font-bold">Assigned: Priyank</div>
+                 <div className="text-[10px] text-[#2A1C00] font-bold">Assigned: Vani</div>
                </div>
                <div className="bg-white/50 border border-[#E6D8B8] rounded-lg p-2 text-center">
                  <div className="text-[9px] font-black text-[#9A8262] uppercase mb-1">Shreemad Family</div>

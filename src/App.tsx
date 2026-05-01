@@ -340,7 +340,7 @@ export default function App() {
   }, [leads.length, visits.length]);
 
   const userRole = user?.role?.toLowerCase();
-  const isAdminRole = userRole === 'admin';
+  const isAdminRole = userRole === 'admin' || userRole === 'adm';
   const isManagerRole = userRole === 'manager';
   const managedProjectIds = useMemo(() => user?.assignedProjectIds || (user?.projectId ? [user.projectId] : []), [user]);
 

@@ -730,7 +730,9 @@ export default function App() {
   };
 
   const handleBulkDeleteLeads = (ids: string[]) => {
-    if (!user || user.role !== 'admin') {
+    const uRole = user?.role?.toLowerCase();
+    const isActuallyAdmin = uRole === 'admin' || uRole === 'adm';
+    if (!user || !isActuallyAdmin) {
       toast.error('Only admins can perform bulk delete');
       return;
     }
@@ -742,7 +744,9 @@ export default function App() {
   };
 
   const handleBulkAssignLeads = (ids: string[], userId: number, userName: string) => {
-    if (!user || user.role !== 'admin') {
+    const uRole = user?.role?.toLowerCase();
+    const isActuallyAdmin = uRole === 'admin' || uRole === 'adm';
+    if (!user || !isActuallyAdmin) {
       toast.error('Only admins can perform bulk assignment');
       return;
     }

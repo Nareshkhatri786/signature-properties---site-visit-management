@@ -64,7 +64,8 @@ export default function SettingsPage({
   const [newProjectName, setNewProjectName] = useState('');
   const [newUser, setNewUser] = useState({ username: '', password: '', name: '', projectId: projects[0]?.id || '', role: 'user' as 'admin' | 'user' });
 
-  const isAdmin = user?.role?.toLowerCase() === 'admin';
+  const userRole = user?.role?.toLowerCase();
+  const isAdmin = userRole === 'admin' || userRole === 'adm';
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();

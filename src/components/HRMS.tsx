@@ -15,8 +15,8 @@ interface HRMSProps {
 }
 
 export default React.memo(function HRMS({ user, users, projects, attendance, onNavigate }: HRMSProps) {
-  const userRole = user.role.toLowerCase();
-  const isAdmin = userRole === 'admin';
+  const userRole = user?.role?.toLowerCase();
+  const isAdmin = userRole === 'admin' || userRole === 'adm';
   const isManager = userRole === 'manager';
 
   const managedProjectIds = user.assignedProjectIds || (user.projectId ? [user.projectId] : []);

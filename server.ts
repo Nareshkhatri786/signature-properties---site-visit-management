@@ -250,15 +250,15 @@ async function startServer() {
       const [users, projects, leads, visits, followups, activities, call_logs, templates, webhook_configs, notifications, attendance, workflows] = await Promise.all([
         query("SELECT * FROM users"),
         query("SELECT * FROM projects"),
-        query(`SELECT * FROM leads ${projectFilter} ORDER BY updated_at DESC LIMIT 100`, projectParams),
-        query(`SELECT * FROM visits ${projectFilter} ORDER BY visit_date DESC LIMIT 100`, projectParams),
-        query(`SELECT * FROM followups ${projectFilter} ORDER BY date DESC LIMIT 100`, projectParams),
-        query(`SELECT * FROM activities ${projectFilter} ORDER BY timestamp DESC LIMIT 100`, projectParams),
-        query(`SELECT * FROM call_logs ${projectFilter} ORDER BY timestamp DESC LIMIT 100`, projectParams),
+        query(`SELECT * FROM leads ${projectFilter} ORDER BY updated_at DESC LIMIT 5000`, projectParams),
+        query(`SELECT * FROM visits ${projectFilter} ORDER BY visit_date DESC LIMIT 5000`, projectParams),
+        query(`SELECT * FROM followups ${projectFilter} ORDER BY date DESC LIMIT 5000`, projectParams),
+        query(`SELECT * FROM activities ${projectFilter} ORDER BY timestamp DESC LIMIT 5000`, projectParams),
+        query(`SELECT * FROM call_logs ${projectFilter} ORDER BY timestamp DESC LIMIT 5000`, projectParams),
         query("SELECT * FROM templates"),
         query("SELECT * FROM webhook_configs"),
-        query("SELECT * FROM notifications WHERE (userId = ? OR isAdmin = 1) ORDER BY createdAt DESC LIMIT 50", [u.id]),
-        query(isAdmin ? "SELECT * FROM attendance ORDER BY date DESC LIMIT 100" : "SELECT * FROM attendance WHERE userId = ? ORDER BY date DESC LIMIT 50", isAdmin ? [] : [u.id]),
+        query("SELECT * FROM notifications WHERE (userId = ? OR isAdmin = 1) ORDER BY createdAt DESC LIMIT 500", [u.id]),
+        query(isAdmin ? "SELECT * FROM attendance ORDER BY date DESC LIMIT 500" : "SELECT * FROM attendance WHERE userId = ? ORDER BY date DESC LIMIT 500", isAdmin ? [] : [u.id]),
         query("SELECT * FROM workflows"),
       ]);
 

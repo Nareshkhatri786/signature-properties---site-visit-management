@@ -21,6 +21,9 @@ import {
 import { Settings, User, Visit, Remark, Template, CallLog, Lead, WebhookConfig, Project } from '../types';
 import { toast } from 'react-hot-toast';
 import { generateId } from '../lib/storage';
+import { AttendanceReport } from './AttendanceReport';
+import { AttendanceSettings } from './AttendanceSettings';
+import { Clock } from 'lucide-react';
 
 interface SettingsProps {
   user: User | null;

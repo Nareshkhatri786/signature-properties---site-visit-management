@@ -34,6 +34,7 @@ export default function Sidebar({ isOpen, onClose, currentPage, onNavigate, onLo
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Main' },
     { id: 'leads', label: 'Leads', icon: Users, section: 'Main' },
+    { id: 'hrms', label: 'HRMS & Attendance', icon: UserCheck, section: 'Main' },
     { id: 'followups', label: 'Follow-ups', icon: Bell, section: 'Main' },
     { id: 'visits', label: 'Site Visits', icon: CalendarCheck, section: 'Main' },
     { id: 'reports', label: 'Reports & Audit', icon: BarChart2, section: 'Main' },

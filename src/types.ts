@@ -5,7 +5,7 @@ export type VisitOutcome = 'booked' | 'highly_interested' | 'follow_up_required'
 
 export type TemplateType = 'reminder' | 'welcome' | 'thank_you' | 'follow_up' | 'custom';
 
-export type Page = 'dashboard' | 'leads' | 'lead-detail' | 'visits' | 'add-visit' | 'detail' | 'whatsapp' | 'templates' | 'settings' | 'reports' | 'webhooks' | 'followups' | 'workflow';
+export type Page = 'dashboard' | 'leads' | 'lead-detail' | 'visits' | 'add-visit' | 'detail' | 'whatsapp' | 'templates' | 'settings' | 'reports' | 'webhooks' | 'followups' | 'hrms' | 'workflow';
 
 export type CallOutcome = 'answered' | 'not_answered' | 'busy' | 'switched_off';
 

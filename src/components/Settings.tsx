@@ -422,7 +422,7 @@ export default function SettingsPage({
                       {p.location && p.location.lat !== 0 && (
                         <div className="text-[10px] text-[#9A8262] font-mono flex items-center gap-2">
                           <MapPin size={10} />
-                          {p.location.address || 'Location Set'} ({p.location.lat.toFixed(4)}, {p.location.lng.toFixed(4)})
+                          {p.location.address || 'Location Set'} ({p.location.lat?.toFixed(4) || '0'}, {p.location.lng?.toFixed(4) || '0'})
                         </div>
                       )}
                     </div>

@@ -311,7 +311,7 @@ async function startServer() {
             await pool.execute(
               `INSERT IGNORE INTO followups (id, leadId, projectId, date, scheduled_at, purpose, method, status, created_at)
                VALUES (?, ?, ?, ?, ?, ?, 'call', 'pending', NOW())`,
-              [`fup_auto_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`, d.id, d.projectId, dateOnly, tenMinsLater, "Auto-generated welcome call"]
+              [`fup_auto_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`, d.id, d.projectId, dateOnly, tenMinsLater, `Welcome call for ${d.source || 'New'} Lead`]
             );
           }
         }

@@ -771,7 +771,26 @@ export default function App() {
     setLeads(newLeads);
     ids.forEach(id => {
       const lead = leads.find(l => l.id === id);
-      if (lead) api.save('leads', { ...lead, assignedTo: userId, assignedToName: userName });
+      if (lead) {
+        api.save('leads', { ...lead, assignedTo: userId, assignedToName: userName });
+        
+        // Auto-schedule takeover call for the new owner
+        const takeoverFup: FollowUp = {
+          id: generateId(),
+          leadId: lead.id,
+          projectId: lead.projectId,
+          userId: userId,
+          userName: userName,
+          date: getLocalDateString(),
+          scheduled_at: new Date().toISOString(),
+          purpose: 'Bulk Takeover Call: Introduce yourself to the new lead',
+          method: 'call',
+          status: 'pending',
+          created_at: new Date().toISOString()
+        };
+        setFollowups(prev => [takeoverFup, ...prev]);
+        api.save('followups', takeoverFup);
+      }
     });
     
     logActivity('bulk_assigned', 'system', 'Multiple Leads', `Assigned ${ids.length} leads to ${userName}`);

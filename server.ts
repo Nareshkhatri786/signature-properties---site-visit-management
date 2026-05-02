@@ -17,7 +17,7 @@ webPush.setVapidDetails("mailto:admin@diyacrm.com", PUBLIC_VAPID_KEY, PRIVATE_VA
 
 const JSON_FIELDS_LEADS = ["stats"];
 const JSON_FIELDS_VISITS = ["reminders_sent", "reschedule_log"];
-const JSON_FIELDS_USERS = ["workingHours", "assignedLocation", "assignedProjectIds"];
+const JSON_FIELDS_USERS = ["workingHours", "assignedLocation", "locationRequest", "assignedProjectIds"];
 const JSON_FIELDS_WEBHOOK = ["mapping", "assignedUserIds"];
 const JSON_FIELDS_SETTINGS = ["sources", "budgets", "propertyInterests"];
 const JSON_FIELDS_ATTENDANCE = ["checkIn", "checkOut"];

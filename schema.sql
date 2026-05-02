@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
   assignedProjectIds JSON,
   workingHours       JSON,
   assignedLocation   JSON,
+  locationRequest    JSON,
   created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;

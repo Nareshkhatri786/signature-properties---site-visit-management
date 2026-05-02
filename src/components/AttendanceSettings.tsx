@@ -77,8 +77,92 @@ export const AttendanceSettings: React.FC<AttendanceSettingsProps> = ({ users, p
     }
   };
 
+  const pendingRequests = users.filter(u => u.locationRequest && u.locationRequest.status === 'pending');
+
+  const handleApproveRequest = async (user: User) => {
+    if (!user.locationRequest) return;
+    try {
+      const updatedUser = {
+        ...user,
+        assignedLocation: {
+          lat: user.locationRequest.lat,
+          lng: user.locationRequest.lng,
+          radius: user.locationRequest.radius || 100,
+          address: user.locationRequest.address || 'Verified Work Site'
+        },
+        locationRequest: null // Clear the request
+      };
+      await apiService.save("users", updatedUser);
+      toast.success(`Location approved for ${user.name}`);
+      window.location.reload();
+    } catch (err) {
+      toast.error("Failed to approve request");
+    }
+  };
+
+  const handleRejectRequest = async (user: User) => {
+    try {
+      const updatedUser = {
+        ...user,
+        locationRequest: null // Clear the request
+      };
+      await apiService.save("users", updatedUser);
+      toast.success(`Location request rejected for ${user.name}`);
+      window.location.reload();
+    } catch (err) {
+      toast.error("Failed to reject request");
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Pending Requests Section */}
+      {pendingRequests.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 animate-in slide-in-from-top duration-500">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="bg-amber-500 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <MapPin className="text-black" size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-serif text-amber-500">Pending Location Requests</h3>
+              <p className="text-amber-200/40 text-xs mt-0.5">Staff members requesting to update their work site.</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pendingRequests.map(u => (
+              <div key={u.id} className="bg-[#1C1207] border border-amber-500/20 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white">{u.name}</span>
+                  <span className="text-[10px] bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded border border-amber-500/20 uppercase tracking-widest font-mono">
+                    Pending
+                  </span>
+                </div>
+                <div className="text-[11px] text-amber-200/60 font-mono space-y-1">
+                  <p>Lat: {u.locationRequest?.lat.toFixed(6)}</p>
+                  <p>Lng: {u.locationRequest?.lng.toFixed(6)}</p>
+                  <p>Radius: {u.locationRequest?.radius}m</p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button 
+                    onClick={() => handleApproveRequest(u)}
+                    className="flex-1 bg-green-600 hover:bg-green-500 text-white text-[10px] font-bold py-2 rounded-lg transition-all"
+                  >
+                    Approve
+                  </button>
+                  <button 
+                    onClick={() => handleRejectRequest(u)}
+                    className="flex-1 bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white border border-red-600/30 text-[10px] font-bold py-2 rounded-lg transition-all"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="bg-[#2A1D0E] border border-[#3D2B1A] rounded-2xl overflow-hidden shadow-xl">
         <div className="p-6 border-b border-[#3D2B1A] flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>

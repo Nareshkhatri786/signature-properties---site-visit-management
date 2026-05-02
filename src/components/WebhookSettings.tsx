@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  Webhook, 
-  Plus, 
-  Trash2, 
-  Copy, 
-  CheckCircle2, 
-  Settings2, 
-  ToggleLeft as Toggle, 
+import {
+  Webhook,
+  Plus,
+  Trash2,
+  Copy,
+  CheckCircle2,
+  Settings2,
+  ToggleLeft as Toggle,
   ToggleRight,
   ChevronRight,
   Info,
@@ -102,7 +102,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
           <Webhook className="text-[#C9A84C]" />
           Webhook Integrations
         </h2>
-        <button 
+        <button
           onClick={() => handleOpenModal()}
           className="bg-[#C9A84C] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-[#B0923D] transition-all text-sm"
         >
@@ -114,7 +114,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
         <Info size={18} className="text-[#1A6B3C] shrink-0 mt-0.5" />
         <div className="text-[12px] text-[#1A6B3C] leading-relaxed">
           <strong>How Webhooks Work:</strong><br />
-          Use these URLs to receive leads from external sources like Facebook Ads, Website Forms, or Zapier. 
+          Use these URLs to receive leads from external sources like Facebook Ads, Website Forms, or Zapier.
           Map the incoming JSON fields to our internal Lead fields (name, mobile, email) to ensure smooth data import.
           Duplicates are automatically prevented based on the mobile number.
         </div>
@@ -144,7 +144,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
                 <code className="text-[11px] text-[#C9A84C] font-mono font-bold truncate flex-1">
                   {window.location.origin}/api/webhook/whatsapp
                 </code>
-                <button 
+                <button
                   onClick={() => copyToClipboard(`${window.location.origin}/api/webhook/whatsapp`)}
                   className="p-1.5 hover:bg-gray-100 rounded-md text-[#C9A84C] transition-colors"
                   title="Copy URL"
@@ -154,18 +154,18 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-               <div className="bg-white/50 border border-[#E6D8B8] rounded-lg p-2 text-center">
-                 <div className="text-[9px] font-black text-[#9A8262] uppercase mb-1">Devi Bungalows</div>
-                 <div className="text-[10px] text-[#2A1C00] font-bold">Assigned: Hemant</div>
-               </div>
-               <div className="bg-white/50 border border-[#E6D8B8] rounded-lg p-2 text-center">
-                 <div className="text-[9px] font-black text-[#9A8262] uppercase mb-1">Royal Rudraksha</div>
-                 <div className="text-[10px] text-[#2A1C00] font-bold">Assigned: Vani</div>
-               </div>
-               <div className="bg-white/50 border border-[#E6D8B8] rounded-lg p-2 text-center">
-                 <div className="text-[9px] font-black text-[#9A8262] uppercase mb-1">Shreemad Family</div>
-                 <div className="text-[10px] text-[#2A1C00] font-bold">Assigned: Megha</div>
-               </div>
+              <div className="bg-white/50 border border-[#E6D8B8] rounded-lg p-2 text-center">
+                <div className="text-[9px] font-black text-[#9A8262] uppercase mb-1">Devi Bungalows</div>
+                <div className="text-[10px] text-[#2A1C00] font-bold">Assigned: Hemant</div>
+              </div>
+              <div className="bg-white/50 border border-[#E6D8B8] rounded-lg p-2 text-center">
+                <div className="text-[9px] font-black text-[#9A8262] uppercase mb-1">Royal Rudraksha</div>
+                <div className="text-[10px] text-[#2A1C00] font-bold">Assigned: Vani</div>
+              </div>
+              <div className="bg-white/50 border border-[#E6D8B8] rounded-lg p-2 text-center">
+                <div className="text-[9px] font-black text-[#9A8262] uppercase mb-1">Shreemad Family</div>
+                <div className="text-[10px] text-[#2A1C00] font-bold">Assigned: Megha</div>
+              </div>
             </div>
           </div>
           <div className="md:w-64 bg-[#FDFAF2] rounded-xl p-4 border border-[#E6D8B8] space-y-3">
@@ -203,7 +203,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
                 <code className="text-[11px] text-[#9A8262] truncate max-w-[300px]">
                   {window.location.origin}/api/webhooks/{config.token}
                 </code>
-                <button 
+                <button
                   onClick={() => copyToClipboard(`${window.location.origin}/api/webhooks/${config.token}`)}
                   className="p-1.5 hover:bg-gray-100 rounded-md text-[#C9A84C] transition-colors"
                 >
@@ -213,13 +213,13 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
             </div>
 
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={() => handleOpenModal(config)}
                 className="flex items-center gap-2 px-4 py-2 border border-[#E6D8B8] rounded-lg text-sm font-semibold text-[#9A8262] hover:bg-white hover:text-[#2A1C00] transition-all"
               >
                 <Settings2 size={16} /> Configure Mapping
               </button>
-              <button 
+              <button
                 onClick={() => onDelete(config.id)}
                 className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
               >
@@ -252,8 +252,8 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1.5">
                   <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Source Name</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g. Facebook Ads, Website Form"
@@ -261,7 +261,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
                   />
                 </div>
                 <div className="flex items-end pb-2">
-                  <button 
+                  <button
                     onClick={() => setFormData({ ...formData, active: !formData.active })}
                     className={cn(
                       "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all",
@@ -277,7 +277,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1.5">
                   <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Default Project</label>
-                  <select 
+                  <select
                     value={formData.projectId || ''}
                     onChange={(e) => setFormData({ ...formData, projectId: e.target.value })}
                     className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
@@ -293,7 +293,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
                   <div className="bg-white border border-[#E6D8B8] rounded-lg p-3 max-h-[150px] overflow-y-auto space-y-2">
                     {users.map(u => (
                       <label key={u.id} className="flex items-center gap-3 cursor-pointer hover:bg-[#FDFAF2] p-1 rounded transition-colors">
-                        <input 
+                        <input
                           type="checkbox"
                           checked={(formData.assignedUserIds || []).includes(u.id) || formData.assignedTo === u.id}
                           onChange={(e) => {
@@ -304,10 +304,10 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
                             } else {
                               newIds = currentIds.filter(id => id !== u.id);
                             }
-                            setFormData({ 
-                              ...formData, 
+                            setFormData({
+                              ...formData,
                               assignedUserIds: newIds,
-                              assignedTo: newIds.length === 1 ? newIds[0] : undefined 
+                              assignedTo: newIds.length === 1 ? newIds[0] : undefined
                             });
                           }}
                           className="rounded border-[#C9A84C] text-[#C9A84C] focus:ring-[#C9A84C]"
@@ -330,7 +330,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Field Mapping</label>
-                  <button 
+                  <button
                     onClick={addMappingRow}
                     className="text-[11px] font-bold text-[#C9A84C] hover:underline"
                   >
@@ -346,8 +346,8 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
                   {Object.entries(formData.mapping || {}).map(([key, value], idx) => (
                     <div key={idx} className="grid grid-cols-7 gap-4 items-center">
                       <div className="col-span-3">
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           defaultValue={key}
                           onBlur={(e) => {
                             const newKey = e.target.value;
@@ -365,7 +365,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
                         <ChevronRight size={16} />
                       </div>
                       <div className="col-span-2">
-                        <select 
+                        <select
                           value={value}
                           onChange={(e) => updateMapping(key, e.target.value)}
                           className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
@@ -376,7 +376,7 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
                         </select>
                       </div>
                       <div className="col-span-1 flex justify-end">
-                        <button 
+                        <button
                           onClick={() => removeMappingRow(key)}
                           className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
                         >
@@ -390,13 +390,13 @@ export default function WebhookSettings({ configs, projects, users, onSave, onDe
             </div>
 
             <div className="px-6 py-4 bg-gray-50 border-t border-[#E6D8B8] flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="px-6 py-2 text-sm font-bold text-[#9A8262] hover:text-[#2A1C00]"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleSave}
                 className="bg-[#C9A84C] text-white px-8 py-2 rounded-lg font-bold shadow-md hover:bg-[#B0923D] transition-all"
               >

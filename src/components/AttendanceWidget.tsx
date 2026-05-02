@@ -73,6 +73,104 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attend
     setClockingInProgress(false);
   };
 
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const currentAttendance = attendance.find(a => a.userId === user.id && a.date === today) || null;
+
+  const validateLocation = async () => {
+    if (!user.assignedLocation) {
+       toast.error("No work location assigned.");
+       return null;
+    }
+
+    try {
+      toast.loading("Verifying your location...", { id: 'geo-check', duration: 2000 });
+      const pos = await getCurrentPosition();
+      const distance = calculateDistance(
+        pos.coords.latitude, 
+        pos.coords.longitude, 
+        user.assignedLocation.lat, 
+        user.assignedLocation.lng
+      );
+
+      if (distance > (user.assignedLocation.radius || 100)) {
+        toast.error(`Location validation failed: You are ${Math.round(distance)}m away.`, { id: 'geo-check' });
+        return null;
+      }
+
+      toast.success("Location verified", { id: 'geo-check' });
+      return pos.coords;
+    } catch (error) {
+      toast.error("Could not verify location. Please enable GPS.", { id: 'geo-check' });
+      return null;
+    }
+  };
+
+  const handleClockIn = async () => {
+    setClockingInProgress(true);
+    const coords = await validateLocation();
+    
+    if (coords) {
+      const now = new Date();
+      const startTime = user.workingHours?.start || "10:00";
+      const [startH, startM] = startTime.split(':').map(Number);
+      const scheduledStart = new Date();
+      scheduledStart.setHours(startH, startM, 0, 0);
+
+      const onTime = now <= scheduledStart;
+
+      const record: Partial<Attendance> = {
+        userId: user.id,
+        date: today,
+        checkIn: {
+          time: now.toISOString(),
+          lat: coords.latitude,
+          lng: coords.longitude,
+          onTime
+        },
+        status: 'present'
+      };
+
+      try {
+        const id = `${user.id}_${today}`;
+        await apiService.save("attendance", {...record, id: id});
+        toast.success(onTime ? "Clocked in on time!" : "Clocked in (Late)");
+        window.location.reload();
+      } catch (error) {
+        toast.error("Failed to clock in");
+      }
+    }
+    setClockingInProgress(false);
+  };
+
+  const handleClockOut = async () => {
+    if (!currentAttendance) return;
+    
+    setClockingInProgress(true);
+    const coords = await validateLocation();
+    
+    if (coords) {
+      const now = new Date();
+      const record: Partial<Attendance> = {
+        ...currentAttendance,
+        checkOut: {
+          time: now.toISOString(),
+          lat: coords.latitude,
+          lng: coords.longitude,
+          forced: false
+        }
+      };
+
+      try {
+        await apiService.save("attendance", {...record, id: currentAttendance.id});
+        toast.success("Clocked out successfully!");
+        window.location.reload();
+      } catch (error) {
+        toast.error("Failed to clock out");
+      }
+    }
+    setClockingInProgress(false);
+  };
+
   if (loading) return null;
 
   const isClockedIn = !!currentAttendance?.checkIn;

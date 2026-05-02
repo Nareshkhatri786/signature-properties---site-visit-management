@@ -62,6 +62,7 @@ export default function SettingsPage({
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
   
   const [newProjectName, setNewProjectName] = useState('');
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [newUser, setNewUser] = useState({ username: '', password: '', name: '', projectId: projects[0]?.id || '', role: 'user' as 'admin' | 'user' });
 
   const userRole = user?.role?.toLowerCase();
@@ -74,9 +75,20 @@ export default function SettingsPage({
 
   const handleAddProject = () => {
     if (!newProjectName.trim()) return;
-    const newProject: Project = { id: generateId(), name: newProjectName.trim() };
+    const newProject: Project = { 
+      id: generateId(), 
+      name: newProjectName.trim(),
+      location: { lat: 0, lng: 0, address: '', radius: 100 }
+    };
     onAddProject(newProject);
     setNewProjectName('');
+  };
+
+  const handleUpdateProject = async () => {
+    if (!editingProject) return;
+    onAddProject(editingProject);
+    setEditingProject(null);
+    toast.success(`Project ${editingProject.name} updated`);
   };
 
   const handleRemoveProject = (id: string) => {
@@ -391,16 +403,119 @@ export default function SettingsPage({
                     Add
                   </button>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {projects.map(p => (
-                    <div key={p.id} className="flex items-center justify-between p-3 bg-white border border-[#E6D8B8] rounded-lg">
-                      <span className="text-sm font-medium">{p.name}</span>
-                      <button onClick={() => handleRemoveProject(p.id)} className="text-red-500 hover:text-red-700">
-                        <Trash2 size={16} />
-                      </button>
+                    <div key={p.id} className="space-y-3 p-3 bg-white border border-[#E6D8B8] rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-[#2A1C00]">{p.name}</span>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setEditingProject(p)}
+                            className="text-blue-600 hover:text-blue-800 text-xs font-bold uppercase tracking-wider"
+                          >
+                            Edit Location
+                          </button>
+                          <button onClick={() => handleRemoveProject(p.id)} className="text-red-500 hover:text-red-700">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {p.location && p.location.lat !== 0 && (
+                        <div className="text-[10px] text-[#9A8262] font-mono flex items-center gap-2">
+                          <MapPin size={10} />
+                          {p.location.address || 'Location Set'} ({p.location.lat.toFixed(4)}, {p.location.lng.toFixed(4)})
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
+
+                {/* Edit Project Modal/Form */}
+                {editingProject && (
+                  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white border border-[#E6D8B8] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                      <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between">
+                        <h3 className="font-['Cormorant_Garamond'] text-xl font-bold text-[#2A1C00]">Edit Project Location</h3>
+                        <button onClick={() => setEditingProject(null)} className="text-[#9A8262] hover:text-[#2A1C00]">
+                          <X size={20} />
+                        </button>
+                      </div>
+                      <div className="p-6 space-y-4">
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                          <Info className="text-amber-600 shrink-0" size={18} />
+                          <p className="text-xs text-amber-800">
+                            Enter the Google Map coordinates for this project. Staff assigned to this project will only be able to clock in within 100 meters of this location.
+                          </p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Project Name</label>
+                          <input 
+                            type="text" 
+                            value={editingProject.name}
+                            onChange={(e) => setEditingProject({...editingProject, name: e.target.value})}
+                            className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Latitude</label>
+                            <input 
+                              type="number" 
+                              step="any"
+                              value={editingProject.location?.lat || 0}
+                              onChange={(e) => setEditingProject({
+                                ...editingProject, 
+                                location: { ...(editingProject.location || { address: '', radius: 100, lng: 0 }), lat: parseFloat(e.target.value) }
+                              })}
+                              className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Longitude</label>
+                            <input 
+                              type="number" 
+                              step="any"
+                              value={editingProject.location?.lng || 0}
+                              onChange={(e) => setEditingProject({
+                                ...editingProject, 
+                                location: { ...(editingProject.location || { address: '', radius: 100, lat: 0 }), lng: parseFloat(e.target.value) }
+                              })}
+                              className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Site Address (Google Maps)</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. 123 Business Park, Mumbai"
+                            value={editingProject.location?.address || ''}
+                            onChange={(e) => setEditingProject({
+                              ...editingProject, 
+                              location: { ...(editingProject.location || { lat: 0, lng: 0, radius: 100 }), address: e.target.value }
+                            })}
+                            className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm"
+                          />
+                        </div>
+                        <div className="flex gap-3 mt-6">
+                          <button 
+                            onClick={() => setEditingProject(null)}
+                            className="flex-1 px-4 py-2.5 text-sm font-bold text-[#9A8262] hover:bg-gray-50 rounded-lg transition-all"
+                          >
+                            Cancel
+                          </button>
+                          <button 
+                            onClick={handleUpdateProject}
+                            className="flex-1 bg-[#C9A84C] text-white px-4 py-2.5 rounded-lg font-bold hover:bg-[#B0923D] transition-all shadow-md text-sm flex items-center justify-center gap-2"
+                          >
+                            <Save size={18} /> Update Project
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

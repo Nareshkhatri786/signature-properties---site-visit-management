@@ -10,9 +10,10 @@ import toast from 'react-hot-toast';
 interface AttendanceWidgetProps {
   user: User;
   attendance: Attendance[];
+  projects: Project[];
 }
 
-export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attendance }) => {
+export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attendance, projects }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [clockingInProgress, setClockingInProgress] = useState(false);
   const loading = false;
@@ -22,63 +23,16 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attend
     return () => clearInterval(timer);
   }, []);
 
-  const hasLocation = user.assignedLocation && user.assignedLocation.lat !== 0;
-  const isPendingRequest = !!user.locationRequest;
-
-  const handleSetInitialLocation = async () => {
-    setClockingInProgress(true);
-    try {
-      toast.loading("Capturing your work location...");
-      const pos = await getCurrentPosition();
-      const newLocation = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        radius: 100,
-        address: "My Assigned Work Site"
-      };
-      
-      await apiService.save("users", { ...user, id: user.id, assignedLocation: newLocation });
-      toast.dismiss();
-      toast.success("Work location frozen! You can now clock in.");
-      window.location.reload(); // Reload to get fresh user data
-    } catch (error) {
-      toast.dismiss();
-      toast.error("Could not capture location. Please ensure GPS is enabled.");
-    }
-    setClockingInProgress(false);
-  };
-
-  const handleRequestChange = async () => {
-    setClockingInProgress(true);
-    try {
-      toast.loading("Capturing new location for request...");
-      const pos = await getCurrentPosition();
-      const request = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        radius: 100,
-        address: "New Requested Site",
-        status: 'pending',
-        timestamp: new Date().toISOString()
-      };
-      
-      await apiService.save("users", { ...user, id: user.id, locationRequest: request });
-      toast.dismiss();
-      toast.success("Location change request sent to Admin!");
-      window.location.reload();
-    } catch (error) {
-      toast.dismiss();
-      toast.error("Could not capture location for request.");
-    }
-    setClockingInProgress(false);
-  };
+  const assignedProject = projects.find(p => p.id === user.projectId);
+  const projectLocation = assignedProject?.location;
+  const hasLocation = projectLocation && projectLocation.lat !== 0;
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const currentAttendance = attendance.find(a => a.userId === user.id && a.date === today) || null;
 
   const validateLocation = async () => {
-    if (!user.assignedLocation) {
-       toast.error("No work location assigned.");
+    if (!projectLocation || projectLocation.lat === 0) {
+       toast.error("Project location not set by Admin.");
        return null;
     }
 
@@ -88,12 +42,12 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attend
       const distance = calculateDistance(
         pos.coords.latitude, 
         pos.coords.longitude, 
-        user.assignedLocation.lat, 
-        user.assignedLocation.lng
+        projectLocation.lat, 
+        projectLocation.lng
       );
 
-      if (distance > (user.assignedLocation.radius || 100)) {
-        toast.error(`Location validation failed: You are ${Math.round(distance)}m away.`, { id: 'geo-check' });
+      if (distance > (projectLocation.radius || 100)) {
+        toast.error(`Location failed: You are ${Math.round(distance)}m away from ${assignedProject?.name}.`, { id: 'geo-check' });
         return null;
       }
 
@@ -199,16 +153,9 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attend
               <MapPin className="text-amber-500" size={24} />
             </div>
             <div>
-              <h4 className="text-white font-bold">Location Not Set</h4>
-              <p className="text-amber-200/40 text-xs mt-1">Please stand at your assigned work site and click below to freeze your location.</p>
+              <h4 className="text-white font-bold">Project Location Not Set</h4>
+              <p className="text-amber-200/40 text-xs mt-1">Please ask Admin to set the location for project: <span className="text-amber-500">{assignedProject?.name || 'Assigned Project'}</span></p>
             </div>
-            <button
-              onClick={handleSetInitialLocation}
-              disabled={clockingInProgress}
-              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold py-3 rounded-lg transition-all active:scale-95 disabled:opacity-50"
-            >
-              {clockingInProgress ? "Capturing..." : "Set My Work Site"}
-            </button>
           </div>
         ) : (
           <>
@@ -223,21 +170,8 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attend
                 <p className="text-amber-200/40 text-xs uppercase tracking-widest mb-2 font-mono">Work Site</p>
                 <div className="flex items-center gap-2 text-white font-medium">
                   <MapPin className="w-4 h-4 text-amber-500" />
-                  <span className="truncate">{user.assignedLocation?.address || "Frozen Site"}</span>
+                  <span className="truncate">{assignedProject?.name}</span>
                 </div>
-                
-                {isPendingRequest ? (
-                  <div className="absolute top-2 right-2 bg-blue-500/20 text-blue-400 text-[8px] font-bold px-1.5 py-0.5 rounded border border-blue-500/30 uppercase tracking-widest">
-                    Request Pending
-                  </div>
-                ) : (
-                  <button 
-                    onClick={handleRequestChange}
-                    className="absolute top-2 right-2 opacity-0 group-hover/loc:opacity-100 text-[8px] font-bold text-amber-500/60 hover:text-amber-500 uppercase tracking-widest transition-all"
-                  >
-                    Request Change
-                  </button>
-                )}
               </div>
             </div>
 

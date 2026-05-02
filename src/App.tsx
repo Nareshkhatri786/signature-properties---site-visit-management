@@ -1478,7 +1478,13 @@ export default function App() {
                 toast.success('User removed');
               }}
               onAddProject={(np) => {
-                setProjects(prev => [...prev, np]);
+                setProjects(prev => {
+                  const exists = prev.find(p => p.id === np.id);
+                  if (exists) {
+                    return prev.map(p => p.id === np.id ? np : p);
+                  }
+                  return [...prev, np];
+                });
                 toast.promise(api.save('projects', np.id, np), {
                   loading: 'Saving project...',
                   success: 'Project saved to database',

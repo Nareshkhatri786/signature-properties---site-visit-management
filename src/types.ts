@@ -68,6 +68,12 @@ export interface FollowUp {
 export interface Project {
   id: string;
   name: string;
+  location?: {
+    lat: number;
+    lng: number;
+    address: string;
+    radius: number;
+  };
 }
 
 export interface Settings {

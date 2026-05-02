@@ -49,7 +49,7 @@ export default React.memo(function HRMS({ user, users, projects, attendance, onN
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1 space-y-6">
-          <AttendanceWidget user={user} attendance={attendance} />
+          <AttendanceWidget user={user} attendance={attendance} projects={projects} />
 
           <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl p-6 shadow-sm">
             <h3 className="text-lg font-serif text-[#2A1C00] mb-4 flex items-center gap-2">
@@ -63,11 +63,11 @@ export default React.memo(function HRMS({ user, users, projects, attendance, onN
               </div>
               <div className="flex justify-between items-center py-2 border-b border-[#F0E6D2]">
                 <span className="text-xs text-[#9A8262] uppercase font-mono">My Base Site</span>
-                <span className="text-sm font-medium text-[#2A1C00]">{user.assignedLocation?.address || 'Not Assigned'}</span>
+                <span className="text-sm font-medium text-[#2A1C00]">{projects.find(p => p.id === user.projectId)?.location?.address || 'Not Assigned'}</span>
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-xs text-[#9A8262] uppercase font-mono">Geofence</span>
-                <span className="text-sm font-medium text-[#2A1C00]">{user.assignedLocation?.radius || 100}m radius</span>
+                <span className="text-sm font-medium text-[#2A1C00]">{projects.find(p => p.id === user.projectId)?.location?.radius || 100}m radius</span>
               </div>
             </div>
           </div>

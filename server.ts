@@ -23,6 +23,7 @@ const JSON_FIELDS_SETTINGS = ["sources", "budgets", "propertyInterests"];
 const JSON_FIELDS_ATTENDANCE = ["checkIn", "checkOut"];
 const JSON_FIELDS_NOTIF = ["metadata"];
 const JSON_FIELDS_WORKFLOWS = ["conditions", "actions"];
+const JSON_FIELDS_PROJECTS = ["location"];
 const JWT_SECRET = process.env.JWT_SECRET || "diyacrm_secret_change_in_prod";
 
 // Helper to format ISO dates for MySQL
@@ -341,9 +342,10 @@ async function startServer() {
           [d.id,d.username,passwordValue,d.name,d.role||"user",d.projectId||null,d.assignedProjectIds||null,d.workingHours||null,d.assignedLocation||null]
         );
       } else if (col === "projects") {
+        const d = stringifyJsonFields(data, JSON_FIELDS_PROJECTS);
         await pool.execute(
-          `INSERT INTO projects (id,name,description) VALUES (?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description)`,
-          [data.id, data.name, data.description||null]
+          `INSERT INTO projects (id,name,description,location) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),location=VALUES(location)`,
+          [d.id, d.name, d.description||null, d.location||null]
         );
       } else if (col === "settings") {
         const d = stringifyJsonFields(data, JSON_FIELDS_SETTINGS);

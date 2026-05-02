@@ -8,6 +8,11 @@ dotenv.config();
 
 let globalPool: mysql.Pool | null = null;
 
+export function setDbPool(pool: mysql.Pool) {
+  globalPool = pool;
+}
+
+
 function getPool() {
   if (!globalPool) {
     globalPool = mysql.createPool({
@@ -36,6 +41,35 @@ const smtpConfig = {
 };
 const transporter = nodemailer.createTransport(smtpConfig);
 const RECIPIENT = (process.env.REPORT_RECIPIENT || "diya9574466663@gmail.com").trim();
+
+// --- Helpers ---
+
+export async function getReportStats() {
+  const tables = ["leads", "visits", "users", "projects", "call_logs", "followups"];
+  const counts: Record<string, number> = {};
+  for (const t of tables) {
+    const [row] = await sql<any>(`SELECT COUNT(*) AS c FROM ${t}`);
+    counts[t] = row?.c || 0;
+  }
+  return { 
+    status: "ok", 
+    db: "mysql", 
+    smtpConfigured: !!(process.env.SMTP_USER && process.env.SMTP_PASS), 
+    recipient: RECIPIENT, 
+    collections: counts 
+  };
+}
+
+export async function sendCustomEmail(to: string, subject: string, html: string): Promise<boolean> {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return false;
+  try {
+    await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to, subject, html });
+    return true;
+  } catch (e: any) {
+    console.error("[Email] Custom Send Failed:", e.message);
+    return false;
+  }
+}
 
 // --- Report Generators ---
 

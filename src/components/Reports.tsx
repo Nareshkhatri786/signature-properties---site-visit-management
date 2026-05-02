@@ -338,7 +338,10 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
                   try {
                     const res = await fetch('/api/reports/trigger', {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
+                      },
                       body: JSON.stringify({ type: 'daily' })
                     });
                     const data = await res.json();
@@ -362,7 +365,10 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
                   try {
                     const res = await fetch('/api/reports/trigger', {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
+                      },
                       body: JSON.stringify({ type: 'weekend' })
                     });
                     const data = await res.json();

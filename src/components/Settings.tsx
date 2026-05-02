@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   User as UserIcon,
   Plus,
-  Briefcase
+  Briefcase,
+  X
 } from 'lucide-react';
 import { Settings, User, Visit, Remark, Template, CallLog, Lead, WebhookConfig, Project } from '../types';
 import { toast } from 'react-hot-toast';

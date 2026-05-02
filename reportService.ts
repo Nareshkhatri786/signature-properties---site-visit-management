@@ -1,18 +1,25 @@
-import mysql from "mysql2/promise";
-import nodemailer from "nodemailer";
-import cron from "node-cron";
-import dotenv from "dotenv";
+import nodemailer from 'nodemailer';
+import cron from 'node-cron';
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
+import { format, subDays } from 'date-fns';
+
 dotenv.config();
 
 let globalPool: mysql.Pool | null = null;
 
-export function setDbPool(pool: mysql.Pool) {
-  globalPool = pool;
-  console.log("[Report] MySQL pool injected.");
-}
-
-function getPool(): mysql.Pool {
-  if (!globalPool) throw new Error("DB pool not initialized in reportService");
+function getPool() {
+  if (!globalPool) {
+    globalPool = mysql.createPool({
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT || "3306"),
+      user: process.env.DB_USER,
+      password: process.env.DB_PASS,
+      database: process.env.DB_NAME,
+      waitForConnections: true,
+      connectionLimit: 10,
+    });
+  }
   return globalPool;
 }
 
@@ -22,108 +29,152 @@ async function sql<T = any>(q: string, p?: any[]): Promise<T[]> {
 }
 
 const smtpConfig = {
-  host: process.env.SMTP_HOST || "",
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
   port: parseInt(process.env.SMTP_PORT || "587"),
   secure: process.env.SMTP_PORT === "465",
   auth: { user: process.env.SMTP_USER || "", pass: process.env.SMTP_PASS || "" },
 };
 const transporter = nodemailer.createTransport(smtpConfig);
-const RECIPIENT = (process.env.REPORT_RECIPIENT || "").trim();
+const RECIPIENT = "diya9574466663@gmail.com";
 
-export async function getReportStats() {
-  const tables = ["leads","visits","users","projects","call_logs","followups"];
-  const counts: Record<string,number> = {};
-  for (const t of tables) {
-    const [row] = await sql<any>(`SELECT COUNT(*) AS c FROM ${t}`);
-    counts[t] = row?.c || 0;
-  }
-  return { status: "ok", db: "mysql", smtpConfigured: !!(process.env.SMTP_USER && process.env.SMTP_PASS), recipient: RECIPIENT, collections: counts };
-}
+// --- Report Generators ---
 
 export async function generateDailyMISReport() {
-  console.log("[MIS] Generating Daily Report...");
-  const now = new Date();
-  const today = now.toISOString().split("T")[0];
-  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
-  const weekStartStr = weekStart.toISOString().split("T")[0];
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-01`;
+  const today = format(new Date(), 'yyyy-MM-dd');
+  console.log(`[MIS] Generating Daily Report for ${today}...`);
 
-  const projects = await sql<any>("SELECT * FROM projects");
-  const users = await sql<any>("SELECT * FROM users");
+  const [newLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) = ?", [today]);
+  const [hotLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) = ? AND quality = 'hot'", [today]);
+  const [warmLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) = ? AND quality = 'warm'", [today]);
+  
+  const [visitsSch] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE visit_date = ? AND visit_status = 'scheduled'", [today]);
+  const [visitsDone] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE visit_date = ? AND visit_status = 'completed'", [today]);
 
-  const projectRows = await Promise.all(projects.map(async p => {
-    const [totRow] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE projectId=?", [p.id]);
-    const [newRow] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE projectId=? AND DATE(created_at)=?", [p.id, today]);
-    const [activeRow] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE projectId=? AND status NOT IN ('lost','closed')", [p.id]);
-    const statuses = ["new","contacted","visit_scheduled","visit_done","closed","lost"];
-    const stageCounts: Record<string,number> = {};
-    for (const s of statuses) {
-      const [r] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE projectId=? AND status=?", [p.id, s]);
-      stageCounts[s] = r?.c || 0;
-    }
-    const [vSch] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE projectId=? AND visit_date=? AND visit_status='scheduled'", [p.id, today]);
-    const [vDone] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE projectId=? AND visit_date=? AND visit_status='completed'", [p.id, today]);
-    return { name: p.name, newToday: newRow?.c||0, active: activeRow?.c||0, stageCounts, vSch: vSch?.c||0, vDone: vDone?.c||0 };
+  const [followupsDone] = await sql<any>("SELECT COUNT(*) AS c FROM followups WHERE date = ? AND status = 'completed'", [today]);
+
+  const users = await sql<any>("SELECT id, name FROM users");
+  const userStats = await Promise.all(users.map(async u => {
+    const [l] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE assignedTo = ? AND DATE(created_at) = ?", [u.id, today]);
+    const [v] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE assigned_to = ? AND visit_date = ? AND visit_status = 'completed'", [u.id, today]);
+    const [f] = await sql<any>("SELECT COUNT(*) AS c FROM followups WHERE userId = ? AND date = ? AND status = 'completed'", [u.id, today]);
+    return { name: u.name, leads: l.c, visits: v.c, followups: f.c };
   }));
-
-  const userRows = await Promise.all(users.map(async u => {
-    const [calls] = await sql<any>("SELECT COUNT(*) AS c FROM call_logs WHERE `by`=? AND DATE(timestamp)=?", [u.name, today]);
-    const [answered] = await sql<any>("SELECT COUNT(*) AS c FROM call_logs WHERE `by`=? AND DATE(timestamp)=? AND outcome='answered'", [u.name, today]);
-    const [leads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE assignedTo=?", [u.id]);
-    const [fSch] = await sql<any>("SELECT COUNT(*) AS c FROM followups WHERE userId=? AND date=? AND status='pending'", [u.id, today]);
-    const [fDone] = await sql<any>("SELECT COUNT(*) AS c FROM followups WHERE userId=? AND date=? AND status='completed'", [u.id, today]);
-    const [fOver] = await sql<any>("SELECT COUNT(*) AS c FROM followups WHERE userId=? AND date<? AND status='pending'", [u.id, today]);
-    return { name: u.name, calls: calls?.c||0, answered: answered?.c||0, leads: leads?.c||0, fSch: fSch?.c||0, fDone: fDone?.c||0, fOver: fOver?.c||0 };
-  }));
-
-  const [weekLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) >= ?", [weekStartStr]);
-  const [monthLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) >= ?", [monthStart]);
 
   const html = `
-<h2>DAILY MIS REPORT — ${today}</h2>
-<table border="1" cellpadding="5" style="border-collapse:collapse;width:100%">
-<thead><tr style="background:#f2f2f2"><th>Project</th><th>New Today</th><th>Active</th><th>New</th><th>Contacted</th><th>V.Sch</th><th>V.Done</th><th>Booked</th><th>Visits Sch Today</th><th>Visits Done Today</th></tr></thead>
-<tbody>${projectRows.map(r=>`<tr><td>${r.name}</td><td>${r.newToday}</td><td>${r.active}</td><td>${r.stageCounts.new}</td><td>${r.stageCounts.contacted}</td><td>${r.stageCounts.visit_scheduled}</td><td>${r.stageCounts.visit_done}</td><td>${r.stageCounts.closed}</td><td>${r.vSch}</td><td>${r.vDone}</td></tr>`).join("")}</tbody>
-</table>
-<br/>
-<table border="1" cellpadding="5" style="border-collapse:collapse;width:100%">
-<thead><tr style="background:#f2f2f2"><th>User</th><th>Calls</th><th>Connected</th><th>Leads</th><th>F/U Today</th><th>F/U Done</th><th>Overdue F/U</th></tr></thead>
-<tbody>${userRows.map(r=>`<tr><td>${r.name}</td><td>${r.calls}</td><td>${r.answered}</td><td>${r.leads}</td><td>${r.fSch}</td><td>${r.fDone}</td><td style="color:${r.fOver>0?"red":"black"}">${r.fOver}</td></tr>`).join("")}</tbody>
-</table>
-<p><b>Weekly New Leads:</b> ${weekLeads?.c||0} &nbsp; <b>Monthly New Leads:</b> ${monthLeads?.c||0}</p>`;
+    <div style="font-family: sans-serif; color: #333; max-width: 600px; border: 1px solid #eee; padding: 20px;">
+      <h2 style="color: #C9A84C; border-bottom: 2px solid #C9A84C; padding-bottom: 10px;">Daily MIS Report - ${today}</h2>
+      
+      <div style="margin: 20px 0; background: #f9f9f9; padding: 15px; border-radius: 8px;">
+        <h3 style="margin-top:0">Today's Overview</h3>
+        <table style="width: 100%; text-align: left;">
+          <tr><td>New Leads:</td><td><b>${newLeads.c}</b> (Hot: ${hotLeads.c}, Warm: ${warmLeads.c})</td></tr>
+          <tr><td>Visits:</td><td><b>${visitsDone.c} Completed</b> (${visitsSch.c} Scheduled)</td></tr>
+          <tr><td>Follow-ups:</td><td><b>${followupsDone.c} Completed</b></td></tr>
+        </table>
+      </div>
 
-  await sendEmail(`Daily MIS Report — ${today}`, html);
+      <h3>User Performance (Today)</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background: #f0f0f0; text-align: left;">
+            <th style="padding: 8px; border: 1px solid #ddd;">User</th>
+            <th style="padding: 8px; border: 1px solid #ddd;">Leads</th>
+            <th style="padding: 8px; border: 1px solid #ddd;">Visits</th>
+            <th style="padding: 8px; border: 1px solid #ddd;">F-ups</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${userStats.map(s => `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd;">${s.name}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${s.leads}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${s.visits}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${s.followups}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <p style="font-size: 12px; color: #999; margin-top: 30px;">Sent automatically by Signature Properties CRM at 8:00 PM IST.</p>
+    </div>
+  `;
+
+  await sendEmail(`Daily MIS Report - ${today}`, html);
+}
+
+export async function generateWeeklyMISReport() {
+  const start = format(subDays(new Date(), 7), 'yyyy-MM-dd'); // Last Monday approx
+  const end = format(subDays(new Date(), 1), 'yyyy-MM-dd');   // Last Sunday
+  console.log(`[MIS] Generating Weekly Report for ${start} to ${end}...`);
+
+  const [totalLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) BETWEEN ? AND ?", [start, end]);
+  const [hotLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) BETWEEN ? AND ? AND quality = 'hot'", [start, end]);
+  const [warmLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) BETWEEN ? AND ? AND quality = 'warm'", [start, end]);
+  
+  const [visitsDone] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE visit_date BETWEEN ? AND ? AND visit_status = 'completed'", [start, end]);
+  const [followupsDone] = await sql<any>("SELECT COUNT(*) AS c FROM followups WHERE date BETWEEN ? AND ? AND status = 'completed'", [start, end]);
+
+  const users = await sql<any>("SELECT id, name FROM users");
+  const userStats = await Promise.all(users.map(async u => {
+    const [l] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE assignedTo = ? AND DATE(created_at) BETWEEN ? AND ?", [u.id, start, end]);
+    const [v] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE assigned_to = ? AND visit_date BETWEEN ? AND ? AND visit_status = 'completed'", [u.id, start, end]);
+    const [f] = await sql<any>("SELECT COUNT(*) AS c FROM followups WHERE userId = ? AND date BETWEEN ? AND ? AND status = 'completed'", [u.id, start, end]);
+    return { name: u.name, leads: l.c, visits: v.c, followups: f.c };
+  }));
+
+  const html = `
+    <div style="font-family: sans-serif; color: #333; max-width: 600px; border: 1px solid #eee; padding: 20px;">
+      <h2 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px;">Weekly Performance Report</h2>
+      <p style="color: #7f8c8d; font-size: 14px;">Period: <b>${start}</b> to <b>${end}</b> (Mon-Sun)</p>
+      
+      <div style="margin: 20px 0; background: #ecf0f1; padding: 15px; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr;">
+        <div>
+          <p style="margin:5px 0">Total Leads: <b>${totalLeads.c}</b></p>
+          <p style="margin:5px 0">Hot Leads: <b style="color:#e74c3c">${hotLeads.c}</b></p>
+          <p style="margin:5px 0">Warm Leads: <b style="color:#e67e22">${warmLeads.c}</b></p>
+        </div>
+        <div>
+          <p style="margin:5px 0">Visits Done: <b>${visitsDone.c}</b></p>
+          <p style="margin:5px 0">Follow-ups: <b>${followupsDone.c}</b></p>
+        </div>
+      </div>
+
+      <h3>User Contribution (Full Week)</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background: #34495e; color: white; text-align: left;">
+            <th style="padding: 8px; border: 1px solid #ddd;">User</th>
+            <th style="padding: 8px; border: 1px solid #ddd;">Leads</th>
+            <th style="padding: 8px; border: 1px solid #ddd;">Visits</th>
+            <th style="padding: 8px; border: 1px solid #ddd;">F-ups</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${userStats.map(s => `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd;">${s.name}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${s.leads}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${s.visits}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${s.followups}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <p style="font-size: 12px; color: #999; margin-top: 30px;">Weekly report generated on Monday morning.</p>
+    </div>
+  `;
+
+  await sendEmail(`Weekly MIS Report (${start} - ${end})`, html);
 }
 
 export async function generateWeekendMISReport() {
-  console.log("[MIS] Generating Weekend Report...");
-  const now = new Date();
-  const today = now.toISOString().split("T")[0];
-  const tomorrow = new Date(now); tomorrow.setDate(now.getDate()+1);
-  const tomorrowStr = tomorrow.toISOString().split("T")[0];
-  const lastSat = new Date(now); lastSat.setDate(now.getDate()-(now.getDay()+1));
-  const lastSatStr = lastSat.toISOString().split("T")[0];
-
-  const projects = await sql<any>("SELECT * FROM projects");
-  const weekendRows = await Promise.all(projects.map(async p => {
-    const [hot] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE projectId=? AND (visit_date=? OR visit_date=?) AND visit_status='scheduled' AND status='hot'", [p.id, today, tomorrowStr]);
-    const [warm] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE projectId=? AND (visit_date=? OR visit_date=?) AND visit_status='scheduled' AND status='warm'", [p.id, today, tomorrowStr]);
-    const [cold] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE projectId=? AND (visit_date=? OR visit_date=?) AND visit_status='scheduled' AND status='cold'", [p.id, today, tomorrowStr]);
-    const [total] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE projectId=? AND (visit_date=? OR visit_date=?) AND visit_status='scheduled'", [p.id, today, tomorrowStr]);
-    const [newL] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE projectId=? AND DATE(created_at)>=?", [p.id, lastSatStr]);
-    const [active] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE projectId=? AND status NOT IN ('lost','closed')", [p.id]);
-    return { name: p.name, total: total?.c||0, hot: hot?.c||0, warm: warm?.c||0, cold: cold?.c||0, newL: newL?.c||0, active: active?.c||0 };
-  }));
-
-  const html = `
-<h2>WEEKEND MIS REPORT — ${today}</h2>
-<h3>Planned Visits (Sat+Sun)</h3>
-<table border="1" cellpadding="5" style="border-collapse:collapse;width:100%">
-<thead><tr style="background:#f2f2f2"><th>Project</th><th>Total Visits</th><th>Hot</th><th>Warm</th><th>Cold</th><th>New Leads (This Week)</th><th>Active Leads</th></tr></thead>
-<tbody>${weekendRows.map(r=>`<tr><td>${r.name}</td><td>${r.total}</td><td>${r.hot}</td><td>${r.warm}</td><td>${r.cold}</td><td>${r.newL}</td><td>${r.active}</td></tr>`).join("")}</tbody>
-</table>`;
-
-  await sendEmail(`Weekend MIS Report — ${today}`, html);
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const dayName = format(new Date(), 'EEEE');
+  console.log(`[MIS] Generating Weekend Summary (${dayName})...`);
+  
+  // Reuse daily logic but with different title
+  await generateDailyMISReport();
 }
 
 async function sendEmail(subject: string, html: string) {
@@ -132,21 +183,32 @@ async function sendEmail(subject: string, html: string) {
     console.log("SUBJECT:", subject);
     return;
   }
-  await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: RECIPIENT, subject, html });
-  console.log("[MIS] Email sent to", RECIPIENT);
-}
-
-export async function sendCustomEmail(to: string, subject: string, html: string): Promise<boolean> {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return false;
   try {
-    await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to, subject, html });
-    return true;
-  } catch (e: any) { console.error("[Email]", e.message); return false; }
+    await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: RECIPIENT, subject, html });
+    console.log("[MIS] Email sent to", RECIPIENT);
+  } catch (e: any) {
+    console.error("[MIS] Email Failed:", e.message);
+  }
 }
 
 export function setupMISReports() {
   console.log("[MIS] Scheduling reports...");
-  cron.schedule("30 14 * * *", () => generateDailyMISReport().catch(console.error));
-  cron.schedule("30 3 * * 6", () => generateWeekendMISReport().catch(console.error));
-  console.log("[MIS] Daily@8PM IST, Weekend@Sat9AM IST");
+  
+  // Daily at 8:00 PM IST (14:30 UTC)
+  cron.schedule("30 14 * * *", () => {
+    generateDailyMISReport().catch(console.error);
+  });
+
+  // Weekly at 9:00 AM IST on Monday (03:30 UTC)
+  cron.schedule("30 3 * * 1", () => {
+    generateWeeklyMISReport().catch(console.error);
+  });
+
+  // Saturday & Sunday at 10:00 AM IST (04:30 UTC)
+  cron.schedule("30 4 * * 6,0", () => {
+    generateWeekendMISReport().catch(console.error);
+  });
+
+  console.log("[MIS] Scheduled: Daily@8PM, Weekly@Mon9AM, Weekend@Sat-Sun10AM");
 }
+

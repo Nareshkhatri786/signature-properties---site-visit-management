@@ -35,7 +35,7 @@ const smtpConfig = {
   auth: { user: process.env.SMTP_USER || "", pass: process.env.SMTP_PASS || "" },
 };
 const transporter = nodemailer.createTransport(smtpConfig);
-const RECIPIENT = "diya9574466663@gmail.com";
+const RECIPIENT = (process.env.REPORT_RECIPIENT || "diya9574466663@gmail.com").trim();
 
 // --- Report Generators ---
 

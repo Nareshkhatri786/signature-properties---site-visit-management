@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, Calendar, User as UserIcon } from 'lucide-react';
-import { User, Page } from '../types';
+import { User, Page, Attendance } from '../types';
 import { NotificationCenter } from './NotificationCenter';
+import { QuickAttendance } from './QuickAttendance';
 import { apiService } from '../lib/api-service';
 import { format } from 'date-fns';
 
@@ -11,9 +12,10 @@ interface TopbarProps {
   onMenuClick: () => void;
   onNavigate: (page: Page, id?: string) => void;
   notifications: UserNotification[];
+  attendance: Attendance[];
 }
 
-export default function Topbar({ user, title, onMenuClick, onNavigate, notifications }: TopbarProps) {
+export default function Topbar({ user, title, onMenuClick, onNavigate, notifications, attendance }: TopbarProps) {
   const today = new Date().toLocaleDateString('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -34,6 +36,7 @@ export default function Topbar({ user, title, onMenuClick, onNavigate, notificat
       </h1>
 
       <div className="flex items-center gap-2 sm:gap-6">
+        <QuickAttendance user={user} attendance={attendance} />
         <NotificationCenter user={user} onNavigate={onNavigate} notifications={notifications} />
 
         <div className="hidden md:flex items-center gap-2 text-[#9A8262] text-[12.5px]">

@@ -991,6 +991,7 @@ export default function App() {
           onMenuClick={() => setIsSidebarOpen(true)}
           onNavigate={navigate}
           notifications={notifications}
+          attendance={attendance}
         />
         
         <main className="p-4 lg:p-8 flex-1">

@@ -17,7 +17,6 @@ import TemplateManager from './components/TemplateManager';
 import SettingsPage from './components/Settings';
 import Reports from './components/Reports';
 import WebhookSettings from './components/WebhookSettings';
-import HRMS from './components/HRMS';
 import CallOutcomeModal from './components/CallOutcomeModal';
 import PostCallWhatsAppModal from './components/PostCallWhatsAppModal';
 import Login from './components/Login';
@@ -86,7 +85,6 @@ export default function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
 
@@ -1004,15 +1002,6 @@ export default function App() {
               followUps={filteredFollowups}
               user={user}
               stats={stats}
-              onNavigate={navigate} 
-            />
-          )}
-          {currentPage === 'hrms' && (
-            <HRMS 
-              user={user} 
-              users={users} 
-              projects={projects}
-              attendance={attendance}
               onNavigate={navigate} 
             />
           )}

@@ -21,9 +21,11 @@ import {
   Save,
   Sparkles,
   ArrowRightLeft,
-  Star
+  Star,
+  AlertCircle
 } from 'lucide-react';
-import { Lead, Visit, Remark, CallLog, Page, LeadStatus, LeadQuality, FollowUp, CallOutcome, Project, User, RemarkCategory, RemarkSentiment, Activity, ActivityType, WhatsAppMessage } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { Lead, Visit, Remark, CallLog, Page, LeadStatus, LeadQuality, FollowUp, CallOutcome, Project, User, RemarkCategory, RemarkSentiment, Activity, ActivityType, WhatsAppMessage, VisitOutcome } from '../types';
 import { cn } from '../lib/utils';
 import { StatusBadge, VisitBadge } from './Dashboard';
 import FollowUpForm from './FollowUpForm';
@@ -57,9 +59,10 @@ interface LeadDetailProps {
   onLogCallOutcome: (outcome: CallOutcome, note?: string) => void;
   onNavigate: (page: Page, id?: string) => void;
   onTransferLead: (leadId: string, projectId: string) => void;
+  onQuickVisitSave?: (visit: Visit) => void;
 }
 
-export default React.memo(function LeadDetail({ user, lead, visits, remarks: initialRemarks, callLogs, followUps, projects, users, onUpdateLead, onAddVisit, onAddFollowUp, onUpdateFollowUp, onAddRemark, onAIScore, onCall, onWhatsApp, onLogCallOutcome, onNavigate, onTransferLead }: LeadDetailProps) {
+export default React.memo(function LeadDetail({ user, lead, visits, remarks: initialRemarks, callLogs, followUps, projects, users, onUpdateLead, onAddVisit, onAddFollowUp, onUpdateFollowUp, onAddRemark, onAIScore, onCall, onWhatsApp, onLogCallOutcome, onNavigate, onTransferLead, onQuickVisitSave }: LeadDetailProps) {
   const [syncedRemarks, setSyncedRemarks] = useState<Remark[]>(initialRemarks);
   const [syncedActivities, setSyncedActivities] = useState<Activity[]>([]);
   const [syncedWhatsApp, setSyncedWhatsApp] = useState<WhatsAppMessage[]>([]);
@@ -109,6 +112,27 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
   const [selectedOutcome, setSelectedOutcome] = useState<CallOutcome | null>(null);
   const [callNote, setCallNote] = useState('');
   
+  // Quick Actions Modals
+  const [isQuickVisitModalOpen, setIsQuickVisitModalOpen] = useState(false);
+  const [isQuickCompleteModalOpen, setIsQuickCompleteModalOpen] = useState(false);
+  
+  // Quick Visit Form Data
+  const [quickVisitData, setQuickVisitData] = useState({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    time: '',
+    remark: ''
+  });
+
+  // Quick Complete Form Data
+  const [quickCompleteData, setQuickCompleteData] = useState({
+    feedback: '',
+    interest: 'warm' as LeadQuality,
+    outcome: 'follow_up_required' as VisitOutcome,
+    nextStep: 'none' as 'none' | 'followup' | 'revisit',
+    nextDate: '',
+    nextTime: ''
+  });
+  
   // Remark state
   const [remarkText, setRemarkText] = useState('');
   const [remarkCategory, setRemarkCategory] = useState<RemarkCategory>('general');
@@ -116,9 +140,176 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
 
   const handleUpdateStatus = (field: 'status' | 'quality', value: string) => {
     if (lead[field] === value) return;
+    
+    if (field === 'status') {
+      if (value === 'visit_scheduled') {
+        setIsQuickVisitModalOpen(true);
+        return;
+      }
+      if (value === 'visit_done') {
+        setIsQuickCompleteModalOpen(true);
+        return;
+      }
+    }
+
     const oldVal = lead[field];
     onUpdateLead({ ...lead, [field]: value, updated_at: new Date().toISOString() });
     logActivity(field === 'status' ? 'lead_status_changed' : 'lead_quality_changed', `Changed ${field} from ${oldVal} to ${value}`);
+  };
+
+  const handleQuickVisitSubmit = () => {
+    if (!quickVisitData.date) {
+      toast.error('Please select a visit date');
+      return;
+    }
+
+    const newVisit: Visit = {
+      id: generateId(),
+      leadId: lead.id,
+      client_name: lead.name,
+      mobile: lead.mobile,
+      email: lead.email || '',
+      visit_date: quickVisitData.date,
+      visit_time: quickVisitData.time,
+      purpose: quickVisitData.remark,
+      status: lead.quality,
+      visit_status: 'scheduled',
+      assigned_to: user.name,
+      source: lead.source,
+      budget: lead.budget || '',
+      property_interest: lead.property_interest || '',
+      priority: lead.priority,
+      created_at: new Date().toISOString(),
+      projectId: lead.projectId
+    };
+
+    apiService.save('visits', newVisit).catch(console.error);
+    if (onQuickVisitSave) onQuickVisitSave(newVisit);
+    
+    const updatedLead = { 
+      ...lead, 
+      status: 'visit_scheduled' as LeadStatus, 
+      updated_at: new Date().toISOString(),
+      stats: {
+        ...(lead.stats || { visits_planned: 0, visits_done: 0, calls_attempted: 0, calls_answered: 0, followups_done: 0 }),
+        visits_planned: ((lead.stats?.visits_planned || 0) + 1)
+      }
+    };
+    onUpdateLead(updatedLead);
+    
+    if (quickVisitData.remark) {
+       const remark: Remark = {
+         id: generateId(),
+         text: `Visit Scheduled for ${quickVisitData.date}: ${quickVisitData.remark}`,
+         by: user.name,
+         at: new Date().toISOString()
+       };
+       apiService.saveRemark(lead.id, remark).catch(console.error);
+       onAddRemark(remark);
+    }
+
+    logActivity('visit_scheduled', `Scheduled for ${quickVisitData.date}`);
+    setIsQuickVisitModalOpen(false);
+    toast.success('Visit scheduled and status updated');
+  };
+
+  const handleQuickCompleteSubmit = () => {
+    if (!quickCompleteData.feedback) {
+      toast.error('Please provide client feedback');
+      return;
+    }
+
+    // Find the latest scheduled visit for this lead to complete it
+    const activeVisit = visits
+      .filter(v => v.visit_status === 'scheduled' || v.visit_status === 'rescheduled')
+      .sort((a, b) => b.visit_date.localeCompare(a.visit_date))[0];
+
+    if (activeVisit) {
+      const updatedVisit: Visit = {
+        ...activeVisit,
+        visit_status: 'completed',
+        client_feedback: quickCompleteData.feedback,
+        interest_level: quickCompleteData.interest,
+        outcome: quickCompleteData.outcome,
+        completed_at: new Date().toISOString()
+      };
+      apiService.save('visits', updatedVisit).catch(console.error);
+    }
+
+    // Update lead status and quality
+    const updatedLead = { 
+      ...lead, 
+      status: 'visit_done' as LeadStatus, 
+      quality: quickCompleteData.interest, 
+      updated_at: new Date().toISOString(),
+      stats: {
+        ...(lead.stats || { visits_planned: 0, visits_done: 0, calls_attempted: 0, calls_answered: 0, followups_done: 0 }),
+        visits_done: ((lead.stats?.visits_done || 0) + 1)
+      }
+    };
+    onUpdateLead(updatedLead);
+
+    // Add remark
+    const remark: Remark = {
+      id: generateId(),
+      text: `Visit Done! Outcome: ${quickCompleteData.outcome.replace(/_/g, ' ').toUpperCase()} | Feedback: ${quickCompleteData.feedback}`,
+      by: user.name,
+      at: new Date().toISOString()
+    };
+    apiService.saveRemark(lead.id, remark).catch(console.error);
+    onAddRemark(remark);
+
+    // Handle next action step
+    if (quickCompleteData.nextStep === 'followup' && quickCompleteData.nextDate) {
+       const newFollowUp: FollowUp = {
+         id: generateId(),
+         leadId: lead.id,
+         projectId: lead.projectId,
+         date: quickCompleteData.nextDate,
+         purpose: 'Follow up post-visit',
+         status: 'pending',
+         userId: user.id,
+         userName: user.name,
+         method: 'call',
+         created_at: new Date().toISOString()
+       };
+       onAddFollowUp(newFollowUp);
+    } else if (quickCompleteData.nextStep === 'revisit' && quickCompleteData.nextDate) {
+      const newVisit: Visit = {
+        id: generateId(),
+        leadId: lead.id,
+        client_name: lead.name,
+        mobile: lead.mobile,
+        email: lead.email || '',
+        visit_date: quickCompleteData.nextDate,
+        visit_time: quickCompleteData.nextTime,
+        purpose: 'Scheduled Re-visit',
+        status: quickCompleteData.interest,
+        visit_status: 'scheduled',
+        assigned_to: user.name,
+        source: lead.source,
+        budget: lead.budget || '',
+        property_interest: lead.property_interest || '',
+        priority: lead.priority,
+        created_at: new Date().toISOString(),
+        projectId: lead.projectId
+      };
+      apiService.save('visits', newVisit).catch(console.error);
+      if (onQuickVisitSave) onQuickVisitSave(newVisit);
+      
+      const remark: Remark = {
+        id: generateId(),
+        text: `Re-visit Scheduled for ${quickCompleteData.nextDate}`,
+        by: user.name,
+        at: new Date().toISOString()
+      };
+      apiService.saveRemark(lead.id, remark).catch(console.error);
+      onAddRemark(remark);
+    }
+
+    logActivity('visit_completed', `Outcome: ${quickCompleteData.outcome}`);
+    setIsQuickCompleteModalOpen(false);
+    toast.success('Visit completed and status updated');
   };
 
   const handleAddRemark = () => {
@@ -815,6 +1006,216 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
           </div>
         </div>
       )}
+
+      {/* Quick Visit Modal */}
+      <AnimatePresence>
+        {isQuickVisitModalOpen && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white border border-[#E6D8B8] rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="w-16 h-16 bg-[#FDF8E6] text-[#C9A84C] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-[#F2ECD8]">
+                  <Calendar size={32} />
+                </div>
+                <h3 className="font-['Cormorant_Garamond'] text-2xl font-bold text-[#2A1C00] mb-2 text-center">Schedule Visit</h3>
+                <p className="text-sm text-[#9A8262] mb-6 text-center leading-relaxed">
+                  Set the appointment for <span className="font-bold text-[#5C4820]">{lead.name}</span>
+                </p>
+
+                <div className="space-y-4 mb-8">
+                  <div className="space-y-1.5">
+                    <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar size={12} /> Visit Date
+                    </label>
+                    <input 
+                      type="date" 
+                      value={quickVisitData.date}
+                      onChange={(e) => setQuickVisitData({...quickVisitData, date: e.target.value})}
+                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock size={12} /> Visit Time (Optional)
+                    </label>
+                    <input 
+                      type="time" 
+                      value={quickVisitData.time}
+                      onChange={(e) => setQuickVisitData({...quickVisitData, time: e.target.value})}
+                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                      <MessageSquare size={12} /> Visit Remark
+                    </label>
+                    <textarea 
+                      value={quickVisitData.remark}
+                      onChange={(e) => setQuickVisitData({...quickVisitData, remark: e.target.value})}
+                      placeholder="Special requirements or notes..."
+                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C] resize-none h-20"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={handleQuickVisitSubmit}
+                    className="w-full bg-[#C9A84C] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all flex items-center justify-center gap-2"
+                  >
+                    <Save size={18} /> Confirm & Schedule
+                  </button>
+                  <button 
+                    onClick={() => setIsQuickVisitModalOpen(false)}
+                    className="w-full bg-white border border-[#E6D8B8] text-[#9A8262] font-semibold py-3 rounded-xl hover:bg-[#FDFAF2] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Quick Complete Modal (Visit Done) */}
+      <AnimatePresence>
+        {isQuickCompleteModalOpen && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white border border-[#E6D8B8] rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="w-16 h-16 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-green-100">
+                  <CheckCircle2 size={32} />
+                </div>
+                <h3 className="font-['Cormorant_Garamond'] text-2xl font-bold text-[#2A1C00] mb-2 text-center">Visit Completed</h3>
+                <p className="text-sm text-[#9A8262] mb-8 text-center leading-relaxed">
+                  Please provide feedback and outcome details for <span className="font-bold text-[#5C4820]">{lead.name}</span>.
+                </p>
+
+                <div className="space-y-6 mb-8">
+                  <div className="space-y-1.5">
+                    <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                      <MessageSquare size={12} /> Client Feedback *
+                    </label>
+                    <textarea 
+                      value={quickCompleteData.feedback}
+                      onChange={(e) => setQuickCompleteData({...quickCompleteData, feedback: e.target.value})}
+                      placeholder="What did the client say about the property?"
+                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C] resize-none h-24"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                        <Star size={12} /> Interest Level
+                      </label>
+                      <select 
+                        value={quickCompleteData.interest}
+                        onChange={(e) => setQuickCompleteData({...quickCompleteData, interest: e.target.value as LeadQuality})}
+                        className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                      >
+                        <option value="hot">🔥 Hot Interest</option>
+                        <option value="warm">🌡️ Warm Interest</option>
+                        <option value="cold">❄️ Cold Interest</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                        <AlertCircle size={12} /> Final Outcome
+                      </label>
+                      <select 
+                        value={quickCompleteData.outcome}
+                        onChange={(e) => setQuickCompleteData({...quickCompleteData, outcome: e.target.value as VisitOutcome})}
+                        className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                      >
+                        <option value="booked">💰 Booked / Token Ready</option>
+                        <option value="highly_interested">🌟 Highly Interested</option>
+                        <option value="follow_up_required">📞 Needs Follow-up</option>
+                        <option value="shared_quotation">📄 Quotation Shared</option>
+                        <option value="negotiation">🤝 In Negotiation</option>
+                        <option value="not_interested">❌ Not Interested</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4 pt-4 border-t border-[#E6D8B8]">
+                    <div className="space-y-1.5">
+                      <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                        <ArrowRightLeft size={12} /> Next Action Step
+                      </label>
+                      <select 
+                        value={quickCompleteData.nextStep}
+                        onChange={(e) => setQuickCompleteData({...quickCompleteData, nextStep: e.target.value as any})}
+                        className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                      >
+                        <option value="none">No immediate action required</option>
+                        <option value="followup">📞 Schedule Follow-up Call</option>
+                        <option value="revisit">📅 Schedule Re-Visit</option>
+                      </select>
+                    </div>
+
+                    {quickCompleteData.nextStep !== 'none' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-[#FDFAF2] p-4 rounded-xl border border-[#E6D8B8]">
+                        <div className="space-y-1.5">
+                          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                            <Calendar size={12} /> Date
+                          </label>
+                          <input 
+                            type="date" 
+                            value={quickCompleteData.nextDate}
+                            onChange={(e) => setQuickCompleteData({...quickCompleteData, nextDate: e.target.value})}
+                            className="w-full bg-white border border-[#E6D8B8] rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                            <Clock size={12} /> Time (Optional)
+                          </label>
+                          <input 
+                            type="time" 
+                            value={quickCompleteData.nextTime}
+                            onChange={(e) => setQuickCompleteData({...quickCompleteData, nextTime: e.target.value})}
+                            className="w-full bg-white border border-[#E6D8B8] rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={handleQuickCompleteSubmit}
+                    disabled={!quickCompleteData.feedback.trim() || (quickCompleteData.nextStep !== 'none' && !quickCompleteData.nextDate)}
+                    className="w-full bg-[#C9A84C] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    <CheckCircle2 size={18} /> Complete Visit & Log Feedback
+                  </button>
+                  <button  
+                    onClick={() => setIsQuickCompleteModalOpen(false)}
+                    className="w-full bg-white border border-[#E6D8B8] text-[#9A8262] font-semibold py-3 rounded-xl hover:bg-[#FDFAF2] transition-colors"
+                  >
+                    Go Back
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 });

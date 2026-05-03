@@ -11,9 +11,10 @@ import { clsx } from 'clsx';
 interface QuickAttendanceProps {
   user: User;
   attendance: Attendance[];
+  onUpdate: (attendance: Attendance) => void;
 }
 
-export const QuickAttendance: React.FC<QuickAttendanceProps> = ({ user, attendance }) => {
+export const QuickAttendance: React.FC<QuickAttendanceProps> = ({ user, attendance, onUpdate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [clockingInProgress, setClockingInProgress] = useState(false);
   const loading = false;
@@ -24,29 +25,30 @@ export const QuickAttendance: React.FC<QuickAttendanceProps> = ({ user, attendan
 
   const handleClockIn = async () => {
     setClockingInProgress(true);
-    let coords = { latitude: 0, longitude: 0 };
-    try {
-      const pos = await getCurrentPosition();
-      coords = pos.coords;
-    } catch (e) {
-      console.warn("Location not available for Quick Attendance");
-    }
     const now = new Date();
     const startTime = user.workingHours?.start || "10:00";
     const [startH, startM] = startTime.split(':').map(Number);
     const scheduledStart = new Date();
     scheduledStart.setHours(startH, startM, 0, 0);
     const onTime = now <= scheduledStart;
-    const record: Partial<Attendance> = {
+    
+    const record: Attendance = {
+      id: `${user.id}_${today}`,
       userId: user.id,
       date: today,
-      checkIn: { time: now.toISOString(), lat: coords.latitude, lng: coords.longitude, onTime },
+      checkIn: { 
+        time: now.toISOString(), 
+        lat: 0, 
+        lng: 0, 
+        onTime 
+      },
       status: 'present'
     };
+
     try {
-      await apiService.save("attendance", {...record, id: `${user.id}_${today}`});
+      await apiService.save("attendance", record);
       toast.success(onTime ? "Clocked in!" : "Clocked in (Late)");
-      window.location.reload();
+      onUpdate(record);
     } catch (e) {
       toast.error("Clock-in failed");
     }
@@ -56,22 +58,20 @@ export const QuickAttendance: React.FC<QuickAttendanceProps> = ({ user, attendan
   const handleClockOut = async () => {
     if (!currentAttendance) return;
     setClockingInProgress(true);
-    let coords = { latitude: 0, longitude: 0 };
-    try {
-      const pos = await getCurrentPosition();
-      coords = pos.coords;
-    } catch (e) {
-      console.warn("Location not available for Quick Attendance");
-    }
     const now = new Date();
-    const record: Partial<Attendance> = {
+    const record: Attendance = {
       ...currentAttendance,
-      checkOut: { time: now.toISOString(), lat: coords.latitude, lng: coords.longitude, forced: false }
+      checkOut: { 
+        time: now.toISOString(), 
+        lat: 0, 
+        lng: 0, 
+        forced: false 
+      }
     };
     try {
-      await apiService.save("attendance", {...record, id: currentAttendance.id});
+      await apiService.save("attendance", record);
       toast.success("Clocked out!");
-      window.location.reload();
+      onUpdate(record);
     } catch (e) {
       toast.error("Clock-out failed");
     }
@@ -148,10 +148,7 @@ export const QuickAttendance: React.FC<QuickAttendanceProps> = ({ user, attendan
                 </div>
               )}
 
-              <div className="mt-4 pt-3 border-t border-[#F0E6D2] flex items-center gap-2">
-                 <MapPin size={12} className="text-[#C9A84C]" />
-                 <span className="text-[10px] text-[#9A8262] truncate">{user.assignedLocation?.address || 'Location not verified'}</span>
-              </div>
+              {/* No location info for simple system */}
             </motion.div>
           </>
         )}

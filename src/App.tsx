@@ -1000,6 +1000,15 @@ export default function App() {
           onNavigate={navigate}
           notifications={notifications}
           attendance={attendance}
+          onAttendanceUpdate={(record) => {
+            setAttendance(prev => {
+              const exists = prev.findIndex(a => a.id === record.id);
+              if (exists > -1) {
+                return prev.map((a, i) => i === exists ? record : a);
+              }
+              return [record, ...prev];
+            });
+          }}
         />
         
         <main className="p-4 lg:p-8 flex-1">
@@ -1088,6 +1097,10 @@ export default function App() {
               }}
               onNavigate={navigate}
               onTransferLead={handleTransferLead}
+              onQuickVisitSave={(v) => {
+                setVisits(prev => [v, ...prev]);
+                logActivity('visit_scheduled', v.id, v.client_name, `Quick Schedule: ${v.visit_date}`);
+              }}
             />
           )}
           {currentPage === 'visits' && (

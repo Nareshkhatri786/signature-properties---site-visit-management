@@ -75,61 +75,119 @@ export async function sendCustomEmail(to: string, subject: string, html: string)
 
 export async function generateDailyMISReport() {
   const today = format(new Date(), 'yyyy-MM-dd');
-  console.log(`[MIS] Generating Daily Report for ${today}...`);
+  const now = new Date();
+  const startOfWeek = format(subDays(now, 7), 'yyyy-MM-dd');
+  const startOfMonth = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
 
-  const [newLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) = ?", [today]);
-  const [hotLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) = ? AND quality = 'hot'", [today]);
-  const [warmLeads] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) = ? AND quality = 'warm'", [today]);
-  
-  const [visitsSch] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE visit_date = ? AND visit_status = 'scheduled'", [today]);
-  const [visitsDone] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE visit_date = ? AND visit_status = 'completed'", [today]);
+  console.log(`[MIS] Generating Detailed Daily Report for ${today}...`);
 
-  const [followupsDone] = await sql<any>("SELECT COUNT(*) AS c FROM followups WHERE date = ? AND status = 'completed'", [today]);
+  // 1. Project Stats
+  const projectStats = await sql<any>(`
+    SELECT 
+      p.id,
+      p.name as projectName,
+      (SELECT COUNT(*) FROM leads l WHERE l.projectId = p.id AND DATE(l.created_at) = ?) as newLeads,
+      (SELECT COUNT(*) FROM leads l WHERE l.projectId = p.id AND l.status NOT IN ('closed', 'lost')) as activeLeads,
+      (SELECT COUNT(*) FROM leads l WHERE l.projectId = p.id AND l.status = 'new') as newStg,
+      (SELECT COUNT(*) FROM leads l WHERE l.projectId = p.id AND l.status = 'contacted') as contStg,
+      (SELECT COUNT(*) FROM leads l WHERE l.projectId = p.id AND l.status = 'visit_scheduled') as vSchStg,
+      (SELECT COUNT(*) FROM leads l WHERE l.projectId = p.id AND l.status = 'visit_done') as vDoneStg,
+      (SELECT COUNT(*) FROM visits v WHERE v.projectId = p.id AND v.outcome = 'booked' AND DATE(v.completed_at) = ?) as booked,
+      (SELECT COUNT(*) FROM visits v WHERE v.projectId = p.id AND v.visit_date = ? AND v.visit_status IN ('scheduled', 'rescheduled')) as vSchToday,
+      (SELECT COUNT(*) FROM visits v WHERE v.projectId = p.id AND v.visit_date = ? AND v.visit_status = 'completed') as vDoneToday,
+      (SELECT COUNT(*) FROM leads l WHERE l.projectId = p.id AND DATE(l.created_at) >= ?) as weeklyNew,
+      (SELECT COUNT(*) FROM leads l WHERE l.projectId = p.id AND DATE(l.created_at) >= ?) as monthlyNew
+    FROM projects p
+  `, [today, today, today, today, startOfWeek, startOfMonth]);
 
-  const users = await sql<any>("SELECT id, name FROM users");
-  const userStats = await Promise.all(users.map(async u => {
-    const [l] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE assignedTo = ? AND DATE(created_at) = ?", [u.id, today]);
-    const [v] = await sql<any>("SELECT COUNT(*) AS c FROM visits WHERE assigned_to = ? AND visit_date = ? AND visit_status = 'completed'", [u.id, today]);
-    const [f] = await sql<any>("SELECT COUNT(*) AS c FROM followups WHERE userId = ? AND date = ? AND status = 'completed'", [u.id, today]);
-    return { name: u.name, leads: l.c, visits: v.c, followups: f.c };
-  }));
+  // 2. User Stats
+  const userStats = await sql<any>(`
+    SELECT 
+      u.name as userName,
+      (SELECT COUNT(*) FROM call_logs c WHERE (c.by = u.name OR c.by = u.username) AND DATE(c.timestamp) = ?) as callsAttempted,
+      (SELECT COUNT(*) FROM call_logs c WHERE (c.by = u.name OR c.by = u.username) AND DATE(c.timestamp) = ? AND c.outcome = 'answered') as callsConnected,
+      (SELECT COUNT(*) FROM leads l WHERE l.assignedTo = u.id) as leadsHandled,
+      (SELECT COUNT(*) FROM visits v WHERE v.assigned_to = u.name AND v.visit_date = ? AND v.visit_status IN ('scheduled', 'rescheduled')) as visitsSch,
+      (SELECT COUNT(*) FROM visits v WHERE v.assigned_to = u.name AND v.visit_date = ? AND v.visit_status = 'completed') as visitsDone
+    FROM users u
+    WHERE u.role != 'admin'
+  `, [today, today, today, today]);
+
+  // 3. Summary Stats
+  const [weeklyNew] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) >= ?", [startOfWeek]);
+  const [monthlyNew] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) >= ?", [startOfMonth]);
 
   const html = `
-    <div style="font-family: sans-serif; color: #333; max-width: 600px; border: 1px solid #eee; padding: 20px;">
-      <h2 style="color: #C9A84C; border-bottom: 2px solid #C9A84C; padding-bottom: 10px;">Daily MIS Report - ${today}</h2>
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 1000px; padding: 20px;">
+      <h2 style="font-size: 18px; margin-bottom: 20px; text-transform: uppercase;">Daily MIS Report - ${today}</h2>
       
-      <div style="margin: 20px 0; background: #f9f9f9; padding: 15px; border-radius: 8px;">
-        <h3 style="margin-top:0">Today's Overview</h3>
-        <table style="width: 100%; text-align: left;">
-          <tr><td>New Leads:</td><td><b>${newLeads.c}</b> (Hot: ${hotLeads.c}, Warm: ${warmLeads.c})</td></tr>
-          <tr><td>Visits:</td><td><b>${visitsDone.c} Completed</b> (${visitsSch.c} Scheduled)</td></tr>
-          <tr><td>Follow-ups:</td><td><b>${followupsDone.c} Completed</b></td></tr>
-        </table>
-      </div>
-
-      <h3>User Performance (Today)</h3>
-      <table style="width: 100%; border-collapse: collapse;">
+      <!-- Project Wise Table -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; border: 1px solid #ddd;">
         <thead>
-          <tr style="background: #f0f0f0; text-align: left;">
-            <th style="padding: 8px; border: 1px solid #ddd;">User</th>
-            <th style="padding: 8px; border: 1px solid #ddd;">Leads</th>
-            <th style="padding: 8px; border: 1px solid #ddd;">Visits</th>
-            <th style="padding: 8px; border: 1px solid #ddd;">F-ups</th>
+          <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Project</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">New Leads</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Active Leads</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">New Stg</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Cont Stg</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">V.Sch Stg</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">V.Done Stg</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Booked</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">V.Sch Today</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">V.Done Today</th>
+            <th style="padding: 10px; border: 1px solid #ddd; background: #f0f7ff;">Weekly New</th>
+            <th style="padding: 10px; border: 1px solid #ddd; background: #f0fff4;">Monthly New</th>
           </tr>
         </thead>
         <tbody>
-          ${userStats.map(s => `
+          ${projectStats.map(p => `
             <tr>
-              <td style="padding: 8px; border: 1px solid #ddd;">${s.name}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${s.leads}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${s.visits}</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${s.followups}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background: #fdfdfd;">${p.projectName}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.newLeads}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.activeLeads}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.newStg}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.contStg}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.vSchStg}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.vDoneStg}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.booked}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.vSchToday}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.vDoneToday}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold; background: #f0f7ff;">${p.weeklyNew}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold; background: #f0fff4;">${p.monthlyNew}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
 
-      <p style="font-size: 12px; color: #999; margin-top: 30px;">Sent automatically by Signature Properties CRM at 8:00 PM IST.</p>
+      <!-- User Performance Table -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; border: 1px solid #ddd;">
+        <thead>
+          <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">User</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Calls Attempted</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Calls Connected</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Leads Handled</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Visits Scheduled</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Visits Done</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${userStats.map(u => `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background: #fdfdfd;">${u.userName}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.callsAttempted}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.callsConnected}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.leadsHandled}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.visitsSch}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.visitsDone}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <p style="font-size: 11px; color: #999; margin-top: 40px; border-top: 1px solid #eee; padding-top: 10px;">
+        Sent automatically by Signature Properties CRM — Daily Performance Audit.
+      </p>
     </div>
   `;
 
@@ -211,6 +269,66 @@ export async function generateWeekendMISReport() {
   await generateDailyMISReport();
 }
 
+export async function generateAttendanceMISReport() {
+  const now = new Date();
+  const startOfMonth = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
+  const endOfMonth = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), 'yyyy-MM-dd');
+  const monthName = format(now, 'MMMM yyyy');
+
+  console.log(`[MIS] Generating Attendance Report for ${monthName}...`);
+
+  const attendanceData = await sql<any>(`
+    SELECT a.*, u.name as userName 
+    FROM attendance a 
+    JOIN users u ON a.userId = u.id 
+    WHERE a.date BETWEEN ? AND ?
+    ORDER BY a.date DESC, u.name ASC
+  `, [startOfMonth, endOfMonth]);
+
+  const html = `
+    <div style="font-family: sans-serif; color: #333; max-width: 800px; border: 1px solid #eee; padding: 20px;">
+      <h2 style="color: #27ae60; border-bottom: 2px solid #27ae60; padding-bottom: 10px;">Attendance MIS Report - ${monthName}</h2>
+      <p style="color: #7f8c8d; font-size: 14px;">Generated on: <b>${format(new Date(), 'PPP p')}</b></p>
+      
+      <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <thead>
+          <tr style="background: #27ae60; color: white; text-align: left;">
+            <th style="padding: 10px; border: 1px solid #ddd;">Date</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">User</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Clock In</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Clock Out</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${attendanceData.length === 0 ? '<tr><td colspan="5" style="padding: 20px; text-align: center; color: #999;">No attendance records found for this month yet.</td></tr>' : ''}
+          ${attendanceData.map(a => {
+            const checkIn = a.checkIn ? format(new Date(a.checkIn.time), 'hh:mm a') : '---';
+            const checkOut = a.checkOut ? format(new Date(a.checkOut.time), 'hh:mm a') : '---';
+            const statusColor = a.status === 'present' ? '#27ae60' : (a.status === 'missed_punch' ? '#f39c12' : '#e74c3c');
+            
+            return `
+              <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;">${format(new Date(a.date), 'dd MMM (EEE)')}</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${a.userName}</td>
+                <td style="padding: 8px; border: 1px solid #ddd; color: #27ae60;">${checkIn}</td>
+                <td style="padding: 8px; border: 1px solid #ddd; color: #2980b9;">${checkOut}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">
+                  <span style="color: ${statusColor}; font-weight: bold; text-transform: uppercase; font-size: 10px;">${a.status.replace('_', ' ')}</span>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+
+      <p style="font-size: 12px; color: #999; margin-top: 30px;">This report is sent every Monday and Saturday morning to track staff attendance.</p>
+    </div>
+  `;
+
+  await sendEmail(`Attendance MIS Report - ${monthName}`, html);
+}
+
 async function sendEmail(subject: string, html: string) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.warn("[MIS] SMTP not configured, printing to console");
@@ -243,6 +361,11 @@ export function setupMISReports() {
     generateWeekendMISReport().catch(console.error);
   });
 
-  console.log("[MIS] Scheduled: Daily@8PM, Weekly@Mon9AM, Weekend@Sat-Sun10AM");
+  // Attendance Report: Monday & Saturday at 10:00 AM IST (04:30 UTC)
+  cron.schedule("30 4 * * 1,6", () => {
+    generateAttendanceMISReport().catch(console.error);
+  });
+
+  console.log("[MIS] Scheduled: Daily@8PM, Weekly@Mon9AM, Weekend@Sat-Sun10AM, Attendance@Mon-Sat10AM");
 }
 

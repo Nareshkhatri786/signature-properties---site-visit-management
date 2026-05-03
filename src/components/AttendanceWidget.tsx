@@ -199,8 +199,6 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attend
                 </div>
               )}
             </div>
-          </>
-        )}
       </div>
     </div>
   );

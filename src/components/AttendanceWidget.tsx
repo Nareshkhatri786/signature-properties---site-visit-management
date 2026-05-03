@@ -30,68 +30,44 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attend
   const today = format(new Date(), 'yyyy-MM-dd');
   const currentAttendance = attendance.find(a => a.userId === user.id && a.date === today) || null;
 
-  const validateLocation = async () => {
-    if (!projectLocation || projectLocation.lat === 0) {
-       toast.error("Project location not set by Admin.");
-       return null;
-    }
-
-    try {
-      toast.loading("Verifying your location...", { id: 'geo-check', duration: 2000 });
-      const pos = await getCurrentPosition();
-      const distance = calculateDistance(
-        pos.coords.latitude, 
-        pos.coords.longitude, 
-        projectLocation.lat, 
-        projectLocation.lng
-      );
-
-      if (distance > (projectLocation.radius || 100)) {
-        toast.error(`Location failed: You are ${Math.round(distance)}m away from ${assignedProject?.name}.`, { id: 'geo-check' });
-        return null;
-      }
-
-      toast.success("Location verified", { id: 'geo-check' });
-      return pos.coords;
-    } catch (error) {
-      toast.error("Could not verify location. Please enable GPS.", { id: 'geo-check' });
-      return null;
-    }
-  };
-
   const handleClockIn = async () => {
     setClockingInProgress(true);
-    const coords = await validateLocation();
+    let coords = { latitude: 0, longitude: 0 };
     
-    if (coords) {
-      const now = new Date();
-      const startTime = user.workingHours?.start || "10:00";
-      const [startH, startM] = startTime.split(':').map(Number);
-      const scheduledStart = new Date();
-      scheduledStart.setHours(startH, startM, 0, 0);
+    try {
+      const pos = await getCurrentPosition();
+      coords = pos.coords;
+    } catch (e) {
+      console.warn("Location not available, proceeding without coordinates.");
+    }
+    
+    const now = new Date();
+    const startTime = user.workingHours?.start || "10:00";
+    const [startH, startM] = startTime.split(':').map(Number);
+    const scheduledStart = new Date();
+    scheduledStart.setHours(startH, startM, 0, 0);
 
-      const onTime = now <= scheduledStart;
+    const onTime = now <= scheduledStart;
 
-      const record: Partial<Attendance> = {
-        userId: user.id,
-        date: today,
-        checkIn: {
-          time: now.toISOString(),
-          lat: coords.latitude,
-          lng: coords.longitude,
-          onTime
-        },
-        status: 'present'
-      };
+    const record: Partial<Attendance> = {
+      userId: user.id,
+      date: today,
+      checkIn: {
+        time: now.toISOString(),
+        lat: coords.latitude,
+        lng: coords.longitude,
+        onTime
+      },
+      status: 'present'
+    };
 
-      try {
-        const id = `${user.id}_${today}`;
-        await apiService.save("attendance", {...record, id: id});
-        toast.success(onTime ? "Clocked in on time!" : "Clocked in (Late)");
-        window.location.reload();
-      } catch (error) {
-        toast.error("Failed to clock in");
-      }
+    try {
+      const id = `${user.id}_${today}`;
+      await apiService.save("attendance", {...record, id: id});
+      toast.success(onTime ? "Clocked in on time!" : "Clocked in (Late)");
+      window.location.reload();
+    } catch (error) {
+      toast.error("Failed to clock in");
     }
     setClockingInProgress(false);
   };
@@ -100,27 +76,32 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attend
     if (!currentAttendance) return;
     
     setClockingInProgress(true);
-    const coords = await validateLocation();
+    let coords = { latitude: 0, longitude: 0 };
     
-    if (coords) {
-      const now = new Date();
-      const record: Partial<Attendance> = {
-        ...currentAttendance,
-        checkOut: {
-          time: now.toISOString(),
-          lat: coords.latitude,
-          lng: coords.longitude,
-          forced: false
-        }
-      };
-
-      try {
-        await apiService.save("attendance", {...record, id: currentAttendance.id});
-        toast.success("Clocked out successfully!");
-        window.location.reload();
-      } catch (error) {
-        toast.error("Failed to clock out");
+    try {
+      const pos = await getCurrentPosition();
+      coords = pos.coords;
+    } catch (e) {
+      console.warn("Location not available, proceeding without coordinates.");
+    }
+    
+    const now = new Date();
+    const record: Partial<Attendance> = {
+      ...currentAttendance,
+      checkOut: {
+        time: now.toISOString(),
+        lat: coords.latitude,
+        lng: coords.longitude,
+        forced: false
       }
+    };
+
+    try {
+      await apiService.save("attendance", {...record, id: currentAttendance.id});
+      toast.success("Clocked out successfully!");
+      window.location.reload();
+    } catch (error) {
+      toast.error("Failed to clock out");
     }
     setClockingInProgress(false);
   };
@@ -147,33 +128,21 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ user, attend
           </div>
         </div>
 
-        {!hasLocation ? (
-          <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-6 text-center space-y-4">
-            <div className="bg-amber-500/20 w-12 h-12 rounded-full flex items-center justify-center mx-auto">
-              <MapPin className="text-amber-500" size={24} />
-            </div>
-            <div>
-              <h4 className="text-white font-bold">Project Location Not Set</h4>
-              <p className="text-amber-200/40 text-xs mt-1">Please ask Admin to set the location for project: <span className="text-amber-500">{assignedProject?.name || 'Assigned Project'}</span></p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-[#1C1207] rounded-xl p-4 border border-[#3D2B1A]">
+            <p className="text-amber-200/40 text-xs uppercase tracking-widest mb-2 font-mono">Shift Hours</p>
+            <p className="text-white font-medium">
+              {user.workingHours?.start || "10:00"} - {user.workingHours?.end || "19:00"}
+            </p>
+          </div>
+          <div className="bg-[#1C1207] rounded-xl p-4 border border-[#3D2B1A] relative group/loc">
+            <p className="text-amber-200/40 text-xs uppercase tracking-widest mb-2 font-mono">Work Site</p>
+            <div className="flex items-center gap-2 text-white font-medium">
+              <MapPin className="w-4 h-4 text-amber-500" />
+              <span className="truncate">{assignedProject?.name || 'Anywhere'}</span>
             </div>
           </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="bg-[#1C1207] rounded-xl p-4 border border-[#3D2B1A]">
-                <p className="text-amber-200/40 text-xs uppercase tracking-widest mb-2 font-mono">Shift Hours</p>
-                <p className="text-white font-medium">
-                  {user.workingHours?.start || "10:00"} - {user.workingHours?.end || "19:00"}
-                </p>
-              </div>
-              <div className="bg-[#1C1207] rounded-xl p-4 border border-[#3D2B1A] relative group/loc">
-                <p className="text-amber-200/40 text-xs uppercase tracking-widest mb-2 font-mono">Work Site</p>
-                <div className="flex items-center gap-2 text-white font-medium">
-                  <MapPin className="w-4 h-4 text-amber-500" />
-                  <span className="truncate">{assignedProject?.name}</span>
-                </div>
-              </div>
-            </div>
+        </div>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between text-sm">

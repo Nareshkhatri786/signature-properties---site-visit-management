@@ -66,8 +66,8 @@ export default React.memo(function HRMS({ user, users, projects, attendance, onN
                 <span className="text-sm font-medium text-[#2A1C00]">{projects.find(p => p.id === user.projectId)?.location?.address || 'Not Assigned'}</span>
               </div>
               <div className="flex justify-between items-center py-2">
-                <span className="text-xs text-[#9A8262] uppercase font-mono">Geofence</span>
-                <span className="text-sm font-medium text-[#2A1C00]">{projects.find(p => p.id === user.projectId)?.location?.radius || 100}m radius</span>
+                <span className="text-xs text-[#9A8262] uppercase font-mono">Status</span>
+                <span className="text-sm font-medium text-green-600">Active</span>
               </div>
             </div>
           </div>

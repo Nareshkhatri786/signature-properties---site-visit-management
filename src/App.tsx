@@ -42,20 +42,26 @@ const api = {
     if (collection === 'remarks' && data.targetId) {
       return apiService.saveRemark(data.targetId, data);
     }
-    const res = await apiService.save(collection, data);
-    
     try {
-      const currentUser = storage.getAuth();
-      if (collection === 'leads' && data.assignedTo && data.assignedTo !== currentUser?.id) {
-        pushService.sendPushNotification([data.assignedTo.toString()], "New Lead Assigned", `Lead ${data.name} has been assigned to you.`).catch(console.error);
-      } else if (collection === 'visits' && data.assigned_to && data.assigned_to !== currentUser?.id && data.visit_status === 'scheduled') {
-        pushService.sendPushNotification([data.assigned_to.toString()], "New Visit Scheduled", `Visit with ${data.client_name} is scheduled for ${data.visit_date}.`).catch(console.error);
+      const res = await apiService.save(collection, data);
+      
+      try {
+        const currentUser = storage.getAuth();
+        if (collection === 'leads' && data.assignedTo && data.assignedTo !== currentUser?.id) {
+          pushService.sendPushNotification([data.assignedTo.toString()], "New Lead Assigned", `Lead ${data.name} has been assigned to you.`).catch(console.error);
+        } else if (collection === 'visits' && data.assigned_to && data.assigned_to !== currentUser?.id && data.visit_status === 'scheduled') {
+          pushService.sendPushNotification([data.assigned_to.toString()], "New Visit Scheduled", `Visit with ${data.client_name} is scheduled for ${data.visit_date}.`).catch(console.error);
+        }
+      } catch (e) {
+        console.error("Push notify error:", e);
       }
-    } catch (e) {
-      console.error("Push notify error:", e);
+      
+      return res;
+    } catch (e: any) {
+      console.error(`Error saving ${collection}:`, e);
+      toast.error(`Failed to save ${collection}: ${e.message}`);
+      throw e;
     }
-    
-    return res;
   },
   delete: (collection: string, id: string) => apiService.delete(collection, id),
 };

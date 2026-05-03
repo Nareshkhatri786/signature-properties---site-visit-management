@@ -756,6 +756,8 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
               completed_at: new Date().toISOString(),
               outcome_note: note
             });
+            // Immediate feedback for UI
+            logActivity('followup_done', `Outcome: ${note || 'Completed'}`);
             setIsFollowUpModalOpen(false);
           }}
           onClose={() => setIsFollowUpModalOpen(false)}

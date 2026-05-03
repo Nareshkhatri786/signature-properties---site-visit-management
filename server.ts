@@ -328,8 +328,9 @@ async function startServer() {
         const connection = await pool.getConnection();
         try {
           await connection.beginTransaction();
+          console.log(`[Follow-up] Processing save for ID: ${data.id}, Status: ${data.status}`);
           
-          // 1. Save Follow-up
+          // 1. Save/Update Follow-up
           await connection.execute(
             `INSERT INTO followups (id,leadId,visitId,projectId,userId,userName,date,scheduled_at,purpose,method,status,created_at,completed_at,outcome_note)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -337,30 +338,42 @@ async function startServer() {
             [data.id,data.leadId||null,data.visitId||null,data.projectId||null,data.userId||null,data.userName||null,data.date||null,formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
           );
 
-          // 2. If status is 'completed' and it's a lead, increment followups_done stat
-          if (data.status === "completed" && data.leadId) {
-            // Get current lead stats
-            const [leads] = await connection.execute("SELECT stats FROM leads WHERE id = ?", [data.leadId]);
-            if ((leads as any[]).length > 0) {
-              let stats = (leads as any[])[0].stats;
-              if (typeof stats === 'string') stats = JSON.parse(stats);
-              if (!stats) stats = { visits_planned: 0, visits_done: 0, calls_attempted: 0, calls_answered: 0, followups_done: 0 };
-              
-              stats.followups_done = (stats.followups_done || 0) + 1;
-              
-              await connection.execute("UPDATE leads SET stats = ? WHERE id = ?", [JSON.stringify(stats), data.leadId]);
+          // 2. If status is 'completed', handle Lead stats and Activity Log
+          if (data.status === "completed") {
+            // Ensure we have leadId (sometimes frontend sends partial updates)
+            let effectiveLeadId = data.leadId;
+            if (!effectiveLeadId) {
+              const [rows] = await connection.execute("SELECT leadId FROM followups WHERE id = ?", [data.id]);
+              if ((rows as any[]).length > 0) effectiveLeadId = (rows as any[])[0].leadId;
             }
 
-            // 3. Create Activity entry transactionally
-            const activityId = `act_fup_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
-            await connection.execute(
-              `INSERT IGNORE INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,?,?)`,
-              [activityId, 'followup_done', data.userId||null, data.userName||null, data.projectId||null, data.leadId, data.clientName||'Lead', formatMySQLDate(new Date().toISOString()), `Follow-up completed: ${data.outcome_note || 'Completed'}`]
-            );
+            if (effectiveLeadId) {
+              console.log(`[Follow-up] Incrementing stats and logging activity for Lead: ${effectiveLeadId}`);
+              // Update lead stats
+              const [leads] = await connection.execute("SELECT stats FROM leads WHERE id = ?", [effectiveLeadId]);
+              if ((leads as any[]).length > 0) {
+                let stats = (leads as any[])[0].stats;
+                if (typeof stats === 'string') stats = JSON.parse(stats);
+                if (!stats) stats = { visits_planned: 0, visits_done: 0, calls_attempted: 0, calls_answered: 0, followups_done: 0 };
+                
+                stats.followups_done = (stats.followups_done || 0) + 1;
+                await connection.execute("UPDATE leads SET stats = ?, updated_at = NOW() WHERE id = ?", [JSON.stringify(stats), effectiveLeadId]);
+              }
+
+              // Create Activity entry
+              const activityId = `act_fup_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+              const uId = data.userId ? parseInt(String(data.userId)) : null;
+              await connection.execute(
+                `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
+                [activityId, 'followup_done', uId, data.userName||null, data.projectId||null, effectiveLeadId, data.clientName||'Lead', `Follow-up completed: ${data.outcome_note || 'Completed'}`]
+              );
+            }
           }
 
           await connection.commit();
+          console.log(`[Follow-up] Successfully committed transaction for ID: ${data.id}`);
         } catch (err) {
+          console.error(`[Follow-up] Transaction failed for ID: ${data.id}`, err);
           await connection.rollback();
           throw err;
         } finally {

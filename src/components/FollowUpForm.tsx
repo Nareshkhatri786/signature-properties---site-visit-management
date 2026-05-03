@@ -217,34 +217,6 @@ export default function FollowUpForm({
                 <Save size={18} /> {isCompleting ? 'Save & Close' : followUp ? 'Update' : 'Schedule'}
               </button>
             </div>
-
-            {isCompleting && (
-              <button 
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (!formData.note.trim()) {
-                    toast.error('Please enter an outcome note first');
-                    return;
-                  }
-                  // Complete current
-                  if (followUp && onComplete) {
-                    onComplete(followUp.id, formData.note);
-                  }
-                  // Reset form to schedule new
-                  setIsCompleting(false);
-                  setFormData({
-                    date: getLocalDateString(new Date(Date.now() + 86400000)), // Tomorrow
-                    purpose: '',
-                    method: 'call',
-                    note: ''
-                  });
-                }}
-                className="w-full bg-blue-600/10 border border-blue-600/30 text-blue-600 font-bold py-2 rounded-lg hover:bg-blue-600 hover:text-white transition-all text-xs flex items-center justify-center gap-2"
-              >
-                <Calendar size={14} /> Save & Schedule Next Follow-up
-              </button>
-            )}
           </div>
         </form>
       </div>

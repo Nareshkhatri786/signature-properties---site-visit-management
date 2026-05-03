@@ -22,50 +22,33 @@ export const QuickAttendance: React.FC<QuickAttendanceProps> = ({ user, attendan
 
   const currentAttendance = attendance.find((a: Attendance) => a.userId === user.id && a.date === today) || null;
 
-  const validateLocation = async () => {
-    if (!user.assignedLocation) {
-       toast.error("No work location assigned.");
-       return null;
-    }
-    try {
-      toast.loading("Locating...", { id: 'geo-quick', duration: 1500 });
-      const pos = await getCurrentPosition();
-      const distance = calculateDistance(
-        pos.coords.latitude, 
-        pos.coords.longitude, 
-        user.assignedLocation.lat, 
-        user.assignedLocation.lng
-      );
-      if (distance > (user.assignedLocation.radius || 100)) {
-        toast.error(`${Math.round(distance)}m away`, { id: 'geo-quick' });
-        return null;
-      }
-      toast.success("Nearby", { id: 'geo-quick' });
-      return pos.coords;
-    } catch (error) {
-      toast.error("Location disabled", { id: 'geo-quick' });
-      return null;
-    }
-  };
-
   const handleClockIn = async () => {
     setClockingInProgress(true);
-    const coords = await validateLocation();
-    if (coords) {
-      const now = new Date();
-      const startTime = user.workingHours?.start || "10:00";
-      const [startH, startM] = startTime.split(':').map(Number);
-      const scheduledStart = new Date();
-      scheduledStart.setHours(startH, startM, 0, 0);
-      const onTime = now <= scheduledStart;
-      const record: Partial<Attendance> = {
-        userId: user.id,
-        date: today,
-        checkIn: { time: now.toISOString(), lat: coords.latitude, lng: coords.longitude, onTime },
-        status: 'present'
-      };
+    let coords = { latitude: 0, longitude: 0 };
+    try {
+      const pos = await getCurrentPosition();
+      coords = pos.coords;
+    } catch (e) {
+      console.warn("Location not available for Quick Attendance");
+    }
+    const now = new Date();
+    const startTime = user.workingHours?.start || "10:00";
+    const [startH, startM] = startTime.split(':').map(Number);
+    const scheduledStart = new Date();
+    scheduledStart.setHours(startH, startM, 0, 0);
+    const onTime = now <= scheduledStart;
+    const record: Partial<Attendance> = {
+      userId: user.id,
+      date: today,
+      checkIn: { time: now.toISOString(), lat: coords.latitude, lng: coords.longitude, onTime },
+      status: 'present'
+    };
+    try {
       await apiService.save("attendance", {...record, id: `${user.id}_${today}`});
       toast.success(onTime ? "Clocked in!" : "Clocked in (Late)");
+      window.location.reload();
+    } catch (e) {
+      toast.error("Clock-in failed");
     }
     setClockingInProgress(false);
   };
@@ -73,15 +56,24 @@ export const QuickAttendance: React.FC<QuickAttendanceProps> = ({ user, attendan
   const handleClockOut = async () => {
     if (!currentAttendance) return;
     setClockingInProgress(true);
-    const coords = await validateLocation();
-    if (coords) {
-      const now = new Date();
-      const record: Partial<Attendance> = {
-        ...currentAttendance,
-        checkOut: { time: now.toISOString(), lat: coords.latitude, lng: coords.longitude, forced: false }
-      };
+    let coords = { latitude: 0, longitude: 0 };
+    try {
+      const pos = await getCurrentPosition();
+      coords = pos.coords;
+    } catch (e) {
+      console.warn("Location not available for Quick Attendance");
+    }
+    const now = new Date();
+    const record: Partial<Attendance> = {
+      ...currentAttendance,
+      checkOut: { time: now.toISOString(), lat: coords.latitude, lng: coords.longitude, forced: false }
+    };
+    try {
       await apiService.save("attendance", {...record, id: currentAttendance.id});
       toast.success("Clocked out!");
+      window.location.reload();
+    } catch (e) {
+      toast.error("Clock-out failed");
     }
     setClockingInProgress(false);
   };

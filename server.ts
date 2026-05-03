@@ -335,7 +335,7 @@ async function startServer() {
             `INSERT INTO followups (id,leadId,visitId,projectId,userId,userName,date,scheduled_at,purpose,method,status,created_at,completed_at,outcome_note)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
              ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),visitId=VALUES(visitId),date=VALUES(date),purpose=VALUES(purpose),method=VALUES(method),status=VALUES(status),completed_at=VALUES(completed_at),outcome_note=VALUES(outcome_note)`,
-            [data.id,data.leadId||null,data.visitId||null,data.projectId||null,data.userId||null,data.userName||null,data.date||null,formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
+            [data.id,data.leadId||null,data.visitId||null,data.projectId||null,data.userId||null,data.userName||null,formatMySQLDate(data.date),formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
           );
 
           // 2. If status is 'completed', handle Lead stats and Activity Log
@@ -431,7 +431,7 @@ async function startServer() {
         await pool.execute(
           `INSERT INTO attendance (id,userId,date,checkIn,checkOut,status) VALUES (?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE checkIn=VALUES(checkIn),checkOut=VALUES(checkOut),status=VALUES(status)`,
-          [d.id,d.userId,d.date,d.checkIn||null,d.checkOut||null,d.status||"absent"]
+          [d.id,d.userId,formatMySQLDate(d.date),d.checkIn||null,d.checkOut||null,d.status||"absent"]
         );
       } else if (col === "notifications") {
         const d = stringifyJsonFields(data, JSON_FIELDS_NOTIF);

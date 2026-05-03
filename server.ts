@@ -322,15 +322,50 @@ async function startServer() {
           `INSERT INTO visits (id,leadId,client_name,mobile,email,visit_date,visit_time,purpose,status,visit_status,assigned_to,source,budget,property_interest,priority,projectId,reminders_sent,client_feedback,interest_level,outcome,reschedule_log,completed_at,created_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),client_name=VALUES(client_name),mobile=VALUES(mobile),email=VALUES(email),visit_date=VALUES(visit_date),visit_time=VALUES(visit_time),purpose=VALUES(purpose),status=VALUES(status),visit_status=VALUES(visit_status),assigned_to=VALUES(assigned_to),source=VALUES(source),budget=VALUES(budget),property_interest=VALUES(property_interest),priority=VALUES(priority),reminders_sent=VALUES(reminders_sent),client_feedback=VALUES(client_feedback),interest_level=VALUES(interest_level),outcome=VALUES(outcome),reschedule_log=VALUES(reschedule_log),completed_at=VALUES(completed_at)`,
-          [d.id,d.leadId||null,d.client_name,d.mobile||null,d.email||null,d.visit_date||null,d.visit_time||null,d.purpose||null,d.status||"pending",d.visit_status||"scheduled",d.assigned_to||null,d.source||null,d.budget||null,d.property_interest||null,d.priority||0,d.projectId||null,d.reminders_sent||null,d.client_feedback||null,d.interest_level||null,d.outcome||null,d.reschedule_log||null,d.completed_at||null,d.created_at||new Date().toISOString()]
+          [d.id,d.leadId||null,d.client_name,d.mobile||null,d.email||null,d.visit_date||null,d.visit_time||null,d.purpose||null,d.status||"pending",d.visit_status||"scheduled",d.assigned_to||null,d.source||null,d.budget||null,d.property_interest||null,d.priority||0,d.projectId||null,d.reminders_sent||null,d.client_feedback||null,d.interest_level||null,d.outcome||null,d.reschedule_log||null,formatMySQLDate(d.completed_at),formatMySQLDate(d.created_at || new Date().toISOString())]
         );
       } else if (col === "followups") {
-        await pool.execute(
-          `INSERT INTO followups (id,leadId,visitId,projectId,userId,userName,date,scheduled_at,purpose,method,status,created_at,completed_at,outcome_note)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-           ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),visitId=VALUES(visitId),date=VALUES(date),purpose=VALUES(purpose),method=VALUES(method),status=VALUES(status),completed_at=VALUES(completed_at),outcome_note=VALUES(outcome_note)`,
-          [data.id,data.leadId||null,data.visitId||null,data.projectId||null,data.userId||null,data.userName||null,data.date||null,data.scheduled_at||null,data.purpose||null,data.method||"call",data.status||"pending",data.created_at||new Date().toISOString(),data.completed_at||null,data.outcome_note||null]
-        );
+        const connection = await pool.getConnection();
+        try {
+          await connection.beginTransaction();
+          
+          // 1. Save Follow-up
+          await connection.execute(
+            `INSERT INTO followups (id,leadId,visitId,projectId,userId,userName,date,scheduled_at,purpose,method,status,created_at,completed_at,outcome_note)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),visitId=VALUES(visitId),date=VALUES(date),purpose=VALUES(purpose),method=VALUES(method),status=VALUES(status),completed_at=VALUES(completed_at),outcome_note=VALUES(outcome_note)`,
+            [data.id,data.leadId||null,data.visitId||null,data.projectId||null,data.userId||null,data.userName||null,data.date||null,formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
+          );
+
+          // 2. If status is 'completed' and it's a lead, increment followups_done stat
+          if (data.status === "completed" && data.leadId) {
+            // Get current lead stats
+            const [leads] = await connection.execute("SELECT stats FROM leads WHERE id = ?", [data.leadId]);
+            if ((leads as any[]).length > 0) {
+              let stats = (leads as any[])[0].stats;
+              if (typeof stats === 'string') stats = JSON.parse(stats);
+              if (!stats) stats = { visits_planned: 0, visits_done: 0, calls_attempted: 0, calls_answered: 0, followups_done: 0 };
+              
+              stats.followups_done = (stats.followups_done || 0) + 1;
+              
+              await connection.execute("UPDATE leads SET stats = ? WHERE id = ?", [JSON.stringify(stats), data.leadId]);
+            }
+
+            // 3. Create Activity entry transactionally
+            const activityId = `act_fup_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+            await connection.execute(
+              `INSERT IGNORE INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,?,?)`,
+              [activityId, 'followup_done', data.userId||null, data.userName||null, data.projectId||null, data.leadId, data.clientName||'Lead', formatMySQLDate(new Date().toISOString()), `Follow-up completed: ${data.outcome_note || 'Completed'}`]
+            );
+          }
+
+          await connection.commit();
+        } catch (err) {
+          await connection.rollback();
+          throw err;
+        } finally {
+          connection.release();
+        }
       } else if (col === "users") {
         const d = stringifyJsonFields(data, JSON_FIELDS_USERS);
         const passwordUpdate = (data.password && data.password.trim() !== "" && !data.password.startsWith("$2")) ? ",password=VALUES(password)" : "";
@@ -371,12 +406,12 @@ async function startServer() {
         await pool.execute(
           `INSERT INTO call_logs (id,visitId,leadId,projectId,outcome,note,timestamp,\`by\`) VALUES (?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE outcome=VALUES(outcome),note=VALUES(note)`,
-          [data.id,data.visitId||null,data.leadId||null,data.projectId||null,data.outcome||"not_answered",data.note||null,data.timestamp||new Date().toISOString(),data.by||null]
+          [data.id,data.visitId||null,data.leadId||null,data.projectId||null,data.outcome||"not_answered",data.note||null,formatMySQLDate(data.timestamp || new Date().toISOString()),data.by||null]
         );
       } else if (col === "activities") {
         await pool.execute(
           `INSERT IGNORE INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,?,?)`,
-          [data.id,data.type,data.userId||null,data.userName||null,data.projectId||null,data.targetId||null,data.targetName||null,data.timestamp||new Date().toISOString(),data.details||null]
+          [data.id,data.type,data.userId||null,data.userName||null,data.projectId||null,data.targetId||null,data.targetName||null,formatMySQLDate(data.timestamp || new Date().toISOString()),data.details||null]
         );
       } else if (col === "attendance") {
         const d = stringifyJsonFields(data, JSON_FIELDS_ATTENDANCE);
@@ -390,7 +425,7 @@ async function startServer() {
         await pool.execute(
           `INSERT INTO notifications (id,userId,type,title,message,\`read\`,createdAt,isAdmin,metadata,date) VALUES (?,?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE \`read\`=VALUES(\`read\`)`,
-          [d.id,d.userId||null,d.type||"",d.title||"",d.message||"",d.read?1:0,d.createdAt||new Date().toISOString(),d.isAdmin?1:0,d.metadata||null,d.date||null]
+          [d.id,d.userId||null,d.type||"",d.title||"",d.message||"",d.read?1:0,formatMySQLDate(d.createdAt||new Date().toISOString()),d.isAdmin?1:0,d.metadata||null,d.date||null]
         );
       } else if (col === "workflows") {
         const d = stringifyJsonFields(data, JSON_FIELDS_WORKFLOWS);
@@ -398,7 +433,7 @@ async function startServer() {
           `INSERT INTO workflows (id,name,description,isActive,\`trigger\`,conditions,actions,createdAt,updatedAt)
            VALUES (?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),isActive=VALUES(isActive),\`trigger\`=VALUES(\`trigger\`),conditions=VALUES(conditions),actions=VALUES(actions),updatedAt=NOW()`,
-          [d.id, d.name, d.description||null, d.isActive?1:0, d.trigger, d.conditions||"[]", d.actions||"[]", d.createdAt||new Date().toISOString(), new Date().toISOString()]
+          [d.id, d.name, d.description||null, d.isActive?1:0, d.trigger, d.conditions||"[]", d.actions||"[]", formatMySQLDate(d.createdAt||new Date().toISOString()), formatMySQLDate(new Date().toISOString())]
         );
       }
       res.json({ success: true });
@@ -460,7 +495,7 @@ async function startServer() {
       await pool.execute(
         `INSERT INTO remarks (id,targetId,text,\`by\`,at,type,category,sentiment) VALUES (?,?,?,?,?,?,?,?)
          ON DUPLICATE KEY UPDATE text=VALUES(text)`,
-        [remark.id, targetId, remark.text, remark.by||"", remark.at||new Date().toISOString(), remark.type||"remark", remark.category||"general", remark.sentiment||"neutral"]
+        [remark.id, targetId, remark.text, remark.by||"", formatMySQLDate(remark.at||new Date().toISOString()), remark.type||"remark", remark.category||"general", remark.sentiment||"neutral"]
       );
       res.json({ success: true });
     } catch (e: any) {
@@ -528,7 +563,7 @@ async function startServer() {
         `INSERT INTO leads (id,name,mobile,source,quality,status,projectId,assignedTo,stats,created_at,updated_at)
          VALUES (?,?,?,?,?,?,?,?,?,?,?)
          ON DUPLICATE KEY UPDATE name=VALUES(name),mobile=VALUES(mobile),source=VALUES(source),updated_at=NOW()`,
-        [leadData.id, leadData.name||"Unknown", leadData.mobile||null, leadData.source, leadData.quality, leadData.status, leadData.projectId, leadData.assignedTo, leadData.stats, leadData.created_at, now]
+        [leadData.id, leadData.name||"Unknown", leadData.mobile||null, leadData.source, leadData.quality, leadData.status, leadData.projectId, leadData.assignedTo, leadData.stats, formatMySQLDate(leadData.created_at), formatMySQLDate(now)]
       );
 
       res.json({ success: true, leadId: leadData.id });
@@ -575,7 +610,7 @@ async function startServer() {
       const msgId = "msg_" + Date.now();
       await pool.execute(
         `INSERT IGNORE INTO whatsapp_messages (id,leadId,senderName,senderPhoneNumber,content,timestamp,type,projectId) VALUES (?,?,?,?,?,?,?,?)`,
-        [msgId, existingLead?.id || null, clientName, normalizedMobile, messageText, now, "incoming", projectId]
+        [msgId, existingLead?.id || null, clientName, normalizedMobile, messageText, formatMySQLDate(now), "incoming", projectId]
       );
 
       if (existingLead) {
@@ -586,7 +621,7 @@ async function startServer() {
           const fupId = "fup_" + Date.now();
           await pool.execute(
             `INSERT INTO followups (id,leadId,projectId,date,scheduled_at,purpose,method,status,created_at,outcome_note) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-            [fupId, leadId, projectId, dateOnly, now, `Re-enquiry via WhatsApp`, "WhatsApp", "pending", now, `Client: ${messageText}`]
+            [fupId, leadId, projectId, dateOnly, formatMySQLDate(now), `Re-enquiry via WhatsApp`, "WhatsApp", "pending", formatMySQLDate(now), `Client: ${messageText}`]
           );
         }
         await pool.execute("UPDATE leads SET updated_at = NOW() WHERE id = ?", [leadId]);
@@ -595,19 +630,19 @@ async function startServer() {
         const leadId = "lead_" + Date.now();
         await pool.execute(
           `INSERT INTO leads (id,name,mobile,source,quality,status,projectId,assignedTo,stats,created_at,updated_at,property_interest) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-          [leadId, clientName, normalizedMobile, "WhatsApp", "warm", "new", projectId, assignedUserId, JSON.stringify({ visits_planned:0, visits_done:0, calls_attempted:0, calls_answered:0, followups_done:0 }), now, now, messageText]
+          [leadId, clientName, normalizedMobile, "WhatsApp", "warm", "new", projectId, assignedUserId, JSON.stringify({ visits_planned:0, visits_done:0, calls_attempted:0, calls_answered:0, followups_done:0 }), formatMySQLDate(now), formatMySQLDate(now), messageText]
         );
         
         // Log lead creation as an explicit activity
         await pool.execute(
           `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,?,?)`,
-          ["act_" + Date.now(), "lead_created", 0, "System (WhatsApp)", projectId, leadId, clientName, now, `Via WhatsApp: ${messageText.substring(0,50)}`]
+          ["act_" + Date.now(), "lead_created", 0, "System (WhatsApp)", projectId, leadId, clientName, formatMySQLDate(now), `Via WhatsApp: ${messageText.substring(0,50)}`]
         );
 
         const fupId = "fup_" + Date.now();
         await pool.execute(
           `INSERT INTO followups (id,leadId,projectId,date,scheduled_at,purpose,method,status,created_at,outcome_note) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-          [fupId, leadId, projectId, dateOnly, now, `New WhatsApp enquiry`, "WhatsApp", "pending", now, `Client: ${messageText}`]
+          [fupId, leadId, projectId, dateOnly, formatMySQLDate(now), `New WhatsApp enquiry`, "WhatsApp", "pending", formatMySQLDate(now), `Client: ${messageText}`]
         );
         await pool.execute("UPDATE whatsapp_messages SET leadId = ? WHERE id = ?", [leadId, msgId]);
         return res.json({ success: true, leadId, action: "lead_created" });

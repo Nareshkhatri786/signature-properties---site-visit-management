@@ -428,11 +428,17 @@ async function startServer() {
         );
       } else if (col === "attendance") {
         const d = stringifyJsonFields(data, JSON_FIELDS_ATTENDANCE);
-        await pool.execute(
-          `INSERT INTO attendance (id,userId,date,checkIn,checkOut,status) VALUES (?,?,?,?,?,?)
-           ON DUPLICATE KEY UPDATE checkIn=VALUES(checkIn),checkOut=VALUES(checkOut),status=VALUES(status)`,
-          [d.id,d.userId,formatMySQLDate(d.date),d.checkIn||null,d.checkOut||null,d.status||"absent"]
-        );
+        try {
+          await pool.execute(
+            `INSERT INTO attendance (id,userId,date,checkIn,checkOut,status) VALUES (?,?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE checkIn=VALUES(checkIn),checkOut=VALUES(checkOut),status=VALUES(status)`,
+            [d.id, d.userId, d.date, d.checkIn||null, d.checkOut||null, d.status||"absent"]
+          );
+          console.log(`[Attendance] Saved for user ${d.userId} on ${d.date}`);
+        } catch (err) {
+          console.error(`[Attendance Error] User ${d.userId}, Date ${d.date}:`, err);
+          throw err;
+        }
       } else if (col === "notifications") {
         const d = stringifyJsonFields(data, JSON_FIELDS_NOTIF);
         await pool.execute(

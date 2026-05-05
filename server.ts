@@ -241,17 +241,21 @@ async function startServer() {
     }
   });
 
-  // -- LEGACY (to be phased out) --------------------------
   app.get("/api/data", authMiddleware, async (req, res) => {
-    // ... existing logic but limited to 100 records for performance
     try {
-      const u = (req as any).user;
-      const uRole = u.role?.toLowerCase();
+      const uToken = (req as any).user;
+      const userFromDb = await queryOne<any>("SELECT * FROM users WHERE id = ?", [uToken.id]);
+      if (!userFromDb) return res.status(401).json({ error: "User not found" });
+
+      const uRole = userFromDb.role?.toLowerCase();
       const isAdmin = uRole === "admin" || uRole === "adm";
       const projectFilter = isAdmin ? "" : "WHERE projectId = ?";
-      const projectParams = isAdmin ? [] : [u.projectId];
+      const projectParams = isAdmin ? [] : [userFromDb.projectId];
 
-      console.log(`[Data Debug] User: ${u.username}, Role: ${u.role}, isAdmin: ${isAdmin}`);
+      const safeCurrentUser = parseJsonFields({ ...userFromDb }, JSON_FIELDS_USERS);
+      delete safeCurrentUser.password;
+
+      console.log(`[Data Debug] User: ${userFromDb.username}, Role: ${userFromDb.role}, isAdmin: ${isAdmin}`);
 
       const [users, projects, leads, visits, followups, activities, call_logs, templates, webhook_configs, notifications, attendance, workflows] = await Promise.all([
         query("SELECT * FROM users"),
@@ -283,7 +287,8 @@ async function startServer() {
         activities,
         call_logs,
         templates,
-        notifications, webhook_configs, settings, workflows
+        notifications, webhook_configs, settings, workflows,
+        currentUser: safeCurrentUser
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

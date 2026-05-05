@@ -201,6 +201,11 @@ export default function App() {
         setWebhookConfigs(fullData.webhook_configs || []);
         setUsers(fullData.users || []);
         
+        if (fullData.currentUser) {
+          setUser(fullData.currentUser);
+          storage.saveAuth(fullData.currentUser);
+        }
+        
         lastSyncTime.current = new Date().toISOString();
         
         // Fetch stats separately

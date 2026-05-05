@@ -207,6 +207,13 @@ export interface VisitFilters {
   search?: string;
 }
 
+export interface LeadFilters {
+  quality?: LeadQuality | '';
+  status?: LeadStatus | '';
+  source?: string;
+  search?: string;
+}
+
 export interface Visit {
   id: string;
   leadId?: string; // Link to Lead

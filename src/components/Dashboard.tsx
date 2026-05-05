@@ -55,7 +55,7 @@ interface DashboardProps {
     qualityStats: { quality: string, count: number }[];
     todayCount: number;
   };
-  onNavigate: (page: Page, id?: string, filters?: VisitFilters) => void;
+  onNavigate: (page: Page, id?: string, filters?: any) => void;
 }
 
 export default React.memo(function Dashboard({ visits, leads, followUps, user, stats, onNavigate }: DashboardProps) {
@@ -273,8 +273,8 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, s
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={CalendarDays} label="Total Leads (Overall)" value={leads.length} color="gold" onClick={() => onNavigate('leads')} />
-        <StatCard icon={CheckCircle2} label="Active Leads" value={calculatedStats.activeLeadsCount} subLabel="Overall - Disqualified" color="green" onClick={() => onNavigate('leads')} />
-        <StatCard icon={CalendarRange} label="Visits Completed" value={calculatedStats.completedVisitsList.length} color="blue" onClick={() => onNavigate('visits')} />
+        <StatCard icon={CheckCircle2} label="Active Leads" value={calculatedStats.activeLeadsCount} subLabel="Overall - Disqualified" color="green" onClick={() => onNavigate('leads', undefined, { status: '' })} />
+        <StatCard icon={CalendarRange} label="Visits Completed" value={calculatedStats.completedVisitsList.length} color="blue" onClick={() => onNavigate('visits', undefined, { visitStatus: 'completed' })} />
         <StatCard icon={Clock} label="Leads (In Range)" value={calculatedStats.filteredLeadsList.length} color="orange" onClick={() => onNavigate('leads')} />
       </div>
 
@@ -317,10 +317,10 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, s
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={FireExtinguisher} label="Hot Leads" value={calculatedStats.hotLeads} color="red" compact onClick={() => onNavigate('leads')} />
-        <StatCard icon={Thermometer} label="Warm Leads" value={calculatedStats.warmLeads} color="orange" compact onClick={() => onNavigate('leads')} />
-        <StatCard icon={Snowflake} label="Cold Leads" value={calculatedStats.coldLeads} color="blue" compact onClick={() => onNavigate('leads')} />
-        <StatCard icon={Ban} label="Disqualified" value={calculatedStats.disqLeads} color="gray" compact onClick={() => onNavigate('leads')} />
+        <StatCard icon={FireExtinguisher} label="Hot Leads" value={calculatedStats.hotLeads} color="red" compact onClick={() => onNavigate('leads', undefined, { quality: 'hot' })} />
+        <StatCard icon={Thermometer} label="Warm Leads" value={calculatedStats.warmLeads} color="orange" compact onClick={() => onNavigate('leads', undefined, { quality: 'warm' })} />
+        <StatCard icon={Snowflake} label="Cold Leads" value={calculatedStats.coldLeads} color="blue" compact onClick={() => onNavigate('leads', undefined, { quality: 'cold' })} />
+        <StatCard icon={Ban} label="Disqualified" value={calculatedStats.disqLeads} color="gray" compact onClick={() => onNavigate('leads', undefined, { quality: 'disq' })} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">

@@ -228,10 +228,11 @@ async function startServer() {
       const filter = isAdmin ? "" : "WHERE projectId = ?";
       const params = isAdmin ? [] : [u.projectId];
 
+      const whereClause = isAdmin ? "WHERE 1=1" : "WHERE projectId = ?";
       const [statusStats, qualityStats, todayLeads] = await Promise.all([
-        query(`SELECT status, COUNT(*) as count FROM leads ${filter} GROUP BY status`, params),
-        query(`SELECT quality, COUNT(*) as count FROM leads ${filter} GROUP BY quality`, params),
-        queryOne(`SELECT COUNT(*) as count FROM leads ${isAdmin ? 'WHERE' : 'AND'} created_at >= CURDATE() ${filter}`, params)
+        query(`SELECT status, COUNT(*) as count FROM leads ${whereClause} GROUP BY status`, params),
+        query(`SELECT quality, COUNT(*) as count FROM leads ${whereClause} GROUP BY quality`, params),
+        queryOne(`SELECT COUNT(*) as count FROM leads ${whereClause} AND created_at >= CURDATE()`, params)
       ]);
 
       res.json({ statusStats, qualityStats, todayCount: (todayLeads as any)?.count || 0 });

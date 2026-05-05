@@ -108,6 +108,7 @@ export default function App() {
   const [initStep, setInitStep] = useState<string>("Initializing...");
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
   const [activeVisitFilters, setActiveVisitFilters] = useState<VisitFilters | null>(null);
+  const [activeLeadFilters, setActiveLeadFilters] = useState<LeadFilters | null>(null);
   const [followUpPromptData, setFollowUpPromptData] = useState<{ leadId?: string, visitId?: string, projectId: string, clientName: string } | null>(null);
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [preferredFollowUpMethod, setPreferredFollowUpMethod] = useState<FollowUpMethod>('call');
@@ -564,11 +565,19 @@ export default function App() {
     toast.success('Logged out successfully');
   };
 
-  const navigate = (page: Page, id?: string, filters?: VisitFilters) => {
+  const navigate = (page: Page, id?: string, filters?: any) => {
     setCurrentPage(page);
     if (id) setSelectedVisitId(id);
-    if (filters) setActiveVisitFilters(filters);
-    else setActiveVisitFilters(null);
+    
+    if (page === 'visits') {
+      setActiveVisitFilters(filters || null);
+    } else if (page === 'leads') {
+      setActiveLeadFilters(filters || null);
+    } else {
+      setActiveVisitFilters(null);
+      setActiveLeadFilters(null);
+    }
+    
     if (page !== 'whatsapp') setGeneratedMessage(null);
     setIsSidebarOpen(false);
     window.scrollTo(0, 0);
@@ -1036,6 +1045,7 @@ export default function App() {
               leads={filteredLeads} 
               users={users}
               projects={projects}
+              initialFilters={activeLeadFilters}
               onNavigate={navigate} 
               onAddLead={() => setIsLeadFormOpen(true)}
               onCall={handleCall}

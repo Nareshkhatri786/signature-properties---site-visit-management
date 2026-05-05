@@ -33,7 +33,7 @@ interface LeadListProps {
   leads: Lead[];
   users: AppUser[];
   projects: Project[];
-  onNavigate: (page: Page, id?: string) => void;
+  onNavigate: (page: Page, id?: string, filters?: any) => void;
   onAddLead: () => void;
   onCall: (lead: Lead) => void;
   onWhatsApp: (lead: Lead) => void;
@@ -43,9 +43,10 @@ interface LeadListProps {
   onBulkAssign: (ids: string[], userId: number, userName: string) => void;
   followUps: FollowUp[];
   visits: Visit[];
+  initialFilters?: LeadFilters | null;
 }
 
-export default React.memo(function LeadList({ leads, users, projects, onNavigate, onAddLead, onCall, onWhatsApp, onBulkScore, onUpdateStatus, onBulkDelete, onBulkAssign, followUps, visits }: LeadListProps) {
+export default React.memo(function LeadList({ leads, users, projects, onNavigate, onAddLead, onCall, onWhatsApp, onBulkScore, onUpdateStatus, onBulkDelete, onBulkAssign, followUps, visits, initialFilters }: LeadListProps) {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<LeadStatus | ''>('');
   const [quality, setQuality] = useState<LeadQuality | ''>('');
@@ -57,6 +58,15 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
   const [projectIdFilter, setProjectIdFilter] = useState<string>('');
   const [assignedToFilter, setAssignedToFilter] = useState<number | ''>('');
   const [followUpFilter, setFollowUpFilter] = useState<string>('');
+
+  React.useEffect(() => {
+    if (initialFilters) {
+      if (initialFilters.quality) setQuality(initialFilters.quality);
+      if (initialFilters.status) setStatus(initialFilters.status);
+      if (initialFilters.source) setSource(initialFilters.source);
+      if (initialFilters.search) setSearch(initialFilters.search);
+    }
+  }, [initialFilters]);
 
   const sources = Array.from(new Set(leads.map(l => l.source))).filter(Boolean).sort();
 

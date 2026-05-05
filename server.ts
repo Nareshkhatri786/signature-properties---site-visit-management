@@ -267,12 +267,12 @@ async function startServer() {
         query(`SELECT * FROM call_logs ${projectFilter} ORDER BY timestamp DESC LIMIT 5000`, projectParams),
         query("SELECT * FROM templates"),
         query("SELECT * FROM webhook_configs"),
-        query("SELECT * FROM notifications WHERE (userId = ? OR isAdmin = 1) ORDER BY createdAt DESC LIMIT 500", [u.id]),
-        query(isAdmin ? "SELECT * FROM attendance ORDER BY date DESC LIMIT 500" : "SELECT * FROM attendance WHERE userId = ? ORDER BY date DESC LIMIT 500", isAdmin ? [] : [u.id]),
+        query("SELECT * FROM notifications WHERE (userId = ? OR isAdmin = 1) ORDER BY createdAt DESC LIMIT 500", [userFromDb.id]),
+        query(isAdmin ? "SELECT * FROM attendance ORDER BY date DESC LIMIT 500" : "SELECT * FROM attendance WHERE userId = ? ORDER BY date DESC LIMIT 500", isAdmin ? [] : [userFromDb.id]),
         query("SELECT * FROM workflows"),
       ]);
 
-      console.log(`[Data Debug] User: ${u.username}, Role: ${u.role}, Leads: ${leads.length}, Users: ${users.length}, Projects: ${projects.length}`);
+      console.log(`[Data Debug] User: ${userFromDb.username}, Role: ${userFromDb.role}, Leads: ${leads.length}, Users: ${users.length}, Projects: ${projects.length}`);
 
       const settingsRow = await queryOne("SELECT * FROM settings WHERE id = 'main'");
       const settings = settingsRow ? parseJsonFields(settingsRow, JSON_FIELDS_SETTINGS) : {};

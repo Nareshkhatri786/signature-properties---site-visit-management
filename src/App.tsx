@@ -1035,6 +1035,9 @@ export default function App() {
               leads={filteredLeads}
               followUps={filteredFollowups}
               user={user}
+              users={users}
+              projects={projects}
+              callLogs={filteredCallLogs}
               stats={stats}
               onNavigate={navigate} 
             />

@@ -1,48 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  CalendarDays, 
-  CheckCircle2, 
-  CalendarRange, 
-  CalendarDays as CalendarIcon, 
-  Clock, 
-  Flag,
-  FireExtinguisher,
-  Thermometer,
-  Snowflake,
-  Ban,
-  Eye,
-  MessageSquare,
-  Plus,
-  Phone,
-  Users,
-  AlertCircle,
-  Filter,
-  LayoutDashboard
+  CalendarDays, CheckCircle2, CalendarRange,
+  CalendarDays as CalendarIcon, Clock, Flag,
+  FireExtinguisher, Thermometer, Snowflake, Ban,
+  Eye, MessageSquare, Plus, Phone, Users, AlertCircle,
+  Filter, LayoutDashboard, TrendingUp, ArrowRight,
+  Trophy, Target, Zap, ChevronRight
 } from 'lucide-react';
-import { Visit, Page, Lead, FollowUp, User, VisitFilters, Project } from '../types';
+import { Visit, Page, Lead, FollowUp, User, VisitFilters, Project, CallLog } from '../types';
 import { cn, getLocalDateString } from '../lib/utils';
 import { getLeadFollowUp, getFollowUpDisplayStatus } from '../lib/followupUtils';
 import { FollowUpStatusBadge } from './FollowUpStatusBadge';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  Cell
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import DateRangeSelector, { DateRange, isDateInRange } from './DateRangeSelector';
-import { 
-  startOfToday, 
-  endOfToday, 
-  isToday, 
-  isYesterday, 
-  isThisWeek, 
-  isThisMonth, 
-  parseISO 
-} from 'date-fns';
+import { startOfToday, endOfToday, isToday, isYesterday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
 import AIAdvisor from './AIAdvisor';
 
 interface DashboardProps {
@@ -50,6 +21,9 @@ interface DashboardProps {
   leads: Lead[];
   followUps: FollowUp[];
   user: User;
+  users?: User[];
+  projects?: Project[];
+  callLogs?: CallLog[];
   stats?: {
     statusStats: { status: string, count: number }[];
     qualityStats: { quality: string, count: number }[];
@@ -58,7 +32,10 @@ interface DashboardProps {
   onNavigate: (page: Page, id?: string, filters?: any) => void;
 }
 
-export default React.memo(function Dashboard({ visits, leads, followUps, user, stats, onNavigate }: DashboardProps) {
+export default React.memo(function Dashboard({ visits, leads, followUps, user, users = [], projects = [], callLogs = [], stats, onNavigate }: DashboardProps) {
+  const userRole = user?.role?.toLowerCase();
+  const isAdmin = userRole === 'admin' || userRole === 'adm';
+  const isManager = userRole === 'manager';
   const [dateRange, setDateRange] = useState<DateRange>({
     type: 'today',
     start: startOfToday(),
@@ -145,6 +122,29 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, s
       .sort((a, b) => (a.visit_date || '').localeCompare(b.visit_date || ''))
       .slice(0, 5);
 
+    // Conversion funnel
+    const visitedLeadIds = new Set(visits.map(v => v.leadId).filter(Boolean));
+    const visitedCount = visitedLeadIds.size;
+    const completedLeadIds = new Set(visits.filter(v => v.visit_status === 'completed').map(v => v.leadId).filter(Boolean));
+    const closedLeads = leads.filter(l => l.status === 'closed').length;
+
+    // Missed opportunities
+    const sevenDaysAgo = new Date(); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const notContactedDays = leads.filter(l => {
+      if (l.quality === 'disq' || l.status === 'closed' || l.status === 'lost') return false;
+      return new Date(l.updated_at) < sevenDaysAgo;
+    });
+    const overdueFollowupsCount = followUps.filter(f => f.status === 'pending' && f.date < todayStr).length;
+    const visitedNoFollowup = visits.filter(v => {
+      if (v.visit_status !== 'completed') return false;
+      return !followUps.some(f => f.visitId === v.id || f.leadId === v.leadId);
+    });
+
+    // Funnel rates
+    const visitRate = leads.length > 0 ? Math.round((visitedCount / leads.length) * 100) : 0;
+    const completionRate = visitedCount > 0 ? Math.round((completedLeadIds.size / visitedCount) * 100) : 0;
+    const closureRate = completedLeadIds.size > 0 ? Math.round((closedLeads / completedLeadIds.size) * 100) : 0;
+
     return {
       hotLeads, warmLeads, coldLeads, disqLeads, activeLeadsCount,
       completedToday, completedYesterday, completedThisWeek, completedThisMonth, completedVisitsList,
@@ -152,9 +152,27 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, s
       filteredVisitsList, filteredLeadsList,
       visitsInRangeDataList, upcoming, followUpRemindersList,
       followupsDueToday: followUps.filter(f => f.status === 'pending' && f.date === todayStr).length,
-      followupsOverdue: followUps.filter(f => f.status === 'pending' && f.date < todayStr).length,
+      followupsOverdue: overdueFollowupsCount,
+      // Funnel
+      visitedCount, completedLeadIds, closedLeads, visitRate, completionRate, closureRate,
+      // Missed
+      notContactedDays, visitedNoFollowup,
     };
   }, [leads, visits, followUps, dateRange, todayStr]);
+
+  // Leaderboard: per-user stats this month
+  const leaderboard = useMemo(() => {
+    if (!users.length) return [];
+    return users.map(u => {
+      const userLeads = leads.filter(l => String(l.assignedTo) === String(u.id));
+      const userVisits = visits.filter(v => v.assigned_to === u.name);
+      const userCalls = callLogs.filter(c => c.by === u.name);
+      const userClosures = userLeads.filter(l => l.status === 'closed').length;
+      const userVisitsDone = userVisits.filter(v => v.visit_status === 'completed').length;
+      const score = userLeads.length + (userVisitsDone * 3) + (userClosures * 10) + Math.floor(userCalls.length / 5);
+      return { user: u, leads: userLeads.length, visits: userVisitsDone, calls: userCalls.length, closures: userClosures, score };
+    }).filter(r => r.leads > 0 || r.calls > 0).sort((a, b) => b.score - a.score).slice(0, 8);
+  }, [users, leads, visits, callLogs]);
 
   const chartData = useMemo(() => [
     { name: 'Hot', value: calculatedStats.hotLeads, color: '#E74C3C' },
@@ -164,7 +182,7 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, s
   ], [calculatedStats]);
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-serif text-3xl font-bold text-[#2A1C00] flex items-center gap-3">
@@ -177,6 +195,121 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, s
         </div>
         <DateRangeSelector selectedRange={dateRange} onChange={setDateRange} />
       </div>
+
+      {/* ===== TODAY'S ACTION TRAY ===== */}
+      <div className="bg-gradient-to-r from-[#1C1207] to-[#2A1D0E] border border-amber-900/30 rounded-2xl p-5 shadow-xl">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 bg-amber-500/20 rounded-xl flex items-center justify-center">
+            <Zap size={18} className="text-amber-400" />
+          </div>
+          <div>
+            <h3 className="text-amber-400 font-bold text-sm uppercase tracking-widest">Today's Action Tray</h3>
+            <p className="text-amber-200/30 text-[10px]">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <button onClick={() => onNavigate('followups')} className="bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 rounded-xl p-4 text-left transition-all group">
+            <div className="flex items-center justify-between mb-2">
+              <AlertCircle size={18} className="text-red-400" />
+              <span className="text-2xl font-bold text-red-300">{calculatedStats.followupsOverdue}</span>
+            </div>
+            <p className="text-red-300 text-xs font-bold">Overdue Follow-ups</p>
+            <p className="text-red-400/60 text-[10px] mt-0.5">Action required immediately</p>
+          </button>
+          <button onClick={() => onNavigate('followups')} className="bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 rounded-xl p-4 text-left transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <CalendarIcon size={18} className="text-amber-400" />
+              <span className="text-2xl font-bold text-amber-300">{calculatedStats.followupsDueToday}</span>
+            </div>
+            <p className="text-amber-300 text-xs font-bold">Follow-ups Due Today</p>
+            <p className="text-amber-400/60 text-[10px] mt-0.5">Complete before EOD</p>
+          </button>
+          <button onClick={() => onNavigate('visits', undefined, { period: 'today', visitStatus: 'scheduled' })} className="bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 rounded-xl p-4 text-left transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <CalendarDays size={18} className="text-blue-400" />
+              <span className="text-2xl font-bold text-blue-300">{calculatedStats.scheduledToday}</span>
+            </div>
+            <p className="text-blue-300 text-xs font-bold">Visits Scheduled Today</p>
+            <p className="text-blue-400/60 text-[10px] mt-0.5">Confirm with clients</p>
+          </button>
+          <button onClick={() => onNavigate('leads', undefined, { quality: 'hot' })} className="bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 rounded-xl p-4 text-left transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <FireExtinguisher size={18} className="text-orange-400" />
+              <span className="text-2xl font-bold text-orange-300">{calculatedStats.hotLeads}</span>
+            </div>
+            <p className="text-orange-300 text-xs font-bold">Hot Leads</p>
+            <p className="text-orange-400/60 text-[10px] mt-0.5">High priority — call now</p>
+          </button>
+        </div>
+      </div>
+
+      {/* ===== CONVERSION FUNNEL ===== */}
+      <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center"><TrendingUp size={20} /></div>
+          <div>
+            <h3 className="font-serif text-xl font-bold text-[#2A1C00]">Conversion Funnel</h3>
+            <p className="text-[10px] text-[#9A8262] font-bold uppercase tracking-widest">Lead → Visit → Booking pipeline</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Leads', value: leads.length, rate: '100%', color: 'bg-slate-200', text: 'text-slate-700', width: 'w-full', nav: () => onNavigate('leads') },
+            { label: 'Visited', value: calculatedStats.visitedCount, rate: `${calculatedStats.visitRate}%`, color: 'bg-purple-400', text: 'text-purple-700', width: `w-[${calculatedStats.visitRate}%]`, nav: () => onNavigate('visits') },
+            { label: 'Visit Done', value: calculatedStats.completedLeadIds.size, rate: `${calculatedStats.completionRate}%`, color: 'bg-blue-400', text: 'text-blue-700', width: `w-[${calculatedStats.completionRate}%]`, nav: () => onNavigate('visits', undefined, { visitStatus: 'completed' }) },
+            { label: 'Closed / Booked', value: calculatedStats.closedLeads, rate: `${calculatedStats.closureRate}%`, color: 'bg-emerald-500', text: 'text-emerald-700', width: `w-[${calculatedStats.closureRate}%]`, nav: () => onNavigate('leads', undefined, { status: 'closed' }) },
+          ].map((stage, i) => (
+            <button key={i} onClick={stage.nav} className="bg-white border border-[#E6D8B8] rounded-xl p-4 text-left hover:shadow-md transition-all group">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">{stage.label}</span>
+                <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", stage.color.replace('bg-', 'bg-').replace('400','100').replace('500','100').replace('200','100'), stage.text)}>{stage.rate}</span>
+              </div>
+              <div className="text-3xl font-serif font-bold text-[#2A1C00] group-hover:text-[#C9A84C] transition-colors">{stage.value}</div>
+              <div className="mt-3 h-1.5 bg-[#F5EDD4] rounded-full overflow-hidden">
+                <div className={cn("h-full rounded-full transition-all", stage.color)} style={{ width: stage.rate }} />
+              </div>
+            </button>
+          ))}
+        </div>
+        {leads.length > 0 && (
+          <p className="mt-4 text-center text-[11px] text-[#9A8262]">
+            Overall conversion: <span className="font-bold text-[#C9A84C]">{leads.length > 0 ? ((calculatedStats.closedLeads / leads.length) * 100).toFixed(1) : 0}%</span> of leads become bookings
+          </p>
+        )}
+      </div>
+
+      {/* ===== MISSED OPPORTUNITIES ===== */}
+      {(calculatedStats.notContactedDays.length > 0 || calculatedStats.visitedNoFollowup.length > 0) && (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center"><Target size={18} /></div>
+            <div>
+              <h3 className="font-bold text-rose-900 text-sm">⚠️ Missed Opportunities — Needs Attention</h3>
+              <p className="text-rose-600/60 text-[10px]">Act now to prevent lead loss</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {calculatedStats.notContactedDays.length > 0 && (
+              <button onClick={() => onNavigate('leads')} className="bg-white border border-rose-200 rounded-xl p-4 text-left hover:bg-rose-50 transition-all flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-rose-800 text-sm">{calculatedStats.notContactedDays.length} Leads — No Activity in 7+ Days</p>
+                  <p className="text-rose-600/70 text-[11px] mt-0.5">Reassign or schedule follow-up</p>
+                </div>
+                <ChevronRight size={18} className="text-rose-400" />
+              </button>
+            )}
+            {calculatedStats.visitedNoFollowup.length > 0 && (
+              <button onClick={() => onNavigate('visits', undefined, { visitStatus: 'completed' })} className="bg-white border border-rose-200 rounded-xl p-4 text-left hover:bg-rose-50 transition-all flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-rose-800 text-sm">{calculatedStats.visitedNoFollowup.length} Visits Done — No Follow-up Scheduled</p>
+                  <p className="text-rose-600/70 text-[11px] mt-0.5">Schedule post-visit follow-up</p>
+                </div>
+                <ChevronRight size={18} className="text-rose-400" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <AIAdvisor 
         leads={leads} 
@@ -322,6 +455,65 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, s
         <StatCard icon={Snowflake} label="Cold Leads" value={calculatedStats.coldLeads} color="blue" compact onClick={() => onNavigate('leads', undefined, { quality: 'cold' })} />
         <StatCard icon={Ban} label="Disqualified" value={calculatedStats.disqLeads} color="gray" compact onClick={() => onNavigate('leads', undefined, { quality: 'disq' })} />
       </div>
+
+      {/* ===== TEAM LEADERBOARD (admin/manager only) ===== */}
+      {(isAdmin || isManager) && leaderboard.length > 0 && (
+        <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-[#E6D8B8] flex items-center gap-3">
+            <div className="w-9 h-9 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center"><Trophy size={18} /></div>
+            <div>
+              <h3 className="font-serif text-lg font-bold text-[#2A1C00]">Team Leaderboard</h3>
+              <p className="text-[10px] text-[#9A8262] font-bold uppercase tracking-widest">Performance across all users</p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-[#FDFAF2] border-b border-[#E6D8B8]">
+                  <th className="px-5 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">#</th>
+                  <th className="px-5 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Name</th>
+                  <th className="px-5 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider text-center">Leads</th>
+                  <th className="px-5 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider text-center">Calls</th>
+                  <th className="px-5 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider text-center">Visits Done</th>
+                  <th className="px-5 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider text-center">Closures</th>
+                  <th className="px-5 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Score</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E6D8B8]/50">
+                {leaderboard.map((row, i) => (
+                  <tr key={row.user.id} className="hover:bg-[#FEFCF5] transition-colors">
+                    <td className="px-5 py-3">
+                      <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold", i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-300 text-slate-700' : i === 2 ? 'bg-orange-300 text-white' : 'bg-[#F5EDD4] text-[#9A8262]')}>{i + 1}</span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center text-[11px] font-bold text-amber-700">{row.user.name[0]}</div>
+                        <span className="font-semibold text-[#2A1C00] text-sm">{row.user.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-center font-bold text-[#2A1C00]">{row.leads}</td>
+                    <td className="px-5 py-3 text-center font-bold text-[#2A1C00]">{row.calls}</td>
+                    <td className="px-5 py-3 text-center">
+                      <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-bold", row.visits > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400')}>{row.visits}</span>
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-bold", row.closures > 0 ? 'bg-[#C9A84C]/20 text-[#C9A84C]' : 'bg-slate-100 text-slate-400')}>{row.closures}</span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-[#F5EDD4] rounded-full overflow-hidden w-20">
+                          <div className="h-full bg-[#C9A84C] rounded-full" style={{ width: `${Math.min(100, (row.score / (leaderboard[0]?.score || 1)) * 100)}%` }} />
+                        </div>
+                        <span className="text-[11px] font-bold text-[#9A8262]">{row.score}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-1 bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl p-7 shadow-sm">

@@ -277,7 +277,8 @@ async function startServer() {
         projects,
         leads: leads.map((r: any) => parseJsonFields(r, JSON_FIELDS_LEADS)),
         visits: visits.map((r: any) => parseJsonFields(r, JSON_FIELDS_VISITS)),
-        followups, activities, call_logs, templates, attendance, notifications, webhook_configs, settings, workflows
+        attendance: attendance.map((r: any) => parseJsonFields(r, JSON_FIELDS_ATTENDANCE)),
+        notifications, webhook_configs, settings, workflows
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

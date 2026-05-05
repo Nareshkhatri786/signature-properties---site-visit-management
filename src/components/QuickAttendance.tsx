@@ -21,7 +21,10 @@ export const QuickAttendance: React.FC<QuickAttendanceProps> = ({ user, attendan
 
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  const currentAttendance = attendance.find((a: Attendance) => a.userId === user.id && a.date === today) || null;
+  const currentAttendance = attendance.find((a: Attendance) => {
+    const aDate = typeof a.date === 'string' ? a.date.split('T')[0] : format(new Date(a.date), 'yyyy-MM-dd');
+    return a.userId === user.id && aDate === today;
+  }) || null;
 
   const handleClockIn = async () => {
     setClockingInProgress(true);

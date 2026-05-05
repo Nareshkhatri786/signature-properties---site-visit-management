@@ -359,12 +359,15 @@ export default function App() {
   const filteredLeads = useMemo(() => {
     if (!user) return [];
     if (isAdminRole) return leads;
-    if (isManagerRole) return leads.filter(l => managedProjectIds.includes(l.projectId));
+    if (isManagerRole) return leads.filter(l =>
+      managedProjectIds.includes(l.projectId) || String(l.assignedTo) === String(user.id)
+    );
     
+    // Regular user: see their project's unassigned leads + any lead directly assigned to them
     return leads.filter(l => {
       const isAssignedToMe = String(l.assignedTo) === String(user.id);
-      const isMyProject = l.projectId === user.projectId || l.projectId === 'p1';
-      return isAssignedToMe || (isMyProject && !l.assignedTo);
+      const isMyProjectUnassigned = l.projectId === user.projectId && !l.assignedTo;
+      return isAssignedToMe || isMyProjectUnassigned;
     });
   }, [leads, user, isAdminRole, isManagerRole, managedProjectIds]);
 

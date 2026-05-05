@@ -249,6 +249,35 @@ async function startServer() {
 
       const uRole = userFromDb.role?.toLowerCase();
       const isAdmin = uRole === "admin" || uRole === "adm";
+      const isManager = uRole === "manager";
+
+      // For managers: get their assignedProjectIds
+      const managerUser = parseJsonFields({ ...userFromDb }, JSON_FIELDS_USERS);
+      const managedProjectIds: string[] = isManager
+        ? (managerUser.assignedProjectIds || (managerUser.projectId ? [managerUser.projectId] : []))
+        : [];
+
+      // Build lead/visit filter:
+      // - Admin: no filter
+      // - Manager: leads from any of their managed projects
+      // - User: leads from their own project OR leads directly assigned to them
+      let leadQuery: string;
+      let leadParams: any[];
+
+      if (isAdmin) {
+        leadQuery = "SELECT * FROM leads ORDER BY updated_at DESC LIMIT 5000";
+        leadParams = [];
+      } else if (isManager && managedProjectIds.length > 0) {
+        const placeholders = managedProjectIds.map(() => '?').join(',');
+        leadQuery = `SELECT * FROM leads WHERE (projectId IN (${placeholders}) OR assignedTo = ?) ORDER BY updated_at DESC LIMIT 5000`;
+        leadParams = [...managedProjectIds, userFromDb.id];
+      } else {
+        // Regular user: see their project's leads + leads directly assigned to them
+        leadQuery = "SELECT * FROM leads WHERE (projectId = ? OR assignedTo = ?) ORDER BY updated_at DESC LIMIT 5000";
+        leadParams = [userFromDb.projectId, userFromDb.id];
+      }
+
+      // Visits / followups / activities / call_logs use a simpler project filter
       const projectFilter = isAdmin ? "" : "WHERE projectId = ?";
       const projectParams = isAdmin ? [] : [userFromDb.projectId];
 
@@ -260,7 +289,7 @@ async function startServer() {
       const [users, projects, leads, visits, followups, activities, call_logs, templates, webhook_configs, notifications, attendance, workflows] = await Promise.all([
         query("SELECT * FROM users"),
         query("SELECT * FROM projects"),
-        query(`SELECT * FROM leads ${projectFilter} ORDER BY updated_at DESC LIMIT 5000`, projectParams),
+        query(leadQuery, leadParams),
         query(`SELECT * FROM visits ${projectFilter} ORDER BY visit_date DESC LIMIT 5000`, projectParams),
         query(`SELECT * FROM followups ${projectFilter} ORDER BY date DESC LIMIT 5000`, projectParams),
         query(`SELECT * FROM activities ${projectFilter} ORDER BY timestamp DESC LIMIT 5000`, projectParams),

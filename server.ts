@@ -278,6 +278,10 @@ async function startServer() {
         leads: leads.map((r: any) => parseJsonFields(r, JSON_FIELDS_LEADS)),
         visits: visits.map((r: any) => parseJsonFields(r, JSON_FIELDS_VISITS)),
         attendance: attendance.map((r: any) => parseJsonFields(r, JSON_FIELDS_ATTENDANCE)),
+        followups,
+        activities,
+        call_logs,
+        templates,
         notifications, webhook_configs, settings, workflows
       });
     } catch (e: any) {

@@ -28,6 +28,8 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
   const [search, setSearch] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [stageFilter, setStageFilter] = useState<string>('all');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const today = getLocalDateString();
   const isAdmin = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'adm';
@@ -102,6 +104,8 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       
       if (priorityFilter !== 'all' && f.priorityStr !== priorityFilter) return false;
       
+      if (stageFilter !== 'all' && f.stage !== stageFilter) return false;
+      
       if (search) {
         const q = search.toLowerCase();
         return f.clientName.toLowerCase().includes(q) || 
@@ -110,7 +114,32 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       }
       return true;
     });
-  }, [assigneeFilteredData, activeTab, search, priorityFilter]);
+  }, [assigneeFilteredData, activeTab, search, priorityFilter, stageFilter]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredData.length && filteredData.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredData.map(f => f.id));
+    }
+  };
+
+  const toggleSelect = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (selectedIds.includes(id)) {
+      setSelectedIds(prev => prev.filter(i => i !== id));
+    } else {
+      setSelectedIds(prev => [...prev, id]);
+    }
+  };
+
+  const handleBulkComplete = () => {
+    if (selectedIds.length === 0) return;
+    if (window.confirm(`Are you sure you want to mark ${selectedIds.length} follow-ups as completed?`)) {
+      selectedIds.forEach(id => onUpdateStatus(id, 'completed', 'Bulk marked as completed'));
+      setSelectedIds([]);
+    }
+  };
 
   const pieData = [
     { name: 'Overdue', value: stats.overdue, color: '#ef4444' },
@@ -217,6 +246,17 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
             <option value="WARM">Warm Leads</option>
             <option value="NORMAL">Normal Leads</option>
           </select>
+
+          <select 
+            value={stageFilter}
+            onChange={(e) => setStageFilter(e.target.value)}
+            className="bg-[#FDFAF2] border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm text-[#2A1C00] font-medium outline-none focus:border-[#C9A84C]"
+          >
+            <option value="all">All Stages</option>
+            {Array.from(new Set(processedData.map(f => f.stage))).filter(Boolean).sort().map(stage => (
+              <option key={stage} value={stage}>{stage.replace(/_/g, ' ')}</option>
+            ))}
+          </select>
         </div>
 
         {/* Tabs */}
@@ -245,7 +285,15 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
             <table className="w-full text-left border-collapse min-w-[1000px]">
               <thead>
                 <tr className="bg-[#FDFAF2] border-b border-[#E6D8B8]">
-                  <th className="px-4 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider w-24">Priority</th>
+                  <th className="px-4 py-3 w-10">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-[#E6D8B8] text-[#C9A84C] focus:ring-[#C9A84C]"
+                      checked={filteredData.length > 0 && selectedIds.length === filteredData.length}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                  <th className="px-2 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider w-24">Priority</th>
                   <th className="px-4 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Lead / Details</th>
                   <th className="px-4 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Stage</th>
                   <th className="px-4 py-3 text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Next Action</th>
@@ -257,10 +305,19 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
               </thead>
               <tbody className="divide-y divide-[#E6D8B8]/30">
                 {filteredData.length > 0 ? filteredData.map(f => (
-                  <tr key={f.id} className="hover:bg-[#FFFDF6] transition-colors group">
-                    <td className="px-0 py-3 relative">
+                  <tr key={f.id} className={cn("hover:bg-[#FFFDF6] transition-colors group cursor-default", selectedIds.includes(f.id) && "bg-[#FFFDF6]")}>
+                    <td className="px-4 py-3 relative">
                       <div className={cn("absolute left-0 top-3 bottom-3 border-l-[3px]", getPriorityColors(f.priorityStr))} />
-                      <div className="pl-4 flex flex-col items-center justify-center text-center">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-[#E6D8B8] text-[#C9A84C] focus:ring-[#C9A84C] cursor-pointer"
+                        checked={selectedIds.includes(f.id)}
+                        onChange={() => toggleSelect(f.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </td>
+                    <td className="px-0 py-3 relative">
+                      <div className="pl-2 flex flex-col items-center justify-center text-center">
                         {f.priorityStr === 'HOT' && <Star size={14} className="text-red-500 fill-red-500 mb-1" />}
                         {f.priorityStr === 'WARM' && <AlertCircle size={14} className="text-orange-500 mb-1" />}
                         {f.priorityStr === 'NORMAL' && <CheckCircle2 size={14} className="text-green-500 mb-1" />}
@@ -351,16 +408,24 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
           {/* Mobile Card View */}
           <div className="md:hidden divide-y divide-[#E6D8B8]/30">
             {filteredData.length > 0 ? filteredData.map(f => (
-              <div key={f.id} className="p-4 bg-white hover:bg-[#FFFDF6] transition-colors relative overflow-hidden">
+              <div key={f.id} className={cn("p-4 bg-white hover:bg-[#FFFDF6] transition-colors relative overflow-hidden", selectedIds.includes(f.id) && "bg-[#FFFDF6]")}>
                 <div className={cn("absolute left-0 top-0 bottom-0 border-l-[4px]", getPriorityColors(f.priorityStr))} />
                 <div className="pl-2 flex justify-between items-start mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-[#2A1C00] cursor-pointer" onClick={() => onNavigate(f.lead ? 'lead-detail' : 'detail', f.leadId || f.visitId)}>{f.clientName}</span>
-                      <span className={cn("text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider", getPriorityColors(f.priorityStr))}>{f.priorityStr}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-[#5C4820]">
-                      <Phone size={12} className="text-[#9A8262]" /> {f.phone}
+                  <div className="flex gap-3">
+                    <input 
+                      type="checkbox" 
+                      className="mt-1 rounded border-[#E6D8B8] text-[#C9A84C] focus:ring-[#C9A84C]"
+                      checked={selectedIds.includes(f.id)}
+                      onChange={() => toggleSelect(f.id)}
+                    />
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-[#2A1C00] cursor-pointer" onClick={() => onNavigate(f.lead ? 'lead-detail' : 'detail', f.leadId || f.visitId)}>{f.clientName}</span>
+                        <span className={cn("text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider", getPriorityColors(f.priorityStr))}>{f.priorityStr}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-[#5C4820]">
+                        <Phone size={12} className="text-[#9A8262]" /> {f.phone}
+                      </div>
                     </div>
                   </div>
                   <div className="text-right">
@@ -478,9 +543,9 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
               <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors"><Plus size={16} className="text-blue-600" /></div>
               Add New Follow Up
             </button>
-            <button className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#FDFAF2] text-sm font-bold text-[#5C4820] transition-colors group border border-transparent hover:border-[#E6D8B8]">
+            <button onClick={handleBulkComplete} className={cn("w-full flex items-center gap-3 p-3 rounded-lg text-sm font-bold transition-colors group border", selectedIds.length > 0 ? "text-green-700 bg-green-50 border-green-200 hover:bg-green-100" : "text-[#5C4820] border-transparent hover:border-[#E6D8B8] hover:bg-[#FDFAF2]")}>
               <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center group-hover:bg-green-100 transition-colors"><CheckSquare size={16} className="text-green-600" /></div>
-              Bulk Mark as Completed
+              Bulk Mark as Completed {selectedIds.length > 0 && `(${selectedIds.length})`}
             </button>
             {isAdmin && (
               <button className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#FDFAF2] text-sm font-bold text-[#5C4820] transition-colors group border border-transparent hover:border-[#E6D8B8]">

@@ -78,12 +78,28 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
     );
   }
   
-  // Load remarks from REST API
+  // Load remarks, activities, and WhatsApp from REST API
   useEffect(() => {
     apiService.getRemarks(visit.id).then((data: Remark[]) => {
       setSyncedRemarks(data.sort((a, b) => b.at.localeCompare(a.at)));
     }).catch(console.error);
-  }, [visit.id]);
+
+    // Fetch activities for this visit (by visitId / targetId)
+    apiService.getActivities(visit.id).then((data: Activity[]) => {
+      setSyncedActivities(data);
+    }).catch(console.error);
+
+    // Also fetch activities linked to the lead (so lead-level actions show too)
+    if (visit.leadId) {
+      apiService.getActivities(visit.leadId).then((leadActivities: Activity[]) => {
+        setSyncedActivities(prev => {
+          const existingIds = new Set(prev.map(a => a.id));
+          const merged = [...prev, ...leadActivities.filter(a => !existingIds.has(a.id))];
+          return merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        });
+      }).catch(console.error);
+    }
+  }, [visit.id, visit.leadId]);
 
   const logActivity = (type: ActivityType, details?: string) => {
     const activity: Activity = {
@@ -92,13 +108,17 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
       userId: user.id,
       userName: user.name,
       projectId: visit.projectId,
-      targetId: visit.id,
+      targetId: visit.leadId || visit.id,   // prefer leadId so it shows on lead timeline too
       targetName: visit.client_name,
       timestamp: new Date().toISOString(),
       details: details || ''
     };
     setSyncedActivities(prev => [activity, ...prev]);
+    // Save once with visit targetId and once with lead targetId
     apiService.save('activities', activity).catch(console.error);
+    if (visit.leadId && visit.leadId !== activity.targetId) {
+      apiService.save('activities', { ...activity, id: generateId(), targetId: visit.id }).catch(console.error);
+    }
   };
 
   const [newRemark, setNewRemark] = useState('');
@@ -121,7 +141,9 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
     outcome: 'follow_up_required' as VisitOutcome,
     nextStep: 'none' as 'none' | 'followup' | 'revisit',
     nextDate: '',
-    nextTime: ''
+    nextTime: '',
+    visitDate: new Date().toISOString().split('T')[0],  // back-date field
+    visitTime: new Date().toTimeString().slice(0, 5)     // back-date time field
   });
 
   const handleReschedule = () => {
@@ -163,16 +185,36 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
   };
 
   const handleCompleteVisit = () => {
+    if (!completionData.feedback.trim()) {
+      toast.error('Please provide client feedback');
+      return;
+    }
+    const completedAt = completionData.visitDate
+      ? new Date(`${completionData.visitDate}T${completionData.visitTime || '00:00'}:00`).toISOString()
+      : new Date().toISOString();
+
     const updatedVisit: Visit = {
       ...visit,
       visit_status: 'completed',
       client_feedback: completionData.feedback,
       interest_level: completionData.interest,
       outcome: completionData.outcome,
-      completed_at: new Date().toISOString()
+      completed_at: completedAt
     };
     onUpdateVisit(updatedVisit);
-    logActivity('visit_completed', `Outcome: ${completionData.outcome.replace(/_/g, ' ')}`);
+
+    // Update lead quality to match interest level
+    if (lead) {
+      onUpdateLead({
+        ...lead,
+        status: 'visit_done' as LeadStatus,
+        quality: completionData.interest,
+        updated_at: completedAt
+      });
+    }
+
+    // Log activity with correct type (visit_done is what ActivityTimeline shows)
+    logActivity('visit_done', `Outcome: ${completionData.outcome.replace(/_/g, ' ')} | Interest: ${completionData.interest}`);
     
     // Add remark for completion
     const remark: Remark = {
@@ -235,15 +277,25 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
     ...callLogs.map(c => ({ type: 'call', date: c.timestamp, data: c })),
   ].sort((a, b) => b.date.localeCompare(a.date));
 
+  // Open completion modal when visit_status is set to 'completed' from dropdown
   const handleUpdateStatus = (field: 'status' | 'visit_status', value: string) => {
+    if (field === 'visit_status' && value === 'completed') {
+      // Reset form data with today's date pre-filled
+      setCompletionData(prev => ({
+        ...prev,
+        visitDate: visit.visit_date || new Date().toISOString().split('T')[0],
+        visitTime: visit.visit_time || new Date().toTimeString().slice(0, 5)
+      }));
+      setIsCompletionModalOpen(true);
+      return;
+    }
     onUpdateVisit({ ...visit, [field]: value });
     
     let activityType: ActivityType = 'lead_updated';
     if (field === 'status') {
       activityType = 'lead_quality_changed';
     } else if (field === 'visit_status') {
-      if (value === 'completed') activityType = 'visit_completed';
-      else if (value === 'cancelled') activityType = 'visit_cancelled';
+      if (value === 'cancelled') activityType = 'visit_cancelled';
       else if (value === 'rescheduled') activityType = 'visit_rescheduled';
       else activityType = 'visit_scheduled';
     }
@@ -1019,6 +1071,36 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
                 </p>
 
                 <div className="space-y-6 mb-8">
+                  {/* Visit Date Back-Entry */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-3">📅 Visit Date & Time (back-entry allowed)</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                          <Calendar size={12} /> Visit Date *
+                        </label>
+                        <input
+                          type="date"
+                          value={completionData.visitDate}
+                          onChange={(e) => setCompletionData({...completionData, visitDate: e.target.value})}
+                          className="w-full bg-white border border-amber-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                          <Clock size={12} /> Visit Time
+                        </label>
+                        <input
+                          type="time"
+                          value={completionData.visitTime}
+                          onChange={(e) => setCompletionData({...completionData, visitTime: e.target.value})}
+                          className="w-full bg-white border border-amber-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
                       <MessageSquare size={12} /> Client Feedback *
@@ -1116,7 +1198,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
                 <div className="flex flex-col gap-3">
                   <button 
                     onClick={handleCompleteVisit}
-                    disabled={!completionData.feedback.trim() || (completionData.nextStep !== 'none' && !completionData.nextDate)}
+                    disabled={!completionData.feedback.trim() || !completionData.visitDate || (completionData.nextStep !== 'none' && !completionData.nextDate)}
                     className="w-full bg-[#C9A84C] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     <CheckCircle2 size={18} /> Complete Visit & Log Feedback

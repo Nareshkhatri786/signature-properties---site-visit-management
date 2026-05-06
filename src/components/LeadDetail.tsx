@@ -130,7 +130,9 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
     outcome: 'follow_up_required' as VisitOutcome,
     nextStep: 'none' as 'none' | 'followup' | 'revisit',
     nextDate: '',
-    nextTime: ''
+    nextTime: '',
+    visitDate: new Date().toISOString().split('T')[0],
+    visitTime: new Date().toTimeString().slice(0, 5)
   });
   
   // Remark state
@@ -225,13 +227,16 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
       .sort((a, b) => b.visit_date.localeCompare(a.visit_date))[0];
 
     if (activeVisit) {
+      const completedAt = quickCompleteData.visitDate
+        ? new Date(`${quickCompleteData.visitDate}T${quickCompleteData.visitTime || '00:00'}:00`).toISOString()
+        : new Date().toISOString();
       const updatedVisit: Visit = {
         ...activeVisit,
         visit_status: 'completed',
         client_feedback: quickCompleteData.feedback,
         interest_level: quickCompleteData.interest,
         outcome: quickCompleteData.outcome,
-        completed_at: new Date().toISOString()
+        completed_at: completedAt
       };
       apiService.save('visits', updatedVisit).catch(console.error);
     }
@@ -307,7 +312,7 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
       onAddRemark(remark);
     }
 
-    logActivity('visit_completed', `Outcome: ${quickCompleteData.outcome}`);
+    logActivity('visit_done', `Outcome: ${quickCompleteData.outcome} | Interest: ${quickCompleteData.interest}`);
     setIsQuickCompleteModalOpen(false);
     toast.success('Visit completed and status updated');
   };
@@ -1102,6 +1107,36 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
                 </p>
 
                 <div className="space-y-6 mb-8">
+                  {/* Visit Date Back-Entry */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-3">📅 Visit Date & Time (back-entry allowed)</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                          <Calendar size={12} /> Visit Date *
+                        </label>
+                        <input
+                          type="date"
+                          value={quickCompleteData.visitDate}
+                          onChange={(e) => setQuickCompleteData({...quickCompleteData, visitDate: e.target.value})}
+                          className="w-full bg-white border border-amber-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                          <Clock size={12} /> Visit Time
+                        </label>
+                        <input
+                          type="time"
+                          value={quickCompleteData.visitTime}
+                          onChange={(e) => setQuickCompleteData({...quickCompleteData, visitTime: e.target.value})}
+                          className="w-full bg-white border border-amber-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
                       <MessageSquare size={12} /> Client Feedback *

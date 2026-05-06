@@ -1409,6 +1409,7 @@ export default function App() {
               leads={leads}
               visits={visits}
               user={user}
+              users={users}
               onUpdateStatus={(id, status, note) => {
                 handleUpdateFollowUp(id, {
                   status,

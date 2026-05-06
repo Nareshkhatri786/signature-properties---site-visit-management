@@ -60,10 +60,11 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       const lastContactDate = lead?.updated_at || visit?.updated_at;
       
       const userName = f.userName || lead?.assignedToName || visit?.assigned_to || 'Unassigned';
+      const computedUserId = f.userId || lead?.assignedTo || visit?.assignedToId;
       
       return {
         ...f, clientName, phone, source, priorityStr, statusGroup, daysOverdue, stage,
-        lead, visit, lastContactDate, quality, userName
+        lead, visit, lastContactDate, quality, userName, computedUserId
       };
     }).sort((a, b) => {
       // Sort by overdue first, then date
@@ -74,12 +75,29 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
     });
   }, [followUps, leads, visits, today]);
 
-  const filteredData = useMemo(() => {
+  // Filter by Assignee first, so stats update when admin selects a specific user
+  const assigneeFilteredData = useMemo(() => {
     return processedData.filter(f => {
+      if (assigneeFilter === 'me' && f.computedUserId !== user.id) return false;
+      if (assigneeFilter !== 'all' && assigneeFilter !== 'me' && f.computedUserId?.toString() !== assigneeFilter) return false;
+      return true;
+    });
+  }, [processedData, assigneeFilter, user.id]);
+
+  const stats = {
+    all: assigneeFilteredData.length,
+    overdue: assigneeFilteredData.filter(f => f.statusGroup === 'overdue').length,
+    today: assigneeFilteredData.filter(f => f.statusGroup === 'today').length,
+    upcoming: assigneeFilteredData.filter(f => f.statusGroup === 'upcoming').length,
+    completed: assigneeFilteredData.filter(f => f.statusGroup === 'completed').length,
+    cancelled: assigneeFilteredData.filter(f => f.statusGroup === 'cancelled').length,
+    hotOverdue: assigneeFilteredData.filter(f => f.statusGroup === 'overdue' && f.priorityStr === 'HOT').length,
+    warmOverdue: assigneeFilteredData.filter(f => f.statusGroup === 'overdue' && f.priorityStr === 'WARM').length,
+  };
+
+  const filteredData = useMemo(() => {
+    return assigneeFilteredData.filter(f => {
       if (activeTab !== 'all' && f.statusGroup !== activeTab) return false;
-      
-      if (assigneeFilter === 'me' && f.userId !== user.id) return false;
-      if (assigneeFilter !== 'all' && assigneeFilter !== 'me' && f.userId?.toString() !== assigneeFilter) return false;
       
       if (priorityFilter !== 'all' && f.priorityStr !== priorityFilter) return false;
       
@@ -91,18 +109,7 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       }
       return true;
     });
-  }, [processedData, activeTab, search, assigneeFilter, priorityFilter, user.id]);
-
-  const stats = {
-    all: processedData.length,
-    overdue: processedData.filter(f => f.statusGroup === 'overdue').length,
-    today: processedData.filter(f => f.statusGroup === 'today').length,
-    upcoming: processedData.filter(f => f.statusGroup === 'upcoming').length,
-    completed: processedData.filter(f => f.statusGroup === 'completed').length,
-    cancelled: processedData.filter(f => f.statusGroup === 'cancelled').length,
-    hotOverdue: processedData.filter(f => f.statusGroup === 'overdue' && f.priorityStr === 'HOT').length,
-    warmOverdue: processedData.filter(f => f.statusGroup === 'overdue' && f.priorityStr === 'WARM').length,
-  };
+  }, [assigneeFilteredData, activeTab, search, priorityFilter]);
 
   const pieData = [
     { name: 'Overdue', value: stats.overdue, color: '#ef4444' },

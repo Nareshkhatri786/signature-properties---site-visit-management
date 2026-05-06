@@ -447,7 +447,7 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
                 <RefreshCw size={16} className="text-orange-500 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-xs font-bold text-orange-900">8 leads to reassign</p>
-                  <p className="text-[10px] text-orange-700 mt-0.5">(Overdue > 3 days)</p>
+                  <p className="text-[10px] text-orange-700 mt-0.5">(Overdue &gt; 3 days)</p>
                 </div>
               </div>
             )}

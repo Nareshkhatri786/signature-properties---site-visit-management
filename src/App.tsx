@@ -1110,6 +1110,13 @@ export default function App() {
               }}
               onAddVisit={(l) => navigate('add-visit', l.id)}
               onAddFollowUp={(f) => {
+                const isDuplicate = followups.some(existing => 
+                  existing.leadId === f.leadId && 
+                  existing.status === 'pending' && 
+                  existing.date === f.date
+                );
+                if (isDuplicate) return;
+
                 setFollowups([f, ...followups]);
                 api.save('followups', f);
                 toast.success('Follow-up scheduled');
@@ -1361,6 +1368,13 @@ export default function App() {
                 api.save('remarks', { ...r, targetId: selectedVisitId });
               }}
               onAddFollowUp={(f) => {
+                const isDuplicate = followups.some(existing => 
+                  existing.leadId === f.leadId && 
+                  existing.status === 'pending' && 
+                  existing.date === f.date
+                );
+                if (isDuplicate) return;
+
                 setFollowups([f, ...followups]);
                 api.save('followups', f);
                 logActivity('followup_scheduled', selectedVisitId, visits.find(v => v.id === selectedVisitId)?.client_name || 'Visit', `Follow-up scheduled for ${f.date}${f.purpose ? `: ${f.purpose}` : ''}`);

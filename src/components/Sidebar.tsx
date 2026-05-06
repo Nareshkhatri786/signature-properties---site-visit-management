@@ -1,21 +1,5 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  CalendarCheck, 
-  UserPlus, 
-  Users,
-  Webhook,
-  MessageSquare, 
-  Layers, 
-  Settings, 
-  LogOut,
-  Home,
-  X,
-  BarChart2,
-  Bell, History as HistoryIcon,
-  UserCheck,
-  Zap
-} from 'lucide-react';
+  import { LayoutDashboard, CalendarCheck, UserPlus, Users, Webhook, MessageSquare, Layers, Settings, LogOut, Home, X, BarChart2, Bell, History as HistoryIcon, UserCheck, Zap, Sun } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Page, User } from '../types';
 
@@ -32,6 +16,7 @@ export default function Sidebar({ isOpen, onClose, currentPage, onNavigate, onLo
   const userRole = user?.role?.toLowerCase();
   const isAdmin = userRole === 'admin' || userRole === 'adm';
   const navItems = [
+    { id: 'today', label: 'Today', icon: Sun, section: 'Main' },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Main' },
     { id: 'leads', label: 'Leads', icon: Users, section: 'Main' },
     { id: 'hrms', label: 'HRMS & Attendance', icon: UserCheck, section: 'Main' },

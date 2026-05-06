@@ -4,6 +4,7 @@ import { User, Visit, Remark, Template, Settings, Page, CallLog, CallOutcome, Le
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import Dashboard from './components/Dashboard';
+import TodayOverview from './components/TodayOverview';
 import LeadList from './components/LeadList';
 import LeadDetail from './components/LeadDetail';
 import LeadForm from './components/LeadForm';
@@ -68,7 +69,7 @@ const api = {
 
 export default function App() {
   const [user, setUser] = useState<User | null>(storage.getAuth());
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const [currentPage, setCurrentPage] = useState<Page>('today');
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -1029,6 +1030,17 @@ export default function App() {
         />
         
         <main className="p-4 lg:p-8 flex-1">
+          {currentPage === 'today' && (
+            <TodayOverview
+              leads={filteredLeads}
+              visits={filteredVisits}
+              followUps={filteredFollowups}
+              callLogs={filteredCallLogs}
+              users={users}
+              user={user}
+              onNavigate={navigate}
+            />
+          )}
           {currentPage === 'dashboard' && (
             <Dashboard 
               visits={filteredVisits} 

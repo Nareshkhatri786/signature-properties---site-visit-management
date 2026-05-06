@@ -386,7 +386,34 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
                     <CalendarIcon size={18} />
                     <span>Weekend MIS</span>
                   </div>
-                  <span className="text-[10px] opacity-60">Run Now (Saturday 9 AM)</span>
+                  <span className="text-[10px] opacity-60">Saturday 9 AM</span>
+                </button>
+                <button 
+                  onClick={async () => {
+                    toast.loading('Generating Detailed Monthly Report...', { id: 'mis-report' });
+                    try {
+                      const res = await fetch('/api/reports/trigger', {
+                        method: 'POST',
+                        headers: { 
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
+                        },
+                        body: JSON.stringify({ type: 'detailed_monthly' })
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
+                      toast.success('Detailed Monthly Report sent to email', { id: 'mis-report' });
+                    } catch (e: any) {
+                      toast.error(e.message || 'Failed to trigger report', { id: 'mis-report', duration: 5000 });
+                    }
+                  }}
+                  className="px-6 py-4 bg-[#C9A84C]/20 text-[#C9A84C] border border-[#C9A84C]/30 backdrop-blur-md rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-[#C9A84C]/30 transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
+                >
+                  <div className="flex items-center gap-2">
+                    <BarChart3 size={18} />
+                    <span>Monthly Detailed</span>
+                  </div>
+                  <span className="text-[10px] opacity-60">Monday 10 AM</span>
                 </button>
               </div>
             </div>

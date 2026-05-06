@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import cron from 'node-cron';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 
 dotenv.config();
 
@@ -329,6 +329,133 @@ export async function generateAttendanceMISReport() {
   await sendEmail(`Attendance MIS Report - ${monthName}`, html);
 }
 
+export async function generateMonthlyDetailedMISReport() {
+  const now = new Date();
+  const monthStart = startOfMonth(now);
+  const monthEnd = endOfMonth(now);
+  const monthName = format(now, 'MMMM yyyy');
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+  console.log(`[MIS] Generating Detailed Monthly Report for ${monthName}...`);
+
+  // 1. Fetch regular users
+  const users = await sql<any>("SELECT id, name, username FROM users WHERE role NOT IN ('admin', 'adm', 'manager')");
+  if (users.length === 0) return console.log("[MIS] No regular users found for report.");
+
+  const startStr = format(monthStart, 'yyyy-MM-dd 00:00:00');
+  const endStr = format(monthEnd, 'yyyy-MM-dd 23:59:59');
+
+  // 2. Fetch all raw metrics for the month
+  const [leadMetrics, callMetrics, callAnsweredMetrics, whatsappMetrics, visitPlannedMetrics, visitDoneMetrics] = await Promise.all([
+    // New Leads
+    sql<any>(`SELECT assignedTo, DATE(created_at) as date, COUNT(*) as count FROM leads WHERE created_at BETWEEN ? AND ? GROUP BY assignedTo, date`, [startStr, endStr]),
+    // Calls Made
+    sql<any>(`SELECT \`by\` as userName, DATE(timestamp) as date, COUNT(*) as count FROM call_logs WHERE timestamp BETWEEN ? AND ? GROUP BY userName, date`, [startStr, endStr]),
+    // Calls Answered
+    sql<any>(`SELECT \`by\` as userName, DATE(timestamp) as date, COUNT(*) as count FROM call_logs WHERE outcome = 'answered' AND timestamp BETWEEN ? AND ? GROUP BY userName, date`, [startStr, endStr]),
+    // WhatsApp Sent
+    sql<any>(`SELECT userName, DATE(timestamp) as date, COUNT(*) as count FROM activities WHERE type = 'whatsapp_sent' AND timestamp BETWEEN ? AND ? GROUP BY userName, date`, [startStr, endStr]),
+    // Visits Planned
+    sql<any>(`SELECT assigned_to as userName, DATE(visit_date) as date, COUNT(*) as count FROM visits WHERE visit_date BETWEEN ? AND ? GROUP BY userName, date`, [startStr, endStr]),
+    // Visits Done
+    sql<any>(`SELECT assigned_to as userName, DATE(visit_date) as date, COUNT(*) as count FROM visits WHERE visit_status = 'completed' AND visit_date BETWEEN ? AND ? GROUP BY userName, date`, [startStr, endStr])
+  ]);
+
+  const metrics = [
+    { label: 'Calls Made', data: callMetrics, icon: '📞', color: '#FFF5F0', headerColor: '#FF7F50' },
+    { label: 'Calls Answered', data: callAnsweredMetrics, icon: '✅', color: '#F0FFF4', headerColor: '#38A169' },
+    { label: 'WhatsApp Sent', data: whatsappMetrics, icon: '💬', color: '#E6FFFA', headerColor: '#319795' },
+    { label: 'New Leads', data: leadMetrics, icon: '👤', color: '#F0F7FF', headerColor: '#3182CE' },
+    { label: 'Visits Planned', data: visitPlannedMetrics, icon: '📅', color: '#F5F0FF', headerColor: '#9F7AEA' },
+    { label: 'Visits Done', data: visitDoneMetrics, icon: '🏠', color: '#FDF2F2', headerColor: '#E53E3E' }
+  ];
+
+  const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1a202c; max-width: 1200px; margin: auto; padding: 20px; background-color: #f7fafc;">
+      <div style="background-color: #fff; padding: 30px; border-radius: 15px; shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #edf2f7; padding-bottom: 20px; margin-bottom: 30px;">
+          <div>
+            <h1 style="margin: 0; color: #2d3748; font-size: 28px;">Detailed MIS Report</h1>
+            <p style="margin: 5px 0 0; color: #718096; font-size: 16px;">${monthName}</p>
+          </div>
+          <div style="text-align: right;">
+            <p style="margin: 0; color: #4a5568; font-weight: bold;">Signature Properties</p>
+            <p style="margin: 0; color: #a0aec0; font-size: 12px;">Generated on: ${format(now, 'dd MMM yyyy HH:mm')}</p>
+          </div>
+        </div>
+
+        ${metrics.map(metric => {
+          const tableData = users.map(user => {
+            const row: Record<string, any> = { name: user.name, total: 0 };
+            daysInMonth.forEach(day => {
+              const dayStr = format(day, 'yyyy-MM-dd');
+              let count = 0;
+              if (metric.label === 'New Leads') {
+                count = metric.data.find((d: any) => d.assignedTo === user.id && format(new Date(d.date), 'yyyy-MM-dd') === dayStr)?.count || 0;
+              } else {
+                count = metric.data.find((d: any) => (d.userName === user.name || d.userName === user.username) && format(new Date(d.date), 'yyyy-MM-dd') === dayStr)?.count || 0;
+              }
+              row[dayStr] = count;
+              row.total += count;
+            });
+            return row;
+          });
+
+          const dayTotals = daysInMonth.map(day => {
+            const dayStr = format(day, 'yyyy-MM-dd');
+            return tableData.reduce((acc, row) => acc + row[dayStr], 0);
+          });
+          const grandTotal = dayTotals.reduce((acc, t) => acc + t, 0);
+
+          return `
+            <div style="margin-bottom: 40px; overflow-x: auto;">
+              <h3 style="color: ${metric.headerColor}; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <span style="background: ${metric.color}; padding: 8px; border-radius: 8px;">${metric.icon}</span>
+                ${metric.label}
+              </h3>
+              <table style="width: 100%; border-collapse: collapse; font-size: 11px; background-color: white; border: 1px solid #e2e8f0;">
+                <thead>
+                  <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                    <th style="padding: 12px 8px; border: 1px solid #e2e8f0; text-align: left; position: sticky; left: 0; background-color: #f8fafc; min-width: 120px;">USER NAME</th>
+                    ${daysInMonth.map(day => `<th style="padding: 12px 4px; border: 1px solid #e2e8f0; text-align: center; min-width: 25px;">${format(day, 'd')}</th>`).join('')}
+                    <th style="padding: 12px 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: bold; background-color: #edf2f7; min-width: 60px;">TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableData.map(row => `
+                    <tr style="border-bottom: 1px solid #edf2f7;">
+                      <td style="padding: 10px 8px; border: 1px solid #e2e8f0; font-weight: bold; position: sticky; left: 0; background-color: white;">${row.name}</td>
+                      ${daysInMonth.map(day => {
+                        const count = row[format(day, 'yyyy-MM-dd')];
+                        return `<td style="padding: 10px 4px; border: 1px solid #e2e8f0; text-align: center; color: ${count > 0 ? '#2d3748' : '#cbd5e0'};">${count || '-'}</td>`;
+                      }).join('')}
+                      <td style="padding: 10px 8px; border: 1px solid #e2e8f0; text-align: center; font-weight: bold; background-color: #f8fafc;">${row.total}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+                <tfoot>
+                  <tr style="background-color: #f8fafc; font-weight: bold; border-top: 2px solid #e2e8f0;">
+                    <td style="padding: 12px 8px; border: 1px solid #e2e8f0; position: sticky; left: 0; background-color: #f8fafc;">TOTAL</td>
+                    ${dayTotals.map(t => `<td style="padding: 12px 4px; border: 1px solid #e2e8f0; text-align: center;">${t || '-'}</td>`).join('')}
+                    <td style="padding: 12px 8px; border: 1px solid #e2e8f0; text-align: center; background-color: #edf2f7;">${grandTotal}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          `;
+        }).join('')}
+        
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #edf2f7; text-align: center; color: #a0aec0; font-size: 12px;">
+          <p>Note: This report is based on the data available for the current month. All counts are recorded per user per day.</p>
+          <p>© 2026 Signature Properties CRM Automation</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  await sendEmail(`Monthly MIS Report - ${monthName}`, html);
+}
+
 async function sendEmail(subject: string, html: string) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.warn("[MIS] SMTP not configured, printing to console");
@@ -366,6 +493,11 @@ export function setupMISReports() {
     generateAttendanceMISReport().catch(console.error);
   });
 
-  console.log("[MIS] Scheduled: Daily@8PM, Weekly@Mon9AM, Weekend@Sat-Sun10AM, Attendance@Mon-Sat10AM");
+  // Detailed Monthly MIS: Every Monday at 10:00 AM IST (04:30 UTC)
+  cron.schedule("30 4 * * 1", () => {
+    generateMonthlyDetailedMISReport().catch(console.error);
+  });
+
+  console.log("[MIS] Scheduled: Daily@8PM, Weekly@Mon9AM, Weekend@Sat-Sun10AM, Attendance@Mon-Sat10AM, MonthlyDetailed@Mon10AM");
 }
 

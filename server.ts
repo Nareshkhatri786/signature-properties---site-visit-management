@@ -5,7 +5,7 @@ import fs from "fs";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { pool, query, queryOne, execute, parseJsonFields, stringifyJsonFields, testConnection } from "./db.js";
-import { setupMISReports, generateDailyMISReport, generateWeekendMISReport, setDbPool, getReportStats, sendCustomEmail } from "./reportService.js";
+import { setupMISReports, generateDailyMISReport, generateWeekendMISReport, generateMonthlyDetailedMISReport, setDbPool, getReportStats, sendCustomEmail } from "./reportService.js";
 import { normalizePhoneNumber } from "./src/lib/phoneUtils.js";
 import webPush from "web-push";
 import dotenv from "dotenv";
@@ -723,6 +723,7 @@ async function startServer() {
     try {
       if (type === "daily") await generateDailyMISReport();
       else if (type === "weekend") await generateWeekendMISReport();
+      else if (type === "detailed_monthly") await generateMonthlyDetailedMISReport();
       else return res.status(400).json({ error: "Invalid type" });
       res.json({ success: true });
     } catch (e: any) { res.status(500).json({ error: e.message }); }

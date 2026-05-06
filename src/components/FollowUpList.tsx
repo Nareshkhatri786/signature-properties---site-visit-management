@@ -59,8 +59,9 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       // Last contact
       const lastContactDate = lead?.updated_at || visit?.updated_at;
       
-      const userName = f.userName || lead?.assignedToName || visit?.assigned_to || 'Unassigned';
-      const computedUserId = f.userId || lead?.assignedTo || visit?.assignedToId;
+      const computedUserId = f.userId || lead?.assignedTo;
+      const userObj = users.find(u => u.id === computedUserId);
+      const userName = f.userName || lead?.assignedToName || userObj?.name || visit?.assigned_to || 'Unassigned';
       
       return {
         ...f, clientName, phone, source, priorityStr, statusGroup, daysOverdue, stage,

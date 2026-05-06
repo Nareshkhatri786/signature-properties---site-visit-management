@@ -57,9 +57,10 @@ interface ReportsProps {
   users: User[];
   projects: Project[];
   onNavigate: (page: Page, id?: string, filters?: VisitFilters) => void;
+  currentUserRole?: string;
 }
 
-export default function Reports({ callLogs, visits, leads, activities, users, projects, onNavigate }: ReportsProps) {
+export default function Reports({ callLogs, visits, leads, activities, users, projects, onNavigate, currentUserRole }: ReportsProps) {
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedActivityType, setSelectedActivityType] = useState<ActivityType | ''>('');
@@ -318,78 +319,80 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
         </div>
       </div>
 
-      {/* Automated MIS Reports Block */}
-      <div className="bg-gradient-to-br from-[#1C1207] to-[#2A1C00] rounded-[2rem] p-8 border border-[#C9A84C]/30 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#C9A84C]/10 rounded-full -mr-48 -mt-48 blur-3xl" />
-        <div className="relative z-10">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#C9A84C]/20 border border-[#C9A84C]/30 rounded-full text-[#C9A84C] text-[10px] font-black uppercase tracking-widest">
-                <Sparkles size={12} />
-                Automation Active
+      {/* Automated MIS Reports Block - Only for Admin and Manager */}
+      {(currentUserRole?.toLowerCase() === 'admin' || currentUserRole?.toLowerCase() === 'adm' || currentUserRole?.toLowerCase() === 'manager') && (
+        <div className="bg-gradient-to-br from-[#1C1207] to-[#2A1C00] rounded-[2rem] p-8 border border-[#C9A84C]/30 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-[#C9A84C]/10 rounded-full -mr-48 -mt-48 blur-3xl" />
+          <div className="relative z-10">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#C9A84C]/20 border border-[#C9A84C]/30 rounded-full text-[#C9A84C] text-[10px] font-black uppercase tracking-widest">
+                  <Sparkles size={12} />
+                  Automation Active
+                </div>
+                <h3 className="font-serif text-3xl font-bold text-white leading-tight">Automated MIS Reports</h3>
+                <p className="text-white/60 text-sm max-w-xl font-medium">Daily operations audit at 8 PM and Weekend performance planning every Saturday 9 AM delivered to your inbox.</p>
               </div>
-              <h3 className="font-serif text-3xl font-bold text-white leading-tight">Automated MIS Reports</h3>
-              <p className="text-white/60 text-sm max-w-xl font-medium">Daily operations audit at 8 PM and Weekend performance planning every Saturday 9 AM delivered to your inbox.</p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <button 
-                onClick={async () => {
-                  toast.loading('Generating Daily MIS Report...', { id: 'mis-report' });
-                  try {
-                    const res = await fetch('/api/reports/trigger', {
-                      method: 'POST',
-                      headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
-                      },
-                      body: JSON.stringify({ type: 'daily' })
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
-                    toast.success('Daily MIS Report sent to email', { id: 'mis-report' });
-                  } catch (e: any) {
-                    toast.error(e.message || 'Failed to trigger report', { id: 'mis-report', duration: 5000 });
-                  }
-                }}
-                className="px-6 py-4 bg-[#C9A84C] text-[#1C1207] rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-[#D4BC7D] transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
-              >
-                <div className="flex items-center gap-2">
-                  <BarChart3 size={18} />
-                  <span>Daily MIS</span>
-                </div>
-                <span className="text-[10px] opacity-60">Run Now (8 PM Cycle)</span>
-              </button>
-              <button 
-                onClick={async () => {
-                  toast.loading('Generating Weekend planning...', { id: 'mis-report' });
-                  try {
-                    const res = await fetch('/api/reports/trigger', {
-                      method: 'POST',
-                      headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
-                      },
-                      body: JSON.stringify({ type: 'weekend' })
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
-                    toast.success('Weekend MIS Report sent to email', { id: 'mis-report' });
-                  } catch (e: any) {
-                    toast.error(e.message || 'Failed to trigger report', { id: 'mis-report', duration: 5000 });
-                  }
-                }}
-                className="px-6 py-4 bg-white/10 text-white border border-white/20 backdrop-blur-md rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-white/20 transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
-              >
-                <div className="flex items-center gap-2">
-                  <CalendarIcon size={18} />
-                  <span>Weekend MIS</span>
-                </div>
-                <span className="text-[10px] opacity-60">Run Now (Saturday 9 AM)</span>
-              </button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button 
+                  onClick={async () => {
+                    toast.loading('Generating Daily MIS Report...', { id: 'mis-report' });
+                    try {
+                      const res = await fetch('/api/reports/trigger', {
+                        method: 'POST',
+                        headers: { 
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
+                        },
+                        body: JSON.stringify({ type: 'daily' })
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
+                      toast.success('Daily MIS Report sent to email', { id: 'mis-report' });
+                    } catch (e: any) {
+                      toast.error(e.message || 'Failed to trigger report', { id: 'mis-report', duration: 5000 });
+                    }
+                  }}
+                  className="px-6 py-4 bg-[#C9A84C] text-[#1C1207] rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-[#D4BC7D] transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
+                >
+                  <div className="flex items-center gap-2">
+                    <BarChart3 size={18} />
+                    <span>Daily MIS</span>
+                  </div>
+                  <span className="text-[10px] opacity-60">Run Now (8 PM Cycle)</span>
+                </button>
+                <button 
+                  onClick={async () => {
+                    toast.loading('Generating Weekend planning...', { id: 'mis-report' });
+                    try {
+                      const res = await fetch('/api/reports/trigger', {
+                        method: 'POST',
+                        headers: { 
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
+                        },
+                        body: JSON.stringify({ type: 'weekend' })
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
+                      toast.success('Weekend MIS Report sent to email', { id: 'mis-report' });
+                    } catch (e: any) {
+                      toast.error(e.message || 'Failed to trigger report', { id: 'mis-report', duration: 5000 });
+                    }
+                  }}
+                  className="px-6 py-4 bg-white/10 text-white border border-white/20 backdrop-blur-md rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-white/20 transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
+                >
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon size={18} />
+                    <span>Weekend MIS</span>
+                  </div>
+                  <span className="text-[10px] opacity-60">Run Now (Saturday 9 AM)</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Primary Action Metrics (Filtered by Range) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

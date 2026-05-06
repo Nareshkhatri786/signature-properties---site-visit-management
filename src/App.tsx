@@ -1415,6 +1415,7 @@ export default function App() {
               users={users}
               projects={projects}
               onNavigate={navigate}
+              currentUserRole={user?.role}
             />
           )}
           {currentPage === 'followups' && (

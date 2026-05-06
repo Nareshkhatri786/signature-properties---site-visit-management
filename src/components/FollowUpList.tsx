@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Calendar, Clock, AlertCircle, CheckCircle2, XCircle, Search, Phone, MessageSquare, 
   ChevronRight, User, Star, MoreVertical, Plus, Settings, Filter, PieChart as PieChartIcon, 
-  Download, RefreshCw, Bell, BellRing, ChevronDown, CheckSquare, Users, Edit3
+  Download, RefreshCw, Bell, BellRing, ChevronDown, CheckSquare, Users, Edit3, Zap
 } from 'lucide-react';
 import { FollowUp, Lead, Visit, Page, VisitFilters, User as UserType } from '../types';
 import { cn, getLocalDateString } from '../lib/utils';

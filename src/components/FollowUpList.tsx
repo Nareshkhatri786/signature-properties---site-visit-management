@@ -59,9 +59,11 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       // Last contact
       const lastContactDate = lead?.updated_at || visit?.updated_at;
       
+      const userName = f.userName || lead?.assignedToName || visit?.assigned_to || 'Unassigned';
+      
       return {
         ...f, clientName, phone, source, priorityStr, statusGroup, daysOverdue, stage,
-        lead, visit, lastContactDate, quality
+        lead, visit, lastContactDate, quality, userName
       };
     }).sort((a, b) => {
       // Sort by overdue first, then date
@@ -230,7 +232,8 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
 
         {/* Table/List View */}
         <div className="bg-white border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto custom-scrollbar min-h-[400px]">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto custom-scrollbar min-h-[400px]">
             <table className="w-full text-left border-collapse min-w-[1000px]">
               <thead>
                 <tr className="bg-[#FDFAF2] border-b border-[#E6D8B8]">
@@ -335,6 +338,70 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-[#E6D8B8]/30">
+            {filteredData.length > 0 ? filteredData.map(f => (
+              <div key={f.id} className="p-4 bg-white hover:bg-[#FFFDF6] transition-colors relative overflow-hidden">
+                <div className={cn("absolute left-0 top-0 bottom-0 border-l-[4px]", getPriorityColors(f.priorityStr))} />
+                <div className="pl-2 flex justify-between items-start mb-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-[#2A1C00] cursor-pointer" onClick={() => onNavigate(f.lead ? 'lead-detail' : 'detail', f.leadId || f.visitId)}>{f.clientName}</span>
+                      <span className={cn("text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider", getPriorityColors(f.priorityStr))}>{f.priorityStr}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-[#5C4820]">
+                      <Phone size={12} className="text-[#9A8262]" /> {f.phone}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-md border", getStageBadge(f.stage))}>
+                      {f.stage.replace(/_/g, ' ')}
+                    </span>
+                    {f.statusGroup === 'overdue' && <p className="text-[9px] font-bold text-red-500 mt-1">{f.daysOverdue} DAYS OVERDUE</p>}
+                  </div>
+                </div>
+                
+                <div className="pl-2 grid grid-cols-2 gap-3 mb-3">
+                  <div className="bg-[#FDFAF2] p-2 rounded-lg border border-[#E6D8B8]/50">
+                    <p className="text-[9px] text-[#9A8262] font-bold uppercase mb-1">Next Action</p>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[#2A1C00]">
+                      {f.method === 'call' ? <Phone size={12} className="text-[#C9A84C]" /> : <MessageSquare size={12} className="text-[#C9A84C]" />}
+                      {f.method === 'call' ? 'Call' : 'WhatsApp'}
+                    </div>
+                    <p className="text-[10px] mt-0.5">{f.purpose}</p>
+                  </div>
+                  <div className="bg-[#FDFAF2] p-2 rounded-lg border border-[#E6D8B8]/50">
+                    <p className="text-[9px] text-[#9A8262] font-bold uppercase mb-1">Due Date</p>
+                    <div className={cn("text-xs font-bold", f.statusGroup === 'overdue' ? 'text-red-500' : f.statusGroup === 'today' ? 'text-blue-500' : 'text-[#2A1C00]')}>
+                      {f.statusGroup === 'today' ? 'Today' : format(parseISO(f.date), 'dd MMM yyyy')}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pl-2 flex items-center justify-between border-t border-[#E6D8B8]/30 pt-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center text-[9px] font-bold text-amber-700">
+                      {(f.userName || 'U')[0]}
+                    </div>
+                    <p className="text-[10px] font-semibold text-[#2A1C00]">{f.userName || 'Unassigned'}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => onCall(f.lead || f.visit!)} className="text-green-600"><Phone size={16} /></button>
+                    <button onClick={() => onNavigate('whatsapp', f.leadId || f.visitId)} className="text-[#25D366]"><MessageSquare size={16} /></button>
+                    {f.status === 'pending' && (
+                      <button onClick={() => onUpdateStatus(f.id, 'completed')} className="text-green-600"><CheckCircle2 size={16} /></button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )) : (
+              <div className="p-8 text-center">
+                <Calendar className="mx-auto text-[#E6D8B8] mb-3" size={32} />
+                <p className="text-sm font-bold text-[#2A1C00]">No follow-ups found</p>
+              </div>
+            )}
           </div>
           
           <div className="px-4 py-3 border-t border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between">

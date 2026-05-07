@@ -36,6 +36,21 @@ function formatMySQLDate(isoString: string | null) {
   }
 }
 
+function formatMySQLDateOnly(isoString: string | null) {
+  if (!isoString) return null;
+  try {
+    // For DATE columns, we only need YYYY-MM-DD
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString.split('T')[0]; // Fallback if Date parsing fails but string has T
+    return d.toISOString().split('T')[0];
+  } catch {
+    if (typeof isoString === 'string' && isoString.includes('T')) {
+      return isoString.split('T')[0];
+    }
+    return null;
+  }
+}
+
 function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) {
@@ -362,7 +377,7 @@ async function startServer() {
           `INSERT INTO visits (id,leadId,client_name,mobile,email,visit_date,visit_time,purpose,status,visit_status,assigned_to,source,budget,property_interest,priority,projectId,reminders_sent,client_feedback,interest_level,outcome,reschedule_log,completed_at,created_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),client_name=VALUES(client_name),mobile=VALUES(mobile),email=VALUES(email),visit_date=VALUES(visit_date),visit_time=VALUES(visit_time),purpose=VALUES(purpose),status=VALUES(status),visit_status=VALUES(visit_status),assigned_to=VALUES(assigned_to),source=VALUES(source),budget=VALUES(budget),property_interest=VALUES(property_interest),priority=VALUES(priority),reminders_sent=VALUES(reminders_sent),client_feedback=VALUES(client_feedback),interest_level=VALUES(interest_level),outcome=VALUES(outcome),reschedule_log=VALUES(reschedule_log),completed_at=VALUES(completed_at)`,
-          [d.id,d.leadId||null,d.client_name,d.mobile||null,d.email||null,d.visit_date||null,d.visit_time||null,d.purpose||null,d.status||"pending",d.visit_status||"scheduled",d.assigned_to||null,d.source||null,d.budget||null,d.property_interest||null,d.priority||0,d.projectId||null,d.reminders_sent||null,d.client_feedback||null,d.interest_level||null,d.outcome||null,d.reschedule_log||null,formatMySQLDate(d.completed_at),formatMySQLDate(d.created_at || new Date().toISOString())]
+          [d.id,d.leadId||null,d.client_name,d.mobile||null,d.email||null,formatMySQLDateOnly(d.visit_date),d.visit_time||null,d.purpose||null,d.status||"pending",d.visit_status||"scheduled",d.assigned_to||null,d.source||null,d.budget||null,d.property_interest||null,d.priority||0,d.projectId||null,d.reminders_sent||null,d.client_feedback||null,d.interest_level||null,d.outcome||null,d.reschedule_log||null,formatMySQLDate(d.completed_at),formatMySQLDate(d.created_at || new Date().toISOString())]
         );
       } else if (col === "followups") {
         const connection = await pool.getConnection();
@@ -375,7 +390,7 @@ async function startServer() {
             `INSERT INTO followups (id,leadId,visitId,projectId,userId,userName,date,scheduled_at,purpose,method,status,created_at,completed_at,outcome_note)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
              ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),visitId=VALUES(visitId),date=VALUES(date),purpose=VALUES(purpose),method=VALUES(method),status=VALUES(status),completed_at=VALUES(completed_at),outcome_note=VALUES(outcome_note)`,
-            [data.id,data.leadId||null,data.visitId||null,data.projectId||null,data.userId||null,data.userName||null,formatMySQLDate(data.date),formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
+            [data.id,data.leadId||null,data.visitId||null,data.projectId||null,data.userId||null,data.userName||null,formatMySQLDateOnly(data.date),formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
           );
 
           // 2. If status is 'completed', handle Lead stats and Activity Log
@@ -472,7 +487,7 @@ async function startServer() {
           await pool.execute(
             `INSERT INTO attendance (id,userId,date,checkIn,checkOut,status) VALUES (?,?,?,?,?,?)
              ON DUPLICATE KEY UPDATE checkIn=VALUES(checkIn),checkOut=VALUES(checkOut),status=VALUES(status)`,
-            [d.id, d.userId, d.date, d.checkIn||null, d.checkOut||null, d.status||"absent"]
+            [d.id, d.userId, formatMySQLDateOnly(d.date), d.checkIn||null, d.checkOut||null, d.status||"absent"]
           );
           console.log(`[Attendance] Saved for user ${d.userId} on ${d.date}`);
         } catch (err) {
@@ -484,7 +499,7 @@ async function startServer() {
         await pool.execute(
           `INSERT INTO notifications (id,userId,type,title,message,\`read\`,createdAt,isAdmin,metadata,date) VALUES (?,?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE \`read\`=VALUES(\`read\`)`,
-          [d.id,d.userId||null,d.type||"",d.title||"",d.message||"",d.read?1:0,formatMySQLDate(d.createdAt||new Date().toISOString()),d.isAdmin?1:0,d.metadata||null,d.date||null]
+          [d.id,d.userId||null,d.type||"",d.title||"",d.message||"",d.read?1:0,formatMySQLDate(d.createdAt||new Date().toISOString()),d.isAdmin?1:0,d.metadata||null,formatMySQLDateOnly(d.date)]
         );
       } else if (col === "workflows") {
         const d = stringifyJsonFields(data, JSON_FIELDS_WORKFLOWS);

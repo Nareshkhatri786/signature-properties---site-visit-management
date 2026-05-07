@@ -31,8 +31,16 @@ export const apiService = {
   getLeads: (page = 1, limit = 50, search = ""): Promise<any> => 
     apiFetch(`/api/leads?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`),
 
-  save: (collection: string, data: any): Promise<any> =>
-    apiFetch("/api/save", { method: "POST", body: JSON.stringify({ collection, data }) }),
+  save: (collection: string, data: any): Promise<any> => {
+    // Sanitize foreign keys to avoid "null"/"undefined" string issues
+    const sanitized = { ...data };
+    ['leadId', 'visitId', 'projectId', 'userId', 'targetId'].forEach(key => {
+      if (sanitized[key] === "null" || sanitized[key] === "undefined") {
+        sanitized[key] = null;
+      }
+    });
+    return apiFetch("/api/save", { method: "POST", body: JSON.stringify({ collection, data: sanitized }) });
+  },
 
   delete: (collection: string, id: string): Promise<any> =>
     apiFetch("/api/delete", { method: "POST", body: JSON.stringify({ collection, id }) }),

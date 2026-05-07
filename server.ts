@@ -26,6 +26,8 @@ const JSON_FIELDS_WORKFLOWS = ["conditions", "actions"];
 const JSON_FIELDS_PROJECTS = ["location"];
 const JWT_SECRET = process.env.JWT_SECRET || "diyacrm_secret_change_in_prod";
 
+const cleanSqlId = (id: any) => (id === null || id === undefined || String(id) === "null" || String(id) === "undefined" || String(id).trim() === "") ? null : id;
+
 // Helper to format ISO dates for MySQL
 function formatMySQLDate(isoString: string | null) {
   if (!isoString) return null;
@@ -354,7 +356,7 @@ async function startServer() {
           `INSERT INTO leads (id,name,mobile,email,source,quality,status,budget,property_interest,priority,projectId,assignedTo,stats,created_at,updated_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE name=VALUES(name),mobile=VALUES(mobile),email=VALUES(email),source=VALUES(source),quality=VALUES(quality),status=VALUES(status),budget=VALUES(budget),property_interest=VALUES(property_interest),priority=VALUES(priority),assignedTo=VALUES(assignedTo),stats=VALUES(stats),updated_at=NOW()`,
-          [d.id,d.name,d.mobile||null,d.email||null,d.source||null,d.quality||"pending",d.status||"new",d.budget||null,d.property_interest||null,d.priority||0,d.projectId||null,d.assignedTo||null,d.stats||null,formatMySQLDate(d.created_at),new Date().toISOString().slice(0, 19).replace('T', ' ')]
+          [d.id,d.name,d.mobile||null,d.email||null,d.source||null,d.quality||"pending",d.status||"new",d.budget||null,d.property_interest||null,d.priority||0,cleanSqlId(d.projectId),cleanSqlId(d.assignedTo),d.stats||null,formatMySQLDate(d.created_at),new Date().toISOString().slice(0, 19).replace('T', ' ')]
         );
 
         // AUTO FOLLOW-UP LOGIC: Only create a welcome call if NO follow-ups exist for this lead
@@ -377,7 +379,7 @@ async function startServer() {
           `INSERT INTO visits (id,leadId,client_name,mobile,email,visit_date,visit_time,purpose,status,visit_status,assigned_to,source,budget,property_interest,priority,projectId,reminders_sent,client_feedback,interest_level,outcome,reschedule_log,completed_at,created_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),client_name=VALUES(client_name),mobile=VALUES(mobile),email=VALUES(email),visit_date=VALUES(visit_date),visit_time=VALUES(visit_time),purpose=VALUES(purpose),status=VALUES(status),visit_status=VALUES(visit_status),assigned_to=VALUES(assigned_to),source=VALUES(source),budget=VALUES(budget),property_interest=VALUES(property_interest),priority=VALUES(priority),reminders_sent=VALUES(reminders_sent),client_feedback=VALUES(client_feedback),interest_level=VALUES(interest_level),outcome=VALUES(outcome),reschedule_log=VALUES(reschedule_log),completed_at=VALUES(completed_at)`,
-          [d.id,d.leadId||null,d.client_name,d.mobile||null,d.email||null,formatMySQLDateOnly(d.visit_date),d.visit_time||null,d.purpose||null,d.status||"pending",d.visit_status||"scheduled",d.assigned_to||null,d.source||null,d.budget||null,d.property_interest||null,d.priority||0,d.projectId||null,d.reminders_sent||null,d.client_feedback||null,d.interest_level||null,d.outcome||null,d.reschedule_log||null,formatMySQLDate(d.completed_at),formatMySQLDate(d.created_at || new Date().toISOString())]
+          [d.id,cleanSqlId(d.leadId),d.client_name,d.mobile||null,d.email||null,formatMySQLDateOnly(d.visit_date),d.visit_time||null,d.purpose||null,d.status||"pending",d.visit_status||"scheduled",d.assigned_to||null,d.source||null,d.budget||null,d.property_interest||null,d.priority||0,cleanSqlId(d.projectId),d.reminders_sent||null,d.client_feedback||null,d.interest_level||null,d.outcome||null,d.reschedule_log||null,formatMySQLDate(d.completed_at),formatMySQLDate(d.created_at || new Date().toISOString())]
         );
       } else if (col === "followups") {
         const connection = await pool.getConnection();
@@ -390,7 +392,7 @@ async function startServer() {
             `INSERT INTO followups (id,leadId,visitId,projectId,userId,userName,date,scheduled_at,purpose,method,status,created_at,completed_at,outcome_note)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
              ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),visitId=VALUES(visitId),date=VALUES(date),purpose=VALUES(purpose),method=VALUES(method),status=VALUES(status),completed_at=VALUES(completed_at),outcome_note=VALUES(outcome_note)`,
-            [data.id,data.leadId||null,data.visitId||null,data.projectId||null,data.userId||null,data.userName||null,formatMySQLDateOnly(data.date),formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
+            [data.id,cleanSqlId(data.leadId),cleanSqlId(data.visitId),cleanSqlId(data.projectId),cleanSqlId(data.userId),data.userName||null,formatMySQLDateOnly(data.date),formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
           );
 
           // 2. If status is 'completed', handle Lead stats and Activity Log
@@ -474,12 +476,12 @@ async function startServer() {
         await pool.execute(
           `INSERT INTO call_logs (id,visitId,leadId,projectId,outcome,note,timestamp,\`by\`) VALUES (?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE outcome=VALUES(outcome),note=VALUES(note)`,
-          [data.id,data.visitId||null,data.leadId||null,data.projectId||null,data.outcome||"not_answered",data.note||null,formatMySQLDate(data.timestamp || new Date().toISOString()),data.by||null]
+          [data.id,cleanSqlId(data.visitId),cleanSqlId(data.leadId),cleanSqlId(data.projectId),data.outcome||"not_answered",data.note||null,formatMySQLDate(data.timestamp || new Date().toISOString()),data.by||null]
         );
       } else if (col === "activities") {
         await pool.execute(
           `INSERT IGNORE INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,?,?)`,
-          [data.id,data.type,data.userId||null,data.userName||null,data.projectId||null,data.targetId||null,data.targetName||null,formatMySQLDate(data.timestamp || new Date().toISOString()),data.details||null]
+          [data.id,data.type,cleanSqlId(data.userId),data.userName||null,cleanSqlId(data.projectId),cleanSqlId(data.targetId),data.targetName||null,formatMySQLDate(data.timestamp || new Date().toISOString()),data.details||null]
         );
       } else if (col === "attendance") {
         const d = stringifyJsonFields(data, JSON_FIELDS_ATTENDANCE);

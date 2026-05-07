@@ -161,6 +161,14 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
                       <option key={l.id} value={l.id}>{l.name} ({l.mobile})</option>
                     ))}
                   </select>
+                  {!formData.leadId && (
+                    <div className="mt-1.5 flex items-start gap-1.5 px-1">
+                      <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[#C9A84C]" />
+                      <p className="text-[10px] text-[#9A8262] leading-tight">
+                        A new lead will be automatically created with the details below.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

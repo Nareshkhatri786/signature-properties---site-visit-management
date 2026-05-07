@@ -1199,49 +1199,57 @@ export default function App() {
               users={users}
               onSave={async (v, r, leadStatus) => {
                 if (!v.projectId && user?.projectId) v.projectId = user.projectId;
-                
                 let targetLeadId = v.leadId;
 
                 // Auto-create lead if missing
-                if (!targetLeadId) {
-                  const newLead: Lead = {
-                    id: generateId(),
-                    name: v.client_name,
-                    mobile: v.mobile,
-                    email: v.email,
-                    source: v.source || 'Direct Site Visit',
-                    projectId: v.projectId,
-                    assignedTo: user.id,
-                    assignedToName: user.name,
-                    quality: v.status,
-                    status: (v.visit_status === 'completed' ? 'visit_done' : 'visit_scheduled') as LeadStatus,
-                    budget: v.budget,
-                    property_interest: v.property_interest,
-                    created_at: v.visit_date + 'T00:00:00Z',
-                    updated_at: new Date().toISOString(),
-                    stats: {
-                      calls_attempted: 0,
-                      calls_answered: 0,
-                      visits_planned: (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled') ? 1 : 0,
-                      visits_done: v.visit_status === 'completed' ? 1 : 0,
-                      followups_done: 0
-                    }
-                  };
+                if (!targetLeadId || targetLeadId === 'null' || targetLeadId === 'undefined') {
+                  // Final safety check: see if a lead with this mobile already exists locally
+                  const normalizedMob = (v.mobile || '').replace(/\D/g, '').slice(-10);
+                  const existingLead = leads.find(l => (l.mobile || '').replace(/\D/g, '').slice(-10) === normalizedMob);
                   
-                  await api.save('leads', newLead);
-                  setLeads(prev => [newLead, ...prev]);
-                  targetLeadId = newLead.id;
-                  v.leadId = newLead.id;
-                  
-                  // Add auto-creation remark
-                  const autoRemark: Remark = {
-                    id: generateId(),
-                    text: `Auto lead create as site visit ${v.visit_status === 'completed' ? 'completed' : 'scheduled'}`,
-                    by: user.name,
-                    at: new Date().toISOString()
-                  };
-                  await api.save('remarks', { ...autoRemark, targetId: newLead.id });
-                  setRemarks(prev => ({ ...prev, [newLead.id]: [autoRemark] }));
+                  if (existingLead) {
+                    v.leadId = existingLead.id;
+                    targetLeadId = existingLead.id;
+                  } else {
+                    const newLead: Lead = {
+                      id: generateId(),
+                      name: v.client_name,
+                      mobile: v.mobile,
+                      email: v.email,
+                      source: v.source || 'Direct Site Visit',
+                      projectId: v.projectId,
+                      assignedTo: user.id,
+                      assignedToName: user.name,
+                      quality: v.status,
+                      status: (v.visit_status === 'completed' ? 'visit_done' : 'visit_scheduled') as LeadStatus,
+                      budget: v.budget,
+                      property_interest: v.property_interest,
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                      stats: {
+                        calls_attempted: 0,
+                        calls_answered: 0,
+                        visits_planned: (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled') ? 1 : 0,
+                        visits_done: v.visit_status === 'completed' ? 1 : 0,
+                        followups_done: 0
+                      }
+                    };
+                    
+                    await api.save('leads', newLead);
+                    setLeads(prev => [newLead, ...prev]);
+                    targetLeadId = newLead.id;
+                    v.leadId = newLead.id;
+                    
+                    // Add auto-creation remark
+                    const autoRemark: Remark = {
+                      id: generateId(),
+                      text: `Auto lead create as site visit ${v.visit_status === 'completed' ? 'completed' : 'scheduled'}`,
+                      by: user.name,
+                      at: new Date().toISOString()
+                    };
+                    await api.save('remarks', { ...autoRemark, targetId: newLead.id });
+                    setRemarks(prev => ({ ...prev, [newLead.id]: [autoRemark] }));
+                  }
                 }
 
                 await api.save('visits', v);
@@ -1290,6 +1298,15 @@ export default function App() {
               followUps={filteredFollowups}
               onUpdateFollowUp={handleUpdateFollowUp}
               onAddVisit={async (newVis) => {
+                // Ensure lead linkage even for re-visits
+                if (!newVis.leadId) {
+                   const normalizedMob = (newVis.mobile || '').replace(/\D/g, '').slice(-10);
+                   const existingLead = leads.find(l => (l.mobile || '').replace(/\D/g, '').slice(-10) === normalizedMob);
+                   if (existingLead) {
+                     newVis.leadId = existingLead.id;
+                   }
+                }
+                
                 await api.save('visits', newVis);
                 setVisits(prev => [newVis, ...prev]);
                 // Update lead stats if necessary

@@ -95,7 +95,7 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
   }, [initialFilters]);
 
   const filteredVisits = visits.filter(v => {
-    const matchesSearch = v.client_name.toLowerCase().includes(search.toLowerCase()) || v.mobile.includes(search);
+    const matchesSearch = (v.client_name || '').toLowerCase().includes(search.toLowerCase()) || (v.mobile || '').includes(search);
     const matchesStatus = status === '' || v.status === status;
     const matchesVisitStatus = visitStatus === '' || v.visit_status === visitStatus;
     

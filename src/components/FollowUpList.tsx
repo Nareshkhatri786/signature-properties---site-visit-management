@@ -119,9 +119,9 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       
       if (search) {
         const q = search.toLowerCase();
-        return f.clientName.toLowerCase().includes(q) || 
-               f.phone.includes(q) || 
-               f.purpose.toLowerCase().includes(q);
+        return (f.clientName || '').toLowerCase().includes(q) || 
+               (f.phone || '').includes(q) || 
+               (f.purpose || '').toLowerCase().includes(q);
       }
       return true;
     });

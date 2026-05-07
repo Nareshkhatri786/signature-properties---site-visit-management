@@ -53,7 +53,7 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
     // 1. Combine all sources with cleaned types and titles
     const rawItems: TimelineItem[] = [
       ...activities
-        .filter(a => !a.userName.includes('System Migration') && !a.userName.includes('Repair'))
+        .filter(a => !(a.userName || '').includes('System Migration') && !(a.userName || '').includes('Repair'))
         .map(a => ({
           id: a.id,
           type: 'activity',
@@ -61,38 +61,38 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
           title: getTimelineTitle(a.type),
           description: a.details || '',
           timestamp: a.timestamp,
-          by: a.userName,
+          by: a.userName || 'Unknown',
           icon: getActivityIcon(a.type),
           color: getActivityColor(a.type),
           meta: { 
-             role: a.userName.toLowerCase().includes('admin') ? 'ADM' : 'SAL'
+             role: (a.userName || '').toLowerCase().includes('admin') ? 'ADM' : 'SAL'
           }
         })),
       ...remarks
-        .filter(r => r.type !== 'visit_note' && !r.text.includes('[System]'))
+        .filter(r => r.type !== 'visit_note' && !(r.text || '').includes('[System]'))
         .map(r => ({
           id: r.id,
           type: 'remark',
           originalType: 'remark_added',
           title: 'Note Added',
-          description: r.text,
+          description: r.text || '',
           timestamp: r.at,
-          by: r.by,
+          by: r.by || 'Unknown',
           icon: MessageSquare,
           color: 'gold',
-          meta: { category: r.category, sentiment: r.sentiment, role: r.by.toLowerCase().includes('admin') ? 'ADM' : 'SAL' }
+          meta: { category: r.category, sentiment: r.sentiment, role: (r.by || '').toLowerCase().includes('admin') ? 'ADM' : 'SAL' }
         })),
       ...callLogs.map(c => ({
         id: c.id,
         type: 'call',
         originalType: 'call_activity',
         title: 'Call Session',
-        description: `Outcome: ${c.outcome.replace('_', ' ')}${c.note ? ` | Note: ${c.note}` : ''}`,
+        description: `Outcome: ${(c.outcome || '').replace('_', ' ')}${c.note ? ` | Note: ${c.note}` : ''}`,
         timestamp: c.timestamp,
-        by: c.by,
+        by: c.by || 'Unknown',
         icon: PhoneCall,
         color: c.outcome === 'answered' ? 'green' : 'orange',
-        meta: { role: c.by.toLowerCase().includes('admin') ? 'ADM' : 'SAL' }
+        meta: { role: (c.by || '').toLowerCase().includes('admin') ? 'ADM' : 'SAL' }
       }))
     ];
 
@@ -307,7 +307,7 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                             </div>
                           ) : (
                             <div className="p-3">
-                              {item.originalType.includes('status_changed') ? (
+                              {(item.originalType || '').includes('status_changed') ? (
                                 <div className="flex items-center gap-2">
                                   <ArrowRightLeft size={14} className="text-[#C9A84C]" />
                                   <p className="text-sm">
@@ -316,7 +316,7 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                                     </span>
                                   </p>
                                 </div>
-                              ) : item.originalType.includes('quality_changed') ? (
+                              ) : (item.originalType || '').includes('quality_changed') ? (
                                 <div className="flex items-center gap-2">
                                   <Tag size={14} className="text-[#C9A84C]" />
                                   <p className="text-sm">

@@ -71,7 +71,7 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
   const sources = Array.from(new Set(leads.map(l => l.source))).filter(Boolean).sort();
 
   const filteredLeads = leads.filter(l => {
-    const matchesSearch = l.name.toLowerCase().includes(search.toLowerCase()) || l.mobile.includes(search);
+    const matchesSearch = (l.name || '').toLowerCase().includes(search.toLowerCase()) || (l.mobile || '').includes(search);
     const matchesStatus = status === '' || l.status === status;
     const matchesQuality = quality === '' || l.quality === quality;
     const matchesSource = source === '' || l.source === source;

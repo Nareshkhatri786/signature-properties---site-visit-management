@@ -40,7 +40,7 @@ export default function VisitKanbanBoard({ visits, users, leads, followUps, onUp
           {STAGES.map((stage) => {
             const stageVisits = visits
               .filter(v => v.visit_status === stage.id)
-              .sort((a, b) => b.visit_date.localeCompare(a.visit_date));
+              .sort((a, b) => (b.visit_date || '').localeCompare(a.visit_date || ''));
 
             return (
               <div key={stage.id} className="w-80 flex flex-col group">

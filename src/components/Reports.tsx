@@ -154,7 +154,7 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
     const matchesType = selectedActivityType === '' || a.type === selectedActivityType;
     const matchesDate = isDateInRange(a.timestamp, dateRange);
     return matchesUser && matchesProject && matchesType && matchesDate;
-  }).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }).sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
 
   const filteredCallLogs = filteredCallLogsGlobal.filter(log => isDateInRange(log.timestamp, dateRange));
 

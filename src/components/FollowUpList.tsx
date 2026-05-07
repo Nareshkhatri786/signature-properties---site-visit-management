@@ -85,7 +85,7 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       if (a.statusGroup === 'overdue' && b.statusGroup !== 'overdue') return -1;
       if (b.statusGroup === 'overdue' && a.statusGroup !== 'overdue') return 1;
       if (a.statusGroup === 'overdue' && b.statusGroup === 'overdue') return b.daysOverdue - a.daysOverdue;
-      return a.date.localeCompare(b.date);
+      return (a.date || '').localeCompare(b.date || '');
     });
   }, [followUps, leads, visits, today]);
 

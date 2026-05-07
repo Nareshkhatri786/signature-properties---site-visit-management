@@ -85,7 +85,7 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
     const priB = b.priority || 0;
     if (priA !== priB) return priB - priA;
     // Then by creation date
-    return b.created_at.localeCompare(a.created_at);
+    return (b.created_at || '').localeCompare(a.created_at || '');
   });
 
   const toggleSelectAll = () => {

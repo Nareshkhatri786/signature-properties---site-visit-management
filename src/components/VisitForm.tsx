@@ -157,7 +157,7 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
                     className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
                   >
                     <option value="">– New Lead –</option>
-                    {leads.sort((a, b) => a.name.localeCompare(b.name)).map(l => (
+                    {leads.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(l => (
                       <option key={l.id} value={l.id}>{l.name} ({l.mobile})</option>
                     ))}
                   </select>

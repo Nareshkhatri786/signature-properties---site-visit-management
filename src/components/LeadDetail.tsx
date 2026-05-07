@@ -73,7 +73,7 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
     
     // Fetch Remarks
     apiService.getRemarks(lead.id).then((data: Remark[]) => {
-      setSyncedRemarks(data.sort((a, b) => b.at.localeCompare(a.at)));
+      setSyncedRemarks(data.sort((a, b) => (b.at || '').localeCompare(a.at || '')));
     }).catch(console.error);
 
     // Fetch Activities
@@ -224,7 +224,7 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
     // Find the latest scheduled visit for this lead to complete it
     const activeVisit = visits
       .filter(v => v.visit_status === 'scheduled' || v.visit_status === 'rescheduled')
-      .sort((a, b) => b.visit_date.localeCompare(a.visit_date))[0];
+      .sort((a, b) => (b.visit_date || '').localeCompare(a.visit_date || ''))[0];
 
     if (activeVisit) {
       const completedAt = quickCompleteData.visitDate
@@ -340,11 +340,11 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
 
   const nextScheduledVisit = visits
     .filter(v => v.visit_status === 'scheduled' || v.visit_status === 'rescheduled')
-    .sort((a, b) => a.visit_date.localeCompare(b.visit_date))[0];
+    .sort((a, b) => (a.visit_date || '').localeCompare(b.visit_date || ''))[0];
 
   const lastVisit = visits
     .filter(v => v.visit_status === 'completed' || v.visit_status === 'cancelled')
-    .sort((a, b) => b.visit_date.localeCompare(a.visit_date))[0];
+    .sort((a, b) => (b.visit_date || '').localeCompare(a.visit_date || ''))[0];
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">

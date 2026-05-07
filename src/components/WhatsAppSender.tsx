@@ -123,7 +123,7 @@ export default function WhatsAppSender({ visits, projects, templates, initialVis
                   className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
                 >
                   <option value="">– Select Client –</option>
-                  {visits.sort((a, b) => a.client_name.localeCompare(b.client_name)).map(v => (
+                  {visits.sort((a, b) => (a.client_name || '').localeCompare(b.client_name || '')).map(v => (
                     <option key={v.id} value={v.id}>{v.client_name} – {v.mobile}</option>
                   ))}
                 </select>

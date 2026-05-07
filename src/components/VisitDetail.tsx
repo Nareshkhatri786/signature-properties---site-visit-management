@@ -81,7 +81,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
   // Load remarks, activities, and WhatsApp from REST API
   useEffect(() => {
     apiService.getRemarks(visit.id).then((data: Remark[]) => {
-      setSyncedRemarks(data.sort((a, b) => b.at.localeCompare(a.at)));
+      setSyncedRemarks(data.sort((a, b) => (b.at || '').localeCompare(a.at || '')));
     }).catch(console.error);
 
     // Fetch activities for this visit (by visitId / targetId)
@@ -275,7 +275,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
   const history = [
     ...syncedRemarks.map(r => ({ type: 'remark', date: r.at, data: r })),
     ...callLogs.map(c => ({ type: 'call', date: c.timestamp, data: c })),
-  ].sort((a, b) => b.date.localeCompare(a.date));
+  ].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   // Open completion modal when visit_status is set to 'completed' from dropdown
   const handleUpdateStatus = (field: 'status' | 'visit_status', value: string) => {

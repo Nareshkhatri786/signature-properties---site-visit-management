@@ -64,7 +64,7 @@ export default function KanbanBoard({ leads, users, followUps, visits, onUpdateS
                 const priA = a.priority || 0;
                 const priB = b.priority || 0;
                 if (priA !== priB) return priB - priA;
-                return b.created_at.localeCompare(a.created_at);
+                return (b.created_at || '').localeCompare(a.created_at || '');
               });
 
             const activeFilter = columnFilters[stage.id];

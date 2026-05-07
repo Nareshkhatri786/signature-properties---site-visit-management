@@ -125,7 +125,7 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
     const priB = b.priority || 0;
     if (priA !== priB) return priB - priA;
     // Then by date
-    return b.visit_date.localeCompare(a.visit_date);
+    return (b.visit_date || '').localeCompare(a.visit_date || '');
   });
 
   return (

@@ -28,6 +28,18 @@ const JWT_SECRET = process.env.JWT_SECRET || "diyacrm_secret_change_in_prod";
 
 const cleanSqlId = (id: any) => (id === null || id === undefined || String(id) === "null" || String(id) === "undefined" || String(id).trim() === "") ? null : id;
 
+const getSafeId = async (table: string, id: any) => {
+  const cleanId = cleanSqlId(id);
+  if (!cleanId) return null;
+  try {
+    const [rows] = await pool.execute(`SELECT id FROM ${table} WHERE id = ?`, [cleanId]);
+    return (rows as any[]).length > 0 ? cleanId : null;
+  } catch (e) {
+    console.error(`[DB] getSafeId error for ${table}:`, e);
+    return null;
+  }
+};
+
 // Helper to format ISO dates for MySQL
 function formatMySQLDate(isoString: string | null) {
   if (!isoString) return null;
@@ -387,12 +399,17 @@ async function startServer() {
           await connection.beginTransaction();
           console.log(`[Follow-up] Processing save for ID: ${data.id}, Status: ${data.status}`);
           
-          // 1. Save/Update Follow-up
+          // 1. Validate Foreign Keys before insert/update
+          const safeLeadId = await getSafeId('leads', data.leadId);
+          const safeVisitId = await getSafeId('visits', data.visitId);
+          const safeProjectId = await getSafeId('projects', data.projectId);
+          const safeUserId = await getSafeId('users', data.userId);
+
           await connection.execute(
             `INSERT INTO followups (id,leadId,visitId,projectId,userId,userName,date,scheduled_at,purpose,method,status,created_at,completed_at,outcome_note)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
              ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),visitId=VALUES(visitId),date=VALUES(date),purpose=VALUES(purpose),method=VALUES(method),status=VALUES(status),completed_at=VALUES(completed_at),outcome_note=VALUES(outcome_note)`,
-            [data.id,cleanSqlId(data.leadId),cleanSqlId(data.visitId),cleanSqlId(data.projectId),cleanSqlId(data.userId),data.userName||null,formatMySQLDateOnly(data.date),formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
+            [data.id,safeLeadId,safeVisitId,safeProjectId,safeUserId,data.userName||null,formatMySQLDateOnly(data.date),formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
           );
 
           // 2. If status is 'completed', handle Lead stats and Activity Log

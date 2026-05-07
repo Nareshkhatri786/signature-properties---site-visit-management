@@ -48,8 +48,19 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       let statusGroup: TabType = 'upcoming';
       if (f.status === 'completed') statusGroup = 'completed';
       else if (f.status === 'cancelled') statusGroup = 'cancelled';
-      else if (f.date < today) statusGroup = 'overdue';
-      else if (f.date === today) statusGroup = 'today';
+      else {
+        let fDate = f.date;
+        if (fDate && (fDate.includes('T') || fDate.includes('Z'))) {
+          try {
+            fDate = getLocalDateString(new Date(fDate));
+          } catch (e) {
+            fDate = fDate.split('T')[0];
+          }
+        }
+        
+        if (fDate < today) statusGroup = 'overdue';
+        else if (fDate === today) statusGroup = 'today';
+      }
       
       const daysOverdue = statusGroup === 'overdue' ? Math.abs(differenceInDays(new Date(), parseISO(f.date))) : 0;
       

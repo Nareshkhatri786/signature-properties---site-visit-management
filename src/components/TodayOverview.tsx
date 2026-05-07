@@ -23,12 +23,24 @@ export default function TodayOverview({ leads, visits, followUps, callLogs, user
   const isAdmin = role === 'admin' || role === 'adm';
 
   const s = useMemo(() => {
+    const normalizeDate = (d: string) => {
+      if (!d) return '';
+      if (d.includes('T') || d.includes('Z')) {
+        try {
+          return getLocalDateString(new Date(d));
+        } catch {
+          return d.split('T')[0];
+        }
+      }
+      return d;
+    };
+
     const todayVisits = visits.filter(v => v.visit_date === todayStr);
     const visitsDone = todayVisits.filter(v => v.visit_status === 'completed').length;
     const visitsScheduled = todayVisits.filter(v => v.visit_status === 'scheduled' || v.visit_status === 'rescheduled').length;
-    const followupsDone = followUps.filter(f => f.status === 'completed' && (f.completed_at?.startsWith(todayStr) || f.date === todayStr)).length;
-    const followupsPending = followUps.filter(f => f.status === 'pending' && f.date === todayStr).length;
-    const followupsOverdue = followUps.filter(f => f.status === 'pending' && f.date < todayStr).length;
+    const followupsDone = followUps.filter(f => f.status === 'completed' && (f.completed_at?.startsWith(todayStr) || normalizeDate(f.date) === todayStr)).length;
+    const followupsPending = followUps.filter(f => f.status === 'pending' && normalizeDate(f.date) === todayStr).length;
+    const followupsOverdue = followUps.filter(f => f.status === 'pending' && normalizeDate(f.date) < todayStr).length;
     const todayCalls = callLogs.filter(c => c.timestamp?.startsWith(todayStr));
     const callsMade = todayCalls.length;
     const bookings = leads.filter(l => l.status === 'closed' && l.updated_at?.startsWith(todayStr)).length;
@@ -36,8 +48,8 @@ export default function TodayOverview({ leads, visits, followUps, callLogs, user
 
     // Team performance today
     const teamPerf = users.filter(u => u.role !== 'admin' && u.role !== 'adm').map(u => {
-      const uFollowups = followUps.filter(f => f.userName === u.name && f.status === 'completed' && (f.completed_at?.startsWith(todayStr) || f.date === todayStr)).length;
-      const uFollowupsTarget = followUps.filter(f => f.userName === u.name && f.date === todayStr).length || 1;
+      const uFollowups = followUps.filter(f => f.userName === u.name && f.status === 'completed' && (f.completed_at?.startsWith(todayStr) || normalizeDate(f.date) === todayStr)).length;
+      const uFollowupsTarget = followUps.filter(f => f.userName === u.name && normalizeDate(f.date) === todayStr).length || 1;
       const uVisitsDone = visits.filter(v => v.assigned_to === u.name && v.visit_status === 'completed' && v.visit_date === todayStr).length;
       const uVisitsTarget = visits.filter(v => v.assigned_to === u.name && (v.visit_status === 'scheduled' || v.visit_status === 'completed') && v.visit_date === todayStr).length || 1;
       const uCalls = callLogs.filter(c => c.by === u.name && c.timestamp?.startsWith(todayStr)).length;

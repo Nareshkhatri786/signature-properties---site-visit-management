@@ -62,8 +62,19 @@ export function getFollowUpDisplayStatus(followUp: FollowUp | null | undefined):
   if (followUp.status === 'completed') return 'completed';
   
   const today = getLocalDateString();
-  if (followUp.date < today) return 'overdue';
-  if (followUp.date === today) return 'today';
+  let fDate = followUp.date;
+  
+  // Normalize date to YYYY-MM-DD if it's an ISO string or object
+  if (fDate && (fDate.includes('T') || fDate.includes('Z'))) {
+    try {
+      fDate = getLocalDateString(new Date(fDate));
+    } catch (e) {
+      fDate = fDate.split('T')[0];
+    }
+  }
+
+  if (fDate < today) return 'overdue';
+  if (fDate === today) return 'today';
   return 'upcoming';
 }
 

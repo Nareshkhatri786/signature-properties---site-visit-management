@@ -134,7 +134,19 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
       if (l.quality === 'disq' || l.status === 'closed' || l.status === 'lost') return false;
       return new Date(l.updated_at) < sevenDaysAgo;
     });
-    const overdueFollowupsCount = followUps.filter(f => f.status === 'pending' && f.date < todayStr).length;
+    const normalizeDate = (d: string) => {
+      if (!d) return '';
+      if (d.includes('T') || d.includes('Z')) {
+        try {
+          return getLocalDateString(new Date(d));
+        } catch {
+          return d.split('T')[0];
+        }
+      }
+      return d;
+    };
+
+    const overdueFollowupsCount = followUps.filter(f => f.status === 'pending' && normalizeDate(f.date) < todayStr).length;
     const visitedNoFollowup = visits.filter(v => {
       if (v.visit_status !== 'completed') return false;
       return !followUps.some(f => f.visitId === v.id || f.leadId === v.leadId);

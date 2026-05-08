@@ -13,6 +13,7 @@ interface FollowUpListProps {
   followUps: FollowUp[];
   leads: Lead[];
   visits: Visit[];
+  projects: AppProject[];
   user: UserType;
   users?: UserType[];
   onUpdateStatus: (id: string, status: 'completed' | 'cancelled', note?: string) => void;
@@ -22,7 +23,7 @@ interface FollowUpListProps {
 
 type TabType = 'all' | 'overdue' | 'today' | 'upcoming' | 'completed' | 'cancelled';
 
-export default function FollowUpList({ followUps, leads, visits, user, users = [], onUpdateStatus, onNavigate, onCall }: FollowUpListProps) {
+export default function FollowUpList({ followUps, leads, visits, projects, user, users = [], onUpdateStatus, onNavigate, onCall }: FollowUpListProps) {
   const [filter, setFilter] = useState<TabType>('pending' as any); // using 'pending' initially, we'll map tabs properly
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [search, setSearch] = useState('');

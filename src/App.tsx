@@ -1444,6 +1444,7 @@ export default function App() {
               followUps={filteredFollowups}
               leads={leads}
               visits={visits}
+              projects={projects}
               user={user}
               users={users}
               onUpdateStatus={(id, status, note) => {

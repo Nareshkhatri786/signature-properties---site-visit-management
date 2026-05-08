@@ -105,6 +105,10 @@ async function ensurePendingFollowup(leadId: string, userId: number | null, proj
   if (!userId) return;
   
   try {
+    // Check if lead is 'lost' - don't create followups for lost leads
+    const lead = await queryOne<any>("SELECT status FROM leads WHERE id = ?", [leadId]);
+    if (lead?.status === 'lost') return;
+
     const existingFup = await queryOne<any>("SELECT id FROM followups WHERE leadId = ? AND status = 'pending'", [leadId]);
     if (!existingFup) {
       const user = await queryOne<any>("SELECT name FROM users WHERE id = ?", [userId]);
@@ -441,7 +445,11 @@ async function startServer() {
         }
 
         // 4. AUTO FOLLOW-UP LOGIC: Ensure a pending follow-up exists if assigned
-        if (d.assignedTo) {
+        if (d.status === "lost") {
+          // If lost, remove all pending followups
+          await execute("DELETE FROM followups WHERE leadId = ? AND status = 'pending'", [d.id]);
+          console.log(`[Lost Lead] Cleaned up followups for ${d.id}`);
+        } else if (d.assignedTo) {
           await ensurePendingFollowup(d.id, d.assignedTo, d.projectId || (currentLead?.projectId));
         } else if (isNewLead && d.status === "new") {
           // Fallback for unassigned new leads: create a system follow-up

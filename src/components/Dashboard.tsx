@@ -157,19 +157,43 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
     const completionRate = visitedCount > 0 ? Math.round((completedLeadIds.size / visitedCount) * 100) : 0;
     const closureRate = completedLeadIds.size > 0 ? Math.round((closedLeads / completedLeadIds.size) * 100) : 0;
 
-    return {
-      hotLeads, warmLeads, coldLeads, disqLeads, activeLeadsCount,
-      completedToday, completedYesterday, completedThisWeek, completedThisMonth, completedVisitsList,
-      scheduledToday, scheduledThisWeek, scheduledThisMonth, scheduledVisitsList,
-      filteredVisitsList, filteredLeadsList,
-      visitsInRangeDataList, upcoming, followUpRemindersList,
-      followupsDueToday: followUps.filter(f => f.status === 'pending' && f.date === todayStr).length,
-      followupsOverdue: overdueFollowupsCount,
-      // Funnel
-      visitedCount, completedLeadIds, closedLeads, visitRate, completionRate, closureRate,
-      // Missed
-      notContactedDays, visitedNoFollowup,
-    };
+      // Visit Insights (Deep Dive)
+      const uniqueMonthlyVisitors = new Set(
+        visits
+          .filter(v => v.visit_status === 'completed' && v.visit_date && isThisMonth(parseISO(v.visit_date)))
+          .map(v => v.leadId)
+          .filter(Boolean)
+      ).size;
+
+      const leadsWithMultipleVisits = leads.filter(l => {
+        let stats = l.stats;
+        if (typeof stats === 'string') stats = JSON.parse(stats);
+        return (stats?.visits_done || 0) > 1;
+      });
+
+      const highPotentialGap = visits.filter(v => {
+        if (v.visit_status !== 'completed') return false;
+        const lead = leads.find(l => l.id === v.leadId);
+        return lead && lead.quality !== 'hot' && lead.status !== 'closed' && lead.status !== 'lost';
+      }).length;
+
+      return {
+        hotLeads, warmLeads, coldLeads, disqLeads, activeLeadsCount,
+        completedToday, completedYesterday, completedThisWeek, completedThisMonth, completedVisitsList,
+        scheduledToday, scheduledThisWeek, scheduledThisMonth, scheduledVisitsList,
+        filteredVisitsList, filteredLeadsList,
+        visitsInRangeDataList, upcoming, followUpRemindersList,
+        followupsDueToday: followUps.filter(f => f.status === 'pending' && f.date === todayStr).length,
+        followupsOverdue: overdueFollowupsCount,
+        // Funnel
+        visitedCount, completedLeadIds, closedLeads, visitRate, completionRate, closureRate,
+        // Missed
+        notContactedDays, visitedNoFollowup,
+        // Visit Insights
+        uniqueMonthlyVisitors,
+        repeatVisitorsCount: leadsWithMultipleVisits.length,
+        highPotentialGap
+      };
   }, [leads, visits, followUps, dateRange, todayStr]);
 
   // Leaderboard: per-user stats this month
@@ -255,6 +279,51 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
         </div>
       </div>
 
+      {/* ===== VISIT PERFORMANCE INSIGHTS ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg">
+              <Users size={20} />
+            </div>
+            <div>
+              <h3 className="font-serif text-lg font-bold text-indigo-900">Monthly Visitors</h3>
+              <p className="text-[10px] text-indigo-400 font-bold uppercase">Unique clients this month</p>
+            </div>
+          </div>
+          <div className="text-4xl font-serif font-bold text-indigo-900 mb-2">{calculatedStats.uniqueMonthlyVisitors}</div>
+          <p className="text-xs text-indigo-600/70">Total unique clients who completed a site visit in {new Date().toLocaleString('default', { month: 'long' })}.</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg">
+              <Trophy size={20} />
+            </div>
+            <div>
+              <h3 className="font-serif text-lg font-bold text-emerald-900">Repeat Visitors</h3>
+              <p className="text-[10px] text-emerald-400 font-bold uppercase">Multi-visit potential</p>
+            </div>
+          </div>
+          <div className="text-4xl font-serif font-bold text-emerald-900 mb-2">{calculatedStats.repeatVisitorsCount}</div>
+          <p className="text-xs text-emerald-600/70">Clients who have visited more than once. These are your **Top Priority** prospects.</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center shadow-lg">
+              <Target size={20} />
+            </div>
+            <div>
+              <h3 className="font-serif text-lg font-bold text-amber-900">High Potential Gap</h3>
+              <p className="text-[10px] text-amber-400 font-bold uppercase">Visited but not Hot</p>
+            </div>
+          </div>
+          <div className="text-4xl font-serif font-bold text-amber-900 mb-2">{calculatedStats.highPotentialGap}</div>
+          <p className="text-xs text-amber-600/70">Clients who finished a visit but aren't marked as 'Hot' yet. Don't let them go cold!</p>
+        </div>
+      </div>
+
       {/* ===== CONVERSION FUNNEL ===== */}
       <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl p-6 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
@@ -267,9 +336,9 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: 'Total Leads', value: leads.length, rate: '100%', color: 'bg-slate-200', text: 'text-slate-700', width: 'w-full', nav: () => onNavigate('leads') },
-            { label: 'Visited', value: calculatedStats.visitedCount, rate: `${calculatedStats.visitRate}%`, color: 'bg-purple-400', text: 'text-purple-700', width: `w-[${calculatedStats.visitRate}%]`, nav: () => onNavigate('visits') },
-            { label: 'Visit Done', value: calculatedStats.completedLeadIds.size, rate: `${calculatedStats.completionRate}%`, color: 'bg-blue-400', text: 'text-blue-700', width: `w-[${calculatedStats.completionRate}%]`, nav: () => onNavigate('visits', undefined, { visitStatus: 'completed' }) },
-            { label: 'Closed / Booked', value: calculatedStats.closedLeads, rate: `${calculatedStats.closureRate}%`, color: 'bg-emerald-500', text: 'text-emerald-700', width: `w-[${calculatedStats.closureRate}%]`, nav: () => onNavigate('leads', undefined, { status: 'closed' }) },
+            { label: 'Visits Scheduled', value: calculatedStats.visitedCount, rate: `${calculatedStats.visitRate}%`, color: 'bg-purple-400', text: 'text-purple-700', width: `w-[${calculatedStats.visitRate}%]`, nav: () => onNavigate('visits') },
+            { label: 'Actual Visitors', value: calculatedStats.completedLeadIds.size, rate: `${calculatedStats.completionRate}%`, color: 'bg-blue-400', text: 'text-blue-700', width: `w-[${calculatedStats.completionRate}%]`, nav: () => onNavigate('visits', undefined, { visitStatus: 'completed' }) },
+            { label: 'Bookings Done', value: calculatedStats.closedLeads, rate: `${calculatedStats.closureRate}%`, color: 'bg-emerald-500', text: 'text-emerald-700', width: `w-[${calculatedStats.closureRate}%]`, nav: () => onNavigate('leads', undefined, { status: 'closed' }) },
           ].map((stage, i) => (
             <button key={i} onClick={stage.nav} className="bg-white border border-[#E6D8B8] rounded-xl p-4 text-left hover:shadow-md transition-all group">
               <div className="flex items-center justify-between mb-3">
@@ -603,7 +672,7 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
                       </div>
                       <p className="text-[#9A8262] text-[11px] font-medium ml-5 mt-1">{v.visit_time || 'Pending Schedule'}</p>
                     </td>
-                    <td className="px-7 py-5 text-[10px]"><StatusBadge status={v.status} /><br /><VisitBadge status={v.visit_status} /></td>
+                    <td className="px-7 py-5 text-[10px]"><StatusBadge status={v.status} /><br /><VisitBadge status={v.visit_status} leadId={v.leadId} leads={leads} /></td>
                     <td className="px-7 py-5 text-right">
                       <div className="flex justify-end gap-1">
                         <button onClick={() => onNavigate('detail', v.id)} className="p-2 text-[#9A8262] hover:bg-[#C9A84C] hover:text-white rounded-[10px]"><Eye size={17} /></button>
@@ -698,7 +767,7 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export function VisitBadge({ status }: { status: string }) {
+export function VisitBadge({ status, leadId, leads = [] }: { status: string, leadId?: string | null, leads?: Lead[] }) {
   const styles: any = {
     scheduled: 'bg-indigo-600 text-white shadow-sm',
     completed: 'bg-emerald-600 text-white shadow-sm',
@@ -706,9 +775,21 @@ export function VisitBadge({ status }: { status: string }) {
     cancelled: 'bg-rose-50 text-rose-600 border border-rose-200',
   };
   const icons: any = { scheduled: '📅', completed: '✅', rescheduled: '🔄', cancelled: '❌' };
+  
+  const lead = leadId ? leads.find(l => l.id === leadId) : null;
+  const stats = lead?.stats ? (typeof lead.stats === 'string' ? JSON.parse(lead.stats) : lead.stats) : null;
+  const visitsDone = stats?.visits_done || 0;
+
   return (
-    <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider", styles[status])}>
-      <span className="text-[12px]">{icons[status]}</span> {status.replace('_', ' ')}
-    </span>
+    <div className="flex flex-col gap-1">
+      <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider", styles[status])}>
+        <span className="text-[12px]">{icons[status]}</span> {status.replace('_', ' ')}
+      </span>
+      {visitsDone > 0 && status !== 'completed' && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md text-[9px] font-black uppercase tracking-tighter w-fit">
+          <Trophy size={10} /> Returning ({visitsDone})
+        </span>
+      )}
+    </div>
   );
 }

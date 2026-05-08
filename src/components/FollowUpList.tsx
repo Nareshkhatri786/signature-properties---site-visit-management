@@ -29,6 +29,7 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [stageFilter, setStageFilter] = useState<string>('all');
+  const [projectFilter, setProjectFilter] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const today = getLocalDateString();
@@ -45,22 +46,22 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       
       const priorityStr = quality === 'hot' ? 'HOT' : quality === 'warm' ? 'WARM' : 'NORMAL';
       
-      let statusGroup: TabType = 'upcoming';
-      if (f.status === 'completed') statusGroup = 'completed';
-      else if (f.status === 'cancelled') statusGroup = 'cancelled';
-      else {
         let fDate = f.date;
-        if (fDate && (fDate.includes('T') || fDate.includes('Z'))) {
-          try {
-            fDate = getLocalDateString(new Date(fDate));
-          } catch (e) {
-            fDate = fDate.split('T')[0];
-          }
+        // Normalize fDate to YYYY-MM-DD format, ignoring time/timezone
+        if (fDate && fDate.includes('T')) {
+          fDate = fDate.split('T')[0];
+        } else if (fDate && fDate.includes(' ')) {
+          fDate = fDate.split(' ')[0];
         }
         
-        if (fDate < today) statusGroup = 'overdue';
-        else if (fDate === today) statusGroup = 'today';
-      }
+        if (f.status === 'completed') statusGroup = 'completed';
+        else if (f.status === 'cancelled') statusGroup = 'cancelled';
+        else {
+          if (!fDate) statusGroup = 'upcoming';
+          else if (fDate < today) statusGroup = 'overdue';
+          else if (fDate === today) statusGroup = 'today';
+          else statusGroup = 'upcoming';
+        }
       
       const daysOverdue = statusGroup === 'overdue' ? Math.abs(differenceInDays(new Date(), parseISO(f.date))) : 0;
       
@@ -89,43 +90,53 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
     });
   }, [followUps, leads, visits, today]);
 
-  // Filter by Assignee first, so stats update when admin selects a specific user
-  const assigneeFilteredData = useMemo(() => {
+  // 1. Filter by everything EXCEPT the active tab
+  const baseFilteredData = useMemo(() => {
     return processedData.filter(f => {
+      // User/Assignee Filter
       if (assigneeFilter === 'me' && f.computedUserId !== user.id) return false;
       if (assigneeFilter !== 'all' && assigneeFilter !== 'me' && f.computedUserId?.toString() !== assigneeFilter) return false;
-      return true;
-    });
-  }, [processedData, assigneeFilter, user.id]);
-
-  const stats = {
-    all: assigneeFilteredData.length,
-    overdue: assigneeFilteredData.filter(f => f.statusGroup === 'overdue').length,
-    today: assigneeFilteredData.filter(f => f.statusGroup === 'today').length,
-    upcoming: assigneeFilteredData.filter(f => f.statusGroup === 'upcoming').length,
-    completed: assigneeFilteredData.filter(f => f.statusGroup === 'completed').length,
-    cancelled: assigneeFilteredData.filter(f => f.statusGroup === 'cancelled').length,
-    hotOverdue: assigneeFilteredData.filter(f => f.statusGroup === 'overdue' && f.priorityStr === 'HOT').length,
-    warmOverdue: assigneeFilteredData.filter(f => f.statusGroup === 'overdue' && f.priorityStr === 'WARM').length,
-  };
-
-  const filteredData = useMemo(() => {
-    return assigneeFilteredData.filter(f => {
-      if (activeTab !== 'all' && f.statusGroup !== activeTab) return false;
       
+      // Project Filter
+      if (projectFilter !== 'all' && f.projectId !== projectFilter) return false;
+
+      // Priority Filter
       if (priorityFilter !== 'all' && f.priorityStr !== priorityFilter) return false;
       
+      // Stage/Status Filter (if user selected one from the dropdown)
       if (stageFilter !== 'all' && f.stage !== stageFilter) return false;
       
+      // Search
       if (search) {
         const q = search.toLowerCase();
         return (f.clientName || '').toLowerCase().includes(q) || 
                (f.phone || '').includes(q) || 
                (f.purpose || '').toLowerCase().includes(q);
       }
+      
       return true;
     });
-  }, [assigneeFilteredData, activeTab, search, priorityFilter, stageFilter]);
+  }, [processedData, assigneeFilter, projectFilter, priorityFilter, stageFilter, search, user.id]);
+
+  // 2. Calculate stats from the base filtered set
+  const stats = useMemo(() => ({
+    all: baseFilteredData.length,
+    overdue: baseFilteredData.filter(f => f.statusGroup === 'overdue').length,
+    today: baseFilteredData.filter(f => f.statusGroup === 'today').length,
+    upcoming: baseFilteredData.filter(f => f.statusGroup === 'upcoming').length,
+    completed: baseFilteredData.filter(f => f.statusGroup === 'completed').length,
+    cancelled: baseFilteredData.filter(f => f.statusGroup === 'cancelled').length,
+    hotOverdue: baseFilteredData.filter(f => f.statusGroup === 'overdue' && f.priorityStr === 'HOT').length,
+    warmOverdue: baseFilteredData.filter(f => f.statusGroup === 'overdue' && f.priorityStr === 'WARM').length,
+  }), [baseFilteredData]);
+
+  // 3. Final list data (apply the active tab)
+  const filteredData = useMemo(() => {
+    return baseFilteredData.filter(f => {
+      if (activeTab !== 'all' && f.statusGroup !== activeTab) return false;
+      return true;
+    });
+  }, [baseFilteredData, activeTab]);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredData.length && filteredData.length > 0) {
@@ -256,6 +267,21 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
             <option value="HOT">Hot Leads</option>
             <option value="WARM">Warm Leads</option>
             <option value="NORMAL">Normal Leads</option>
+          </select>
+
+          {/* Project Filter */}
+          <select 
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+            className="bg-[#FDFAF2] border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm text-[#2A1C00] font-medium outline-none focus:border-[#C9A84C]"
+          >
+            <option value="all">All Projects</option>
+            {/* Unique list of projects from the leads/visits */}
+            {Array.from(new Set(processedData.map(f => f.projectId).filter(Boolean))).map(pid => {
+              const leadWithProj = processedData.find(ld => ld.projectId === pid);
+              const projName = leadWithProj?.lead?.projectId || pid; // Fallback to ID if name not easily joined
+              return <option key={pid} value={pid}>{projName}</option>;
+            })}
           </select>
 
           <select 

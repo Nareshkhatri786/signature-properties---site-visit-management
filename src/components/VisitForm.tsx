@@ -148,7 +148,8 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
                           source: l.source,
                           status: l.quality,
                           priority: l.priority || 0,
-                          lead_status: l.status === 'new' ? 'visit_scheduled' : l.status
+                          lead_status: l.status === 'new' ? 'visit_scheduled' : l.status,
+                          previous_visits: (l.stats as any)?.visits_done || 0
                         }));
                       } else {
                         setFormData(prev => ({ ...prev, leadId: '' }));
@@ -161,6 +162,19 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
                       <option key={l.id} value={l.id}>{l.name} ({l.mobile})</option>
                     ))}
                   </select>
+                  {formData.leadId && (
+                    <div className="mt-2 flex items-center gap-2">
+                      {(formData as any).previous_visits > 0 ? (
+                        <div className="px-2 py-0.5 bg-emerald-100 border border-emerald-200 rounded text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                          <CheckCircle2 size={10} /> VISITED {(formData as any).previous_visits} TIME(S) BEFORE
+                        </div>
+                      ) : (
+                        <div className="px-2 py-0.5 bg-blue-50 border border-blue-100 rounded text-[10px] font-bold text-blue-600">
+                          FIRST TIME VISITOR
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {!formData.leadId && (
                     <div className="mt-1.5 flex items-start gap-1.5 px-1">
                       <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[#C9A84C]" />

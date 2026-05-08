@@ -372,9 +372,22 @@ async function startServer() {
         leadParams = [userFromDb.projectId, userFromDb.id];
       }
 
-      // Visits / followups / activities / call_logs use a simpler project filter
-      const projectFilter = isAdmin ? "" : "WHERE projectId = ?";
-      const projectParams = isAdmin ? [] : [userFromDb.projectId];
+      // Build visit/followup filter:
+      // Users should see tasks for their own project OR tasks linked to leads they own
+      let taskQueryFilter: string;
+      let taskParams: any[];
+
+      if (isAdmin) {
+        taskQueryFilter = "";
+        taskParams = [];
+      } else if (isManager && managedProjectIds.length > 0) {
+        const placeholders = managedProjectIds.map(() => '?').join(',');
+        taskQueryFilter = `WHERE (f.projectId IN (${placeholders}) OR l.assignedTo = ?)`;
+        taskParams = [...managedProjectIds, userFromDb.id];
+      } else {
+        taskQueryFilter = `WHERE (f.projectId = ? OR l.assignedTo = ?)`;
+        taskParams = [userFromDb.projectId, userFromDb.id];
+      }
 
       const safeCurrentUser = parseJsonFields({ ...userFromDb }, JSON_FIELDS_USERS);
       delete safeCurrentUser.password;
@@ -385,10 +398,10 @@ async function startServer() {
         query("SELECT * FROM users"),
         query("SELECT * FROM projects"),
         query(leadQuery, leadParams),
-        query(`SELECT * FROM visits ${projectFilter} ORDER BY visit_date DESC LIMIT 5000`, projectParams),
-        query(`SELECT * FROM followups ${projectFilter} ORDER BY date DESC LIMIT 5000`, projectParams),
-        query(`SELECT * FROM activities ${projectFilter} ORDER BY timestamp DESC LIMIT 5000`, projectParams),
-        query(`SELECT * FROM call_logs ${projectFilter} ORDER BY timestamp DESC LIMIT 5000`, projectParams),
+        query(`SELECT v.* FROM visits v LEFT JOIN leads l ON v.leadId = l.id ${taskQueryFilter.replace(/f\./g, 'v.')} ORDER BY v.visit_date DESC LIMIT 5000`, taskParams),
+        query(`SELECT f.* FROM followups f LEFT JOIN leads l ON f.leadId = l.id ${taskQueryFilter} ORDER BY f.date DESC LIMIT 5000`, taskParams),
+        query(`SELECT a.* FROM activities a LEFT JOIN leads l ON a.leadId = l.id ${taskQueryFilter.replace(/f\./g, 'a.')} ORDER BY a.timestamp DESC LIMIT 5000`, taskParams),
+        query(`SELECT c.* FROM call_logs c LEFT JOIN leads l ON c.leadId = l.id ${taskQueryFilter.replace(/f\./g, 'c.')} ORDER BY c.timestamp DESC LIMIT 5000`, taskParams),
         query("SELECT * FROM templates"),
         query("SELECT * FROM webhook_configs"),
         query("SELECT * FROM notifications WHERE (userId = ? OR isAdmin = 1) ORDER BY createdAt DESC LIMIT 500", [userFromDb.id]),
@@ -462,13 +475,65 @@ async function startServer() {
           );
         }
       } else if (col === "visits") {
-        const d = stringifyJsonFields(data, JSON_FIELDS_VISITS);
-        await pool.execute(
-          `INSERT INTO visits (id,leadId,client_name,mobile,email,visit_date,visit_time,purpose,status,visit_status,assigned_to,source,budget,property_interest,priority,projectId,reminders_sent,client_feedback,interest_level,outcome,reschedule_log,completed_at,created_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-           ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),client_name=VALUES(client_name),mobile=VALUES(mobile),email=VALUES(email),visit_date=VALUES(visit_date),visit_time=VALUES(visit_time),purpose=VALUES(purpose),status=VALUES(status),visit_status=VALUES(visit_status),assigned_to=VALUES(assigned_to),source=VALUES(source),budget=VALUES(budget),property_interest=VALUES(property_interest),priority=VALUES(priority),reminders_sent=VALUES(reminders_sent),client_feedback=VALUES(client_feedback),interest_level=VALUES(interest_level),outcome=VALUES(outcome),reschedule_log=VALUES(reschedule_log),completed_at=VALUES(completed_at)`,
-          [d.id,cleanSqlId(d.leadId),d.client_name,d.mobile||null,d.email||null,formatMySQLDateOnly(d.visit_date),d.visit_time||null,d.purpose||null,d.status||"pending",d.visit_status||"scheduled",d.assigned_to||null,d.source||null,d.budget||null,d.property_interest||null,d.priority||0,cleanSqlId(d.projectId),d.reminders_sent||null,d.client_feedback||null,d.interest_level||null,d.outcome||null,d.reschedule_log||null,formatMySQLDate(d.completed_at),formatMySQLDate(d.created_at || new Date().toISOString())]
-        );
+        const connection = await pool.getConnection();
+        try {
+          await connection.beginTransaction();
+          const d = stringifyJsonFields(data, JSON_FIELDS_VISITS);
+          
+          // 1. Save/Update Visit
+          await connection.execute(
+            `INSERT INTO visits (id,leadId,client_name,mobile,email,visit_date,visit_time,purpose,status,visit_status,assigned_to,source,budget,property_interest,priority,projectId,reminders_sent,client_feedback,interest_level,outcome,reschedule_log,completed_at,created_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),client_name=VALUES(client_name),mobile=VALUES(mobile),email=VALUES(email),visit_date=VALUES(visit_date),visit_time=VALUES(visit_time),purpose=VALUES(purpose),status=VALUES(status),visit_status=VALUES(visit_status),assigned_to=VALUES(assigned_to),source=VALUES(source),budget=VALUES(budget),property_interest=VALUES(property_interest),priority=VALUES(priority),reminders_sent=VALUES(reminders_sent),client_feedback=VALUES(client_feedback),interest_level=VALUES(interest_level),outcome=VALUES(outcome),reschedule_log=VALUES(reschedule_log),completed_at=VALUES(completed_at)`,
+            [d.id,cleanSqlId(d.leadId),d.client_name,d.mobile||null,d.email||null,formatMySQLDateOnly(d.visit_date),d.visit_time||null,d.purpose||null,d.status||"pending",d.visit_status||"scheduled",d.assigned_to||null,d.source||null,d.budget||null,d.property_interest||null,d.priority||0,cleanSqlId(d.projectId),d.reminders_sent||null,d.client_feedback||null,d.interest_level||null,d.outcome||null,d.reschedule_log||null,formatMySQLDate(d.completed_at),formatMySQLDate(d.created_at || new Date().toISOString())]
+          );
+
+          // 2. If Visit is Completed, Sync with Lead
+          if (d.visit_status === "completed" && d.leadId) {
+            // Get current lead stats
+            const [leads] = await connection.execute("SELECT stats, quality, status FROM leads WHERE id = ?", [d.leadId]);
+            if ((leads as any[]).length > 0) {
+              const lead = (leads as any[])[0];
+              let stats = lead.stats;
+              if (typeof stats === 'string') stats = JSON.parse(stats);
+              if (!stats) stats = { visits_planned: 0, visits_done: 0, calls_attempted: 0, calls_answered: 0, followups_done: 0 };
+              
+              stats.visits_done = (stats.visits_done || 0) + 1;
+              
+              // Logic: If visits > 1, auto-hot. Else warm.
+              let newQuality = lead.quality;
+              if (stats.visits_done > 1) newQuality = 'hot';
+              else if (newQuality === 'pending' || newQuality === 'cold') newQuality = 'warm';
+
+              await connection.execute(
+                "UPDATE leads SET status = 'visit_done', quality = ?, stats = ?, updated_at = NOW() WHERE id = ?", 
+                [newQuality, JSON.stringify(stats), d.leadId]
+              );
+
+              // Log Activity
+              const activityId = `act_vis_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+              await connection.execute(
+                `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
+                [activityId, 'visit_completed', null, d.assigned_to||'System', d.projectId||null, d.leadId, d.client_name, `Site Visit Completed. Total visits: ${stats.visits_done}. Lead upgraded to ${newQuality}.`]
+              );
+            }
+          } else if (d.leadId) {
+            // Log visit scheduled/updated
+            const activityId = `act_vis_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+            await connection.execute(
+              `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
+              [activityId, 'visit_scheduled', null, d.assigned_to||'System', d.projectId||null, d.leadId, d.client_name, `Site Visit ${d.visit_status}: ${d.visit_date} ${d.visit_time || ''}`]
+            );
+          }
+
+          await connection.commit();
+        } catch (err) {
+          await connection.rollback();
+          console.error("[Visit Save Error]:", err);
+          throw err;
+        } finally {
+          connection.release();
+        }
       } else if (col === "followups") {
         const connection = await pool.getConnection();
         try {

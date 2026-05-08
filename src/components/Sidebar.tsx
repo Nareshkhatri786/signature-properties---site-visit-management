@@ -22,6 +22,7 @@ export default function Sidebar({ isOpen, onClose, currentPage, onNavigate, onLo
     { id: 'hrms', label: 'HRMS & Attendance', icon: UserCheck, section: 'Main' },
     { id: 'followups', label: 'Follow-ups', icon: Bell, section: 'Main' },
     { id: 'visits', label: 'Site Visits', icon: CalendarCheck, section: 'Main' },
+    { id: 'visit-analysis', label: 'Visit Analytics', icon: TrendingUp, section: 'Main' },
     { id: 'reports', label: 'Reports & Audit', icon: BarChart2, section: 'Main' },
     { id: 'whatsapp', label: 'WhatsApp Send', icon: MessageSquare, section: 'Communication' },
     { id: 'templates', label: 'Templates', icon: Layers, section: 'Communication' },

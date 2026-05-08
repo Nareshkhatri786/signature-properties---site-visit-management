@@ -23,6 +23,7 @@ import CallOutcomeModal from './components/CallOutcomeModal';
 import PostCallWhatsAppModal from './components/PostCallWhatsAppModal';
 import Login from './components/Login';
 import WorkflowBuilder from './components/WorkflowBuilder';
+import VisitAnalysis from './components/VisitAnalysis';
 import { Toaster, toast } from 'react-hot-toast';
 import { CalendarCheck, Plus, Phone, MessageSquare } from 'lucide-react';
 import { aiService } from './lib/ai';
@@ -1603,6 +1604,15 @@ export default function App() {
                 api.delete('workflows', id);
                 toast.success('Workflow deleted');
               }}
+            />
+          )}
+          {currentPage === 'visit-analysis' && (
+            <VisitAnalysis 
+              visits={filteredVisits}
+              leads={leads}
+              projects={projects}
+              onBack={() => navigate('dashboard')}
+              onNavigate={navigate}
             />
           )}
         </main>

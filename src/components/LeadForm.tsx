@@ -70,7 +70,11 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
     }
 
     const digitsOnly = formData.mobile.replace(/\D/g, '');
-    if (digitsOnly.length !== 10) {
+    const finalMobile = (digitsOnly.length === 12 && digitsOnly.startsWith('91')) 
+      ? digitsOnly.substring(2) 
+      : digitsOnly;
+
+    if (finalMobile.length !== 10) {
       toast.error('Mobile number must be exactly 10 digits');
       return;
     }

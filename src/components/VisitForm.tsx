@@ -48,7 +48,12 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
     }
 
     const digitsOnly = formData.mobile.replace(/\D/g, '');
-    if (digitsOnly.length !== 10) {
+    // If it's 12 digits and starts with 91, take the last 10
+    const finalMobile = (digitsOnly.length === 12 && digitsOnly.startsWith('91')) 
+      ? digitsOnly.substring(2) 
+      : digitsOnly;
+
+    if (finalMobile.length !== 10) {
       toast.error('Mobile number must be exactly 10 digits');
       return;
     }

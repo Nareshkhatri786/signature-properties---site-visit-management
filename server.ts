@@ -65,6 +65,68 @@ function formatMySQLDateOnly(isoString: string | null) {
   }
 }
 
+// -- OWNERSHIP SYNC HELPERS -----------------------------
+async function syncLeadOwnership(leadId: string, newUserId: number | null) {
+  if (!newUserId) {
+    // If unassigned, we could optionally unassign related data, 
+    // but usually, it's better to keep the last owner or set to null.
+    // Industry practice: set related pending tasks to null or keep them with last owner.
+    // Here we will set to NULL to match lead status.
+    await execute("UPDATE followups SET userId = NULL, userName = NULL WHERE leadId = ? AND status = 'pending'", [leadId]);
+    await execute("UPDATE visits SET assigned_to = NULL WHERE leadId = ? AND visit_status IN ('scheduled', 'rescheduled')", [leadId]);
+    return;
+  }
+  
+  try {
+    const user = await queryOne<any>("SELECT name FROM users WHERE id = ?", [newUserId]);
+    if (!user) return;
+    
+    const userName = user.name;
+    
+    // Update ALL followups (as requested: "assign all follow ups to lead owner not who created this")
+    await execute(
+      "UPDATE followups SET userId = ?, userName = ? WHERE leadId = ?",
+      [newUserId, userName, leadId]
+    );
+    
+    // Update ALL visits
+    await execute(
+      "UPDATE visits SET assigned_to = ? WHERE leadId = ?",
+      [userName, leadId]
+    );
+    
+    console.log(`[Sync] Reassigned lead ${leadId} all data to user ${userName} (${newUserId})`);
+  } catch (err) {
+    console.error(`[Sync Error] Failed to sync ownership for lead ${leadId}:`, err);
+  }
+}
+
+async function ensurePendingFollowup(leadId: string, userId: number | null, projectId: string | null) {
+  if (!userId) return;
+  
+  try {
+    const existingFup = await queryOne<any>("SELECT id FROM followups WHERE leadId = ? AND status = 'pending'", [leadId]);
+    if (!existingFup) {
+      const user = await queryOne<any>("SELECT name FROM users WHERE id = ?", [userId]);
+      const userName = user?.name || "Assigned User";
+      
+      const fupId = `fup_auto_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+      const now = new Date();
+      const scheduledAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString(); // 30 mins later
+      const dateOnly = scheduledAt.split('T')[0];
+      
+      await execute(
+        `INSERT INTO followups (id, leadId, projectId, userId, userName, date, scheduled_at, purpose, method, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'call', 'pending', NOW())`,
+        [fupId, leadId, projectId, userId, userName, dateOnly, formatMySQLDate(scheduledAt), "Auto-generated Follow-up"]
+      );
+      console.log(`[Auto-FUP] Created for lead ${leadId} assigned to ${userName}`);
+    }
+  } catch (err) {
+    console.error(`[Auto-FUP Error] Failed for lead ${leadId}:`, err);
+  }
+}
+
 function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) {
@@ -360,10 +422,12 @@ async function startServer() {
       if (col === "leads") {
         const d = stringifyJsonFields(data, JSON_FIELDS_LEADS);
         
-        // Check if this is a new lead BEFORE saving
-        const leadExists = await queryOne("SELECT id FROM leads WHERE id = ?", [d.id]);
-        const isNewLead = !leadExists;
+        // 1. Check current assignment to detect change
+        const currentLead = await queryOne<any>("SELECT assignedTo, projectId FROM leads WHERE id = ?", [d.id]);
+        const isAssignmentChanged = currentLead && currentLead.assignedTo != d.assignedTo;
+        const isNewLead = !currentLead;
 
+        // 2. Save/Update lead
         await pool.execute(
           `INSERT INTO leads (id,name,mobile,email,source,quality,status,budget,property_interest,priority,projectId,assignedTo,stats,created_at,updated_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -371,19 +435,23 @@ async function startServer() {
           [d.id,d.name,d.mobile||null,d.email||null,d.source||null,d.quality||"pending",d.status||"new",d.budget||null,d.property_interest||null,d.priority||0,cleanSqlId(d.projectId),cleanSqlId(d.assignedTo),d.stats||null,formatMySQLDate(d.created_at),new Date().toISOString().slice(0, 19).replace('T', ' ')]
         );
 
-        // AUTO FOLLOW-UP LOGIC: Only create a welcome call if NO follow-ups exist for this lead
-        if (d.status === "new") {
-          const existingFupCount = await queryOne("SELECT COUNT(*) as count FROM followups WHERE leadId = ?", [d.id]);
-          if (!existingFupCount || existingFupCount.count === 0) {
-            const tenMinsLater = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-            const dateOnly = tenMinsLater.split('T')[0];
-            
-            await pool.execute(
-              `INSERT IGNORE INTO followups (id, leadId, projectId, date, scheduled_at, purpose, method, status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'call', 'pending', NOW())`,
-              [`fup_auto_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`, d.id, d.projectId, dateOnly, tenMinsLater, `Welcome call for ${d.source || 'New'} Lead`]
-            );
-          }
+        // 3. Sync ownership if changed or new
+        if (isAssignmentChanged || (isNewLead && d.assignedTo)) {
+          await syncLeadOwnership(d.id, d.assignedTo);
+        }
+
+        // 4. AUTO FOLLOW-UP LOGIC: Ensure a pending follow-up exists if assigned
+        if (d.assignedTo) {
+          await ensurePendingFollowup(d.id, d.assignedTo, d.projectId || (currentLead?.projectId));
+        } else if (isNewLead && d.status === "new") {
+          // Fallback for unassigned new leads: create a system follow-up
+          const fupId = `fup_auto_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+          const tenMinsLater = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+          await pool.execute(
+            `INSERT IGNORE INTO followups (id, leadId, projectId, date, scheduled_at, purpose, method, status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'call', 'pending', NOW())`,
+            [fupId, d.id, d.projectId, tenMinsLater.split('T')[0], formatMySQLDate(tenMinsLater), `Welcome call for ${d.source || 'New'} Lead`]
+          );
         }
       } else if (col === "visits") {
         const d = stringifyJsonFields(data, JSON_FIELDS_VISITS);
@@ -612,6 +680,59 @@ async function startServer() {
     }
   });
 
+  // -- ADMIN: FIX ASSIGNMENTS -----------------------------
+  app.post("/api/admin/fix-assignments", authMiddleware, async (req, res) => {
+    const u = (req as any).user;
+    if (u.role !== "admin" && u.role !== "adm") return res.status(403).json({ error: "Forbidden" });
+    
+    try {
+      console.log("[Admin] Starting assignment fix...");
+      
+      // 1. Sync followups with lead owners
+      const [fupResult] = await pool.execute(`
+        UPDATE followups f
+        JOIN leads l ON f.leadId = l.id
+        JOIN users u ON l.assignedTo = u.id
+        SET f.userId = l.assignedTo, f.userName = u.name
+        WHERE l.assignedTo IS NOT NULL AND (f.userId != l.assignedTo OR f.userId IS NULL)
+      `);
+      
+      // 2. Sync visits with lead owners
+      const [visitResult] = await pool.execute(`
+        UPDATE visits v
+        JOIN leads l ON v.leadId = l.id
+        JOIN users u ON l.assignedTo = u.id
+        SET v.assigned_to = u.name
+        WHERE l.assignedTo IS NOT NULL AND (v.assigned_to != u.name OR v.assigned_to IS NULL)
+      `);
+      
+      // 3. Ensure every assigned lead has at least one pending follow-up
+      const assignedLeads = await query<any>("SELECT id, assignedTo, projectId FROM leads WHERE assignedTo IS NOT NULL");
+      let autoFupCount = 0;
+      for (const lead of assignedLeads) {
+        const existing = await queryOne<any>("SELECT id FROM followups WHERE leadId = ? AND status = 'pending'", [lead.id]);
+        if (!existing) {
+          await ensurePendingFollowup(lead.id, lead.assignedTo, lead.projectId);
+          autoFupCount++;
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Assignments synchronized successfully.",
+        stats: {
+          followupsUpdated: (fupResult as any).affectedRows,
+          visitsUpdated: (visitResult as any).affectedRows,
+          autoFollowupsCreated: autoFupCount
+        }
+      });
+    } catch (e: any) {
+      console.error("[Admin Fix Error]:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+
   // -- WEBHOOK (token-based lead capture) -----------------
   const handleWebhook = async (req: express.Request, res: express.Response) => {
     const { token } = req.params;
@@ -646,18 +767,29 @@ async function startServer() {
         leadData[lk] = val;
       });
 
-      const existing = await queryOne<any>("SELECT id, created_at FROM leads WHERE mobile = ?", [leadData.mobile || ""]);
+      const existing = await queryOne<any>("SELECT id, created_at, assignedTo FROM leads WHERE mobile = ?", [leadData.mobile || ""]);
       if (existing) {
         leadData.id = existing.id;
         leadData.created_at = existing.created_at;
+        // If lead already assigned, don't overwrite assignment unless the config explicitly says so
+        // For now, keep current assignment if it exists
+        if (existing.assignedTo && !leadData.assignedTo) {
+          leadData.assignedTo = existing.assignedTo;
+        }
       }
 
       await pool.execute(
         `INSERT INTO leads (id,name,mobile,source,quality,status,projectId,assignedTo,stats,created_at,updated_at)
          VALUES (?,?,?,?,?,?,?,?,?,?,?)
-         ON DUPLICATE KEY UPDATE name=VALUES(name),mobile=VALUES(mobile),source=VALUES(source),updated_at=NOW()`,
+         ON DUPLICATE KEY UPDATE name=VALUES(name),mobile=VALUES(mobile),source=VALUES(source),assignedTo=VALUES(assignedTo),updated_at=NOW()`,
         [leadData.id, leadData.name||"Unknown", leadData.mobile||null, leadData.source, leadData.quality, leadData.status, leadData.projectId, leadData.assignedTo, leadData.stats, formatMySQLDate(leadData.created_at), formatMySQLDate(now)]
       );
+
+      // Sync data for the lead (handles reassignment and auto-followup)
+      if (leadData.assignedTo) {
+        await syncLeadOwnership(leadData.id, leadData.assignedTo);
+        await ensurePendingFollowup(leadData.id, leadData.assignedTo, leadData.projectId);
+      }
 
       res.json({ success: true, leadId: leadData.id });
     } catch (e: any) {

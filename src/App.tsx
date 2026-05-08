@@ -203,6 +203,8 @@ export default function App() {
         setWebhookConfigs(fullData.webhook_configs || []);
         setUsers(fullData.users || []);
         
+        console.log(`[Data Load] Leads: ${fullData.leads?.length}, Visits: ${fullData.visits?.length}`);
+        
         if (fullData.currentUser) {
           setUser(fullData.currentUser);
           storage.saveAuth(fullData.currentUser);
@@ -353,7 +355,7 @@ export default function App() {
     return () => {};
   }, [leads.length, visits.length]);
 
-  const userRole = user?.role?.toLowerCase();
+  const userRole = (user?.role || '').toLowerCase();
   const isAdminRole = userRole === 'admin' || userRole === 'adm';
   const isManagerRole = userRole === 'manager';
   const managedProjectIds = useMemo(() => user?.assignedProjectIds || (user?.projectId ? [user.projectId] : []), [user]);

@@ -1092,6 +1092,28 @@ export default function App() {
                       setCompletionLead(lead);
                       setIsVisitCompletionModalOpen(true);
                       return;
+                    } else {
+                      // No pending visit found? Create a "ghost" visit to complete so it shows in analytics
+                      const ghostVisit: Visit = {
+                        id: generateId(),
+                        leadId: id,
+                        client_name: lead.name,
+                        mobile: lead.mobile,
+                        email: lead.email || '',
+                        visit_date: new Date().toISOString().split('T')[0],
+                        visit_status: 'scheduled', // Will be completed by modal
+                        projectId: lead.projectId,
+                        created_at: new Date().toISOString(),
+                        assigned_to: user?.name || 'System',
+                        source: lead.source,
+                        budget: lead.budget || '',
+                        property_interest: lead.property_interest || '',
+                        priority: lead.priority
+                      };
+                      setCompletionVisit(ghostVisit);
+                      setCompletionLead(lead);
+                      setIsVisitCompletionModalOpen(true);
+                      return;
                     }
                   }
 
@@ -1121,6 +1143,37 @@ export default function App() {
               projects={projects}
               users={users}
               onUpdateLead={(l) => {
+                const oldLead = leads.find(lead => lead.id === l.id);
+                if (oldLead?.status !== 'visit_done' && l.status === 'visit_done') {
+                  const pendingVisits = visits.filter(v => v.leadId === l.id && (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled'));
+                  if (pendingVisits.length > 0) {
+                    const latestVisit = [...pendingVisits].sort((a, b) => b.visit_date.localeCompare(a.visit_date))[0];
+                    setCompletionVisit(latestVisit);
+                    setCompletionLead(l);
+                    setIsVisitCompletionModalOpen(true);
+                  } else {
+                    const ghostVisit: Visit = {
+                      id: generateId(),
+                      leadId: l.id,
+                      client_name: l.name,
+                      mobile: l.mobile,
+                      email: l.email || '',
+                      visit_date: new Date().toISOString().split('T')[0],
+                      visit_status: 'scheduled',
+                      projectId: l.projectId,
+                      created_at: new Date().toISOString(),
+                      assigned_to: user?.name || 'System',
+                      source: l.source,
+                      budget: l.budget || '',
+                      property_interest: l.property_interest || '',
+                      priority: l.priority
+                    };
+                    setCompletionVisit(ghostVisit);
+                    setCompletionLead(l);
+                    setIsVisitCompletionModalOpen(true);
+                  }
+                  return;
+                }
                 setLeads(leads.map(lead => lead.id === l.id ? l : lead));
                 api.save('leads', l);
               }}
@@ -1790,8 +1843,13 @@ export default function App() {
                outcome: data.outcome,
                completed_at: completedAt
              };
-             setVisits(visits.map(v => v.id === completionVisit.id ? updatedVisit : v));
-             api.save('visits', updatedVisit);
+              const exists = visits.some(v => v.id === completionVisit.id);
+              if (exists) {
+                setVisits(visits.map(v => v.id === completionVisit.id ? updatedVisit : v));
+              } else {
+                setVisits([updatedVisit, ...visits]);
+              }
+              api.save('visits', updatedVisit);
 
              // 2. Update Lead
              if (completionLead) {

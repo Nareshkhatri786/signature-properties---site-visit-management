@@ -1380,8 +1380,28 @@ export default function App() {
                 }
               }}
               onUpdateLead={(updatedLead) => {
+                const oldLead = leads.find(l => l.id === updatedLead.id);
                 setLeads(leads.map(l => l.id === updatedLead.id ? updatedLead : l));
                 api.save('leads', updatedLead);
+                
+                // NEW: Auto-sync visit completion if lead status is changed to 'visit_done'
+                if (oldLead?.status !== 'visit_done' && updatedLead.status === 'visit_done') {
+                  const pendingVisits = visits.filter(v => v.leadId === updatedLead.id && (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled'));
+                  if (pendingVisits.length > 0) {
+                    const now = new Date().toISOString();
+                    const updatedVisits = visits.map(v => {
+                      if (v.leadId === updatedLead.id && (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled')) {
+                        const newV = { ...v, visit_status: 'completed' as any, completed_at: now };
+                        api.save('visits', newV);
+                        return newV;
+                      }
+                      return v;
+                    });
+                    setVisits(updatedVisits);
+                    toast.info(`${pendingVisits.length} visits auto-completed.`);
+                  }
+                }
+
                 logActivity('lead_updated', updatedLead.id, updatedLead.name, 'Updated details');
               }}
               onAddRemark={(r) => {

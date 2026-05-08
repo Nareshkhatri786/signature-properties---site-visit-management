@@ -54,6 +54,7 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
           fDate = fDate.split(' ')[0];
         }
         
+        let statusGroup: string;
         if (f.status === 'completed') statusGroup = 'completed';
         else if (f.status === 'cancelled') statusGroup = 'cancelled';
         else {

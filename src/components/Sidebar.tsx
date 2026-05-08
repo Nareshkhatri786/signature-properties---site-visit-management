@@ -1,5 +1,5 @@
 import React from 'react';
-  import { LayoutDashboard, CalendarCheck, UserPlus, Users, Webhook, MessageSquare, Layers, Settings, LogOut, Home, X, BarChart2, Bell, History as HistoryIcon, UserCheck, Zap, Sun } from 'lucide-react';
+import { LayoutDashboard, CalendarCheck, UserPlus, Users, Webhook, MessageSquare, Layers, Settings, LogOut, Home, X, BarChart2, Bell, History as HistoryIcon, UserCheck, Zap, Sun, TrendingUp } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Page, User } from '../types';
 

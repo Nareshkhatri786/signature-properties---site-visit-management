@@ -8,8 +8,8 @@ import { Visit, Lead, Project as AppProject, LeadQuality, LeadStatus } from '../
 import { cn, getLocalDateString } from '../lib/utils';
 import { 
   startOfToday, endOfToday, startOfYesterday, endOfYesterday,
-  startOfThisWeek, endOfThisWeek, startOfLastWeek, endOfLastWeek,
-  startOfThisMonth, endOfThisMonth, startOfLastMonth, endOfLastMonth,
+  startOfWeek, endOfWeek, subWeeks,
+  startOfMonth, endOfMonth, subMonths,
   isWithinInterval, parseISO, isSameDay
 } from 'date-fns';
 
@@ -38,10 +38,10 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
     const intervals: Record<Period, { start: Date, end: Date } | null> = {
       today: { start: startOfToday(), end: endOfToday() },
       yesterday: { start: startOfYesterday(), end: endOfYesterday() },
-      this_week: { start: startOfThisWeek(now), end: endOfThisWeek(now) },
-      last_week: { start: startOfLastWeek(now), end: endOfLastWeek(now) },
-      this_month: { start: startOfThisMonth(now), end: endOfThisMonth(now) },
-      last_month: { start: startOfLastMonth(now), end: endOfLastMonth(now) },
+      this_week: { start: startOfWeek(now), end: endOfWeek(now) },
+      last_week: { start: startOfWeek(subWeeks(now, 1)), end: endOfWeek(subWeeks(now, 1)) },
+      this_month: { start: startOfMonth(now), end: endOfMonth(now) },
+      last_month: { start: startOfMonth(subMonths(now, 1)), end: endOfMonth(subMonths(now, 1)) },
       all: null
     };
 
@@ -95,8 +95,8 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
     return {
       today: getCount({ start: startOfToday(), end: endOfToday() }),
       yesterday: getCount({ start: startOfYesterday(), end: endOfYesterday() }),
-      thisWeek: getCount({ start: startOfThisWeek(new Date()), end: endOfThisWeek(new Date()) }),
-      thisMonth: getCount({ start: startOfThisMonth(new Date()), end: endOfThisMonth(new Date()) })
+      thisWeek: getCount({ start: startOfWeek(new Date()), end: endOfWeek(new Date()) }),
+      thisMonth: getCount({ start: startOfMonth(new Date()), end: endOfMonth(new Date()) })
     };
   }, [visits, selectedProject]);
 

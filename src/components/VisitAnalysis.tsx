@@ -29,6 +29,16 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
   const [selectedQuality, setSelectedQuality] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Helper to get the most accurate date for a visit
+  const getRelevantDate = (v: Visit) => {
+    // For footfall, we prioritize when it was actually completed
+    if (v.visit_status === 'completed' && v.completed_at) {
+      return parseISO(v.completed_at);
+    }
+    // Fallback to visit_date (scheduled date)
+    return v.visit_date ? parseISO(v.visit_date) : new Date(0);
+  };
+
   // 1. Filter logic
   const filteredVisits = useMemo(() => {
     let result = visits.filter(v => v.visit_status === 'completed'); // Focusing on physical footfall
@@ -48,8 +58,7 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
     const interval = intervals[selectedPeriod];
     if (interval) {
       result = result.filter(v => {
-        if (!v.visit_date) return false;
-        const d = parseISO(v.visit_date);
+        const d = getRelevantDate(v);
         return isWithinInterval(d, interval);
       });
     }
@@ -71,7 +80,11 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
       });
     }
 
-    return result.sort((a, b) => (b.visit_date || '').localeCompare(a.visit_date || ''));
+    return result.sort((a, b) => {
+      const dateA = getRelevantDate(a).getTime();
+      const dateB = getRelevantDate(b).getTime();
+      return dateB - dateA;
+    });
   }, [visits, leads, selectedPeriod, selectedProject, selectedQuality, searchQuery]);
 
   // 2. Summary Stats based on filtered data
@@ -90,7 +103,7 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
   // 3. Comparison Stats (Period-based)
   const periodCounts = useMemo(() => {
     const getCount = (interval: { start: Date, end: Date }) => 
-      visits.filter(v => v.visit_status === 'completed' && v.visit_date && isWithinInterval(parseISO(v.visit_date), interval) && (selectedProject === 'all' || v.projectId === selectedProject)).length;
+      visits.filter(v => v.visit_status === 'completed' && isWithinInterval(getRelevantDate(v), interval) && (selectedProject === 'all' || v.projectId === selectedProject)).length;
 
     return {
       today: getCount({ start: startOfToday(), end: endOfToday() }),
@@ -201,12 +214,19 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
                   <tr key={v.id} className="hover:bg-[#FFFDF6] transition-colors group">
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2">
-                        <Calendar size={14} className="text-[#C9A84C]" />
+                        <Calendar size={14} className={cn(v.completed_at ? "text-emerald-500" : "text-[#C9A84C]")} />
                         <span className="font-bold text-[#2A1C00] text-sm">
-                          {parseISO(v.visit_date!).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {getRelevantDate(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </span>
+                        {v.completed_at && (
+                           <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase rounded border border-emerald-100">Completed</span>
+                        )}
                       </div>
-                      <p className="text-[10px] text-[#9A8262] ml-6 mt-0.5">{v.visit_time || '--:--'}</p>
+                      <p className="text-[10px] text-[#9A8262] ml-6 mt-0.5">
+                        {v.completed_at 
+                          ? new Date(v.completed_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                          : (v.visit_time || '--:--')}
+                      </p>
                     </td>
                     <td className="px-6 py-5">
                       <p className="font-bold text-[#2A1C00] group-hover:text-[#C9A84C] transition-colors">{v.client_name}</p>

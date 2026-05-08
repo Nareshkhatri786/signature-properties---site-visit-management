@@ -1343,11 +1343,13 @@ export default function App() {
 
                     // Handle Completed
                     if (oldStatus !== 'completed' && newStatus === 'completed') {
+                      v.completed_at = new Date().toISOString();
                       updatedLead.status = 'visit_done';
                       updatedLead.stats.visits_done += 1;
                       leadChanged = true;
                       logActivity('visit_completed', v.id, v.client_name);
                     } else if (oldStatus === 'completed' && newStatus !== 'completed') {
+                      v.completed_at = undefined;
                       updatedLead.status = 'visit_scheduled';
                       updatedLead.stats.visits_done -= 1;
                       leadChanged = true;

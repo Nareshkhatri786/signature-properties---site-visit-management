@@ -192,7 +192,6 @@ export default function App() {
         setTemplates(initData.templates || []);
         setSettings(initData.settings || {});
         setWorkflows(initData.workflows || []);
-        
         setLeads(fullData.leads || []);
         setVisits(fullData.visits || []);
         setFollowups(fullData.followups || []);
@@ -203,7 +202,7 @@ export default function App() {
         setWebhookConfigs(fullData.webhook_configs || []);
         setUsers(fullData.users || []);
         
-        console.log(`[Data Load] Leads: ${fullData.leads?.length}, Visits: ${fullData.visits?.length}`);
+        console.log(`[Data Load Success] Leads: ${fullData.leads?.length}, Visits: ${fullData.visits?.length}`);
         
         if (fullData.currentUser) {
           setUser(fullData.currentUser);

@@ -24,6 +24,7 @@ import PostCallWhatsAppModal from './components/PostCallWhatsAppModal';
 import Login from './components/Login';
 import WorkflowBuilder from './components/WorkflowBuilder';
 import VisitAnalysis from './components/VisitAnalysis';
+import VisitCompletionModal from './components/VisitCompletionModal';
 import { Toaster, toast } from 'react-hot-toast';
 import { CalendarCheck, Plus, Phone, MessageSquare } from 'lucide-react';
 import { aiService } from './lib/ai';
@@ -115,6 +116,9 @@ export default function App() {
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [preferredFollowUpMethod, setPreferredFollowUpMethod] = useState<FollowUpMethod>('call');
   const [stats, setStats] = useState<any>(null);
+  const [isVisitCompletionModalOpen, setIsVisitCompletionModalOpen] = useState(false);
+  const [completionVisit, setCompletionVisit] = useState<Visit | null>(null);
+  const [completionLead, setCompletionLead] = useState<Lead | null>(null);
   const lastSyncTime = React.useRef<string | null>(null);
   const isFetching = React.useRef(false);
   const repairRun = React.useRef(false);
@@ -1076,12 +1080,22 @@ export default function App() {
               onCall={handleCall}
               onWhatsApp={handleWhatsApp}
               onBulkScore={handleBulkAIScore}
-               onUpdateStatus={(id, status) => {
+              onUpdateStatus={(id, status) => {
                 const lead = leads.find(l => l.id === id);
                 if (lead && lead.status !== status) {
+                  // BUG-LESS SYNC: Trigger modal if status is changed to 'visit_done'
+                  if (status === 'visit_done') {
+                    const pendingVisits = visits.filter(v => v.leadId === id && (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled'));
+                    if (pendingVisits.length > 0) {
+                      const latestVisit = [...pendingVisits].sort((a, b) => b.visit_date.localeCompare(a.visit_date))[0];
+                      setCompletionVisit(latestVisit);
+                      setCompletionLead(lead);
+                      setIsVisitCompletionModalOpen(true);
+                      return;
+                    }
+                  }
+
                   const initialUpdate = { ...lead, status, updated_at: new Date().toISOString() };
-                  
-                  // Run workflow engine on the updated status
                   const processedLead = runWorkflowEngine('status_changed', initialUpdate);
                   
                   setLeads(leads.map(l => l.id === id ? processedLead : l));
@@ -1380,33 +1394,8 @@ export default function App() {
                 }
               }}
               onUpdateLead={(updatedLead) => {
-                const oldLead = leads.find(l => l.id === updatedLead.id);
                 setLeads(leads.map(l => l.id === updatedLead.id ? updatedLead : l));
                 api.save('leads', updatedLead);
-                
-                // NEW: Auto-sync visit completion if lead status is changed to 'visit_done'
-                if (oldLead?.status !== 'visit_done' && updatedLead.status === 'visit_done') {
-                  const pendingVisits = visits.filter(v => v.leadId === updatedLead.id && (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled'));
-                  if (pendingVisits.length > 0) {
-                    const now = new Date().toISOString();
-                    const updatedVisits = visits.map(v => {
-                      if (v.leadId === updatedLead.id && (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled')) {
-                        const newV = { ...v, visit_status: 'completed' as any, completed_at: now };
-                        api.save('visits', newV);
-                        return newV;
-                      }
-                      return v;
-                    });
-                    setVisits(updatedVisits);
-                    toast.info(`${pendingVisits.length} visits auto-completed.`);
-                  }
-                }
-
-                logActivity('lead_updated', updatedLead.id, updatedLead.name, 'Updated details');
-              }}
-              onAddRemark={(r) => {
-                setRemarks(prev => ({ ...prev, [selectedVisitId]: [r, ...(prev[selectedVisitId] || [])] }));
-                api.save('remarks', { ...r, targetId: selectedVisitId });
               }}
               onAddFollowUp={(f) => {
                 const isDuplicate = followups.some(existing => 
@@ -1777,6 +1766,86 @@ export default function App() {
         outcome={postCallOutcome || 'answered'}
         templates={templates}
       />
+
+      {isVisitCompletionModalOpen && completionVisit && user && (
+        <VisitCompletionModal 
+          isOpen={isVisitCompletionModalOpen}
+          onClose={() => {
+            setIsVisitCompletionModalOpen(false);
+            setCompletionVisit(null);
+            setCompletionLead(null);
+          }}
+          visit={completionVisit}
+          lead={completionLead}
+          user={user}
+          onComplete={(data) => {
+             const completedAt = data.completedAt || new Date().toISOString();
+             
+             // 1. Update Visit
+             const updatedVisit: Visit = {
+               ...completionVisit,
+               visit_status: 'completed' as any,
+               client_feedback: data.feedback,
+               interest_level: data.interest,
+               outcome: data.outcome,
+               completed_at: completedAt
+             };
+             setVisits(visits.map(v => v.id === completionVisit.id ? updatedVisit : v));
+             api.save('visits', updatedVisit);
+
+             // 2. Update Lead
+             if (completionLead) {
+               const updatedLead: Lead = {
+                 ...completionLead,
+                 status: 'visit_done' as any,
+                 quality: data.interest,
+                 updated_at: completedAt
+               };
+               setLeads(leads.map(l => l.id === completionLead.id ? updatedLead : l));
+               api.save('leads', updatedLead);
+             }
+
+             // 3. Log Activity
+             const activity: Activity = {
+               id: generateId(),
+               type: 'visit_done',
+               userId: user.id,
+               userName: user.name,
+               projectId: completionVisit.projectId,
+               targetId: completionLead?.id || completionVisit.id,
+               targetName: completionLead?.name || completionVisit.client_name,
+               timestamp: completedAt,
+               details: `Outcome: ${data.outcome.toUpperCase()} | Feedback: ${data.feedback}`
+             };
+             setActivities([activity, ...activities]);
+             api.save('activities', activity);
+
+             // 4. Handle Next Followup
+             if (data.nextStep === 'followup' && data.nextDate) {
+               const f: FollowUp = {
+                 id: generateId(),
+                 leadId: completionLead?.id || '',
+                 visitId: completionVisit.id,
+                 projectId: completionVisit.projectId,
+                 date: data.nextDate,
+                 purpose: 'Follow up post-visit',
+                 status: 'pending',
+                 userId: user.id,
+                 userName: user.name,
+                 method: 'call',
+                 created_at: new Date().toISOString()
+               };
+               setFollowups([f, ...followups]);
+               api.save('followups', f);
+             }
+
+             setIsVisitCompletionModalOpen(false);
+             setCompletionVisit(null);
+             setCompletionLead(null);
+             toast.success('Visit details logged successfully');
+          }}
+        />
+      )}
       </div>
     </ErrorBoundary>
   );

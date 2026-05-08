@@ -114,25 +114,12 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
   
   // Quick Actions Modals
   const [isQuickVisitModalOpen, setIsQuickVisitModalOpen] = useState(false);
-  const [isQuickCompleteModalOpen, setIsQuickCompleteModalOpen] = useState(false);
   
   // Quick Visit Form Data
   const [quickVisitData, setQuickVisitData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     time: '',
     remark: ''
-  });
-
-  // Quick Complete Form Data
-  const [quickCompleteData, setQuickCompleteData] = useState({
-    feedback: '',
-    interest: 'warm' as LeadQuality,
-    outcome: 'follow_up_required' as VisitOutcome,
-    nextStep: 'none' as 'none' | 'followup' | 'revisit',
-    nextDate: '',
-    nextTime: '',
-    visitDate: new Date().toISOString().split('T')[0],
-    visitTime: new Date().toTimeString().slice(0, 5)
   });
   
   // Remark state
@@ -146,10 +133,6 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
     if (field === 'status') {
       if (value === 'visit_scheduled') {
         setIsQuickVisitModalOpen(true);
-        return;
-      }
-      if (value === 'visit_done') {
-        setIsQuickCompleteModalOpen(true);
         return;
       }
     }
@@ -1087,170 +1070,6 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
         )}
       </AnimatePresence>
 
-      {/* Quick Complete Modal (Visit Done) */}
-      <AnimatePresence>
-        {isQuickCompleteModalOpen && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white border border-[#E6D8B8] rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden"
-            >
-              <div className="p-8">
-                <div className="w-16 h-16 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-green-100">
-                  <CheckCircle2 size={32} />
-                </div>
-                <h3 className="font-['Cormorant_Garamond'] text-2xl font-bold text-[#2A1C00] mb-2 text-center">Visit Completed</h3>
-                <p className="text-sm text-[#9A8262] mb-8 text-center leading-relaxed">
-                  Please provide feedback and outcome details for <span className="font-bold text-[#5C4820]">{lead.name}</span>.
-                </p>
-
-                <div className="space-y-6 mb-8">
-                  {/* Visit Date Back-Entry */}
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-3">📅 Visit Date & Time (back-entry allowed)</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                          <Calendar size={12} /> Visit Date *
-                        </label>
-                        <input
-                          type="date"
-                          value={quickCompleteData.visitDate}
-                          onChange={(e) => setQuickCompleteData({...quickCompleteData, visitDate: e.target.value})}
-                          className="w-full bg-white border border-amber-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                          <Clock size={12} /> Visit Time
-                        </label>
-                        <input
-                          type="time"
-                          value={quickCompleteData.visitTime}
-                          onChange={(e) => setQuickCompleteData({...quickCompleteData, visitTime: e.target.value})}
-                          className="w-full bg-white border border-amber-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                      <MessageSquare size={12} /> Client Feedback *
-                    </label>
-                    <textarea 
-                      value={quickCompleteData.feedback}
-                      onChange={(e) => setQuickCompleteData({...quickCompleteData, feedback: e.target.value})}
-                      placeholder="What did the client say about the property?"
-                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C] resize-none h-24"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                        <Star size={12} /> Interest Level
-                      </label>
-                      <select 
-                        value={quickCompleteData.interest}
-                        onChange={(e) => setQuickCompleteData({...quickCompleteData, interest: e.target.value as LeadQuality})}
-                        className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
-                      >
-                        <option value="hot">🔥 Hot Interest</option>
-                        <option value="warm">🌡️ Warm Interest</option>
-                        <option value="cold">❄️ Cold Interest</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                        <AlertCircle size={12} /> Final Outcome
-                      </label>
-                      <select 
-                        value={quickCompleteData.outcome}
-                        onChange={(e) => setQuickCompleteData({...quickCompleteData, outcome: e.target.value as VisitOutcome})}
-                        className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
-                      >
-                        <option value="booked">💰 Booked / Token Ready</option>
-                        <option value="highly_interested">🌟 Highly Interested</option>
-                        <option value="follow_up_required">📞 Needs Follow-up</option>
-                        <option value="shared_quotation">📄 Quotation Shared</option>
-                        <option value="negotiation">🤝 In Negotiation</option>
-                        <option value="not_interested">❌ Not Interested</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4 pt-4 border-t border-[#E6D8B8]">
-                    <div className="space-y-1.5">
-                      <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                        <ArrowRightLeft size={12} /> Next Action Step
-                      </label>
-                      <select 
-                        value={quickCompleteData.nextStep}
-                        onChange={(e) => setQuickCompleteData({...quickCompleteData, nextStep: e.target.value as any})}
-                        className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C]"
-                      >
-                        <option value="none">No immediate action required</option>
-                        <option value="followup">📞 Schedule Follow-up Call</option>
-                        <option value="revisit">📅 Schedule Re-Visit</option>
-                      </select>
-                    </div>
-
-                    {quickCompleteData.nextStep !== 'none' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-[#FDFAF2] p-4 rounded-xl border border-[#E6D8B8]">
-                        <div className="space-y-1.5">
-                          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                            <Calendar size={12} /> Date
-                          </label>
-                          <input 
-                            type="date" 
-                            value={quickCompleteData.nextDate}
-                            onChange={(e) => setQuickCompleteData({...quickCompleteData, nextDate: e.target.value})}
-                            className="w-full bg-white border border-[#E6D8B8] rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                            <Clock size={12} /> Time (Optional)
-                          </label>
-                          <input 
-                            type="time" 
-                            value={quickCompleteData.nextTime}
-                            onChange={(e) => setQuickCompleteData({...quickCompleteData, nextTime: e.target.value})}
-                            className="w-full bg-white border border-[#E6D8B8] rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  <button 
-                    onClick={handleQuickCompleteSubmit}
-                    disabled={!quickCompleteData.feedback.trim() || (quickCompleteData.nextStep !== 'none' && !quickCompleteData.nextDate)}
-                    className="w-full bg-[#C9A84C] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    <CheckCircle2 size={18} /> Complete Visit & Log Feedback
-                  </button>
-                  <button  
-                    onClick={() => setIsQuickCompleteModalOpen(false)}
-                    className="w-full bg-white border border-[#E6D8B8] text-[#9A8262] font-semibold py-3 rounded-xl hover:bg-[#FDFAF2] transition-colors"
-                  >
-                    Go Back
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 });

@@ -400,7 +400,7 @@ async function startServer() {
         query(leadQuery, leadParams),
         query(`SELECT v.* FROM visits v LEFT JOIN leads l ON v.leadId = l.id ${taskQueryFilter.replace(/f\./g, 'v.')} ORDER BY v.visit_date DESC LIMIT 5000`, taskParams),
         query(`SELECT f.* FROM followups f LEFT JOIN leads l ON f.leadId = l.id ${taskQueryFilter} ORDER BY f.date DESC LIMIT 5000`, taskParams),
-        query(`SELECT a.* FROM activities a LEFT JOIN leads l ON a.leadId = l.id ${taskQueryFilter.replace(/f\./g, 'a.')} ORDER BY a.timestamp DESC LIMIT 5000`, taskParams),
+        query(`SELECT a.* FROM activities a LEFT JOIN leads l ON a.targetId = l.id ${taskQueryFilter.replace(/f\./g, 'a.')} ORDER BY a.timestamp DESC LIMIT 5000`, taskParams),
         query(`SELECT c.* FROM call_logs c LEFT JOIN leads l ON c.leadId = l.id ${taskQueryFilter.replace(/f\./g, 'c.')} ORDER BY c.timestamp DESC LIMIT 5000`, taskParams),
         query("SELECT * FROM templates"),
         query("SELECT * FROM webhook_configs"),

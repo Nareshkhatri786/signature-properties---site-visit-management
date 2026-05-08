@@ -34,8 +34,11 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
     visitTime: visit.visit_time || new Date().toTimeString().slice(0, 5)
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = () => {
-    if (!data.feedback.trim()) return;
+    if (!data.feedback.trim() || isSubmitting) return;
+    setIsSubmitting(true);
     const completedAt = new Date(`${data.visitDate}T${data.visitTime || '00:00'}:00`).toISOString();
     onComplete({ ...data, completedAt });
   };
@@ -191,10 +194,19 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                 </button>
                 <button 
                   onClick={handleSubmit}
-                  disabled={!data.feedback.trim()}
+                  disabled={!data.feedback.trim() || isSubmitting}
                   className="flex-[2] bg-[#C9A84C] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  <Save size={18} /> Complete & Save
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={18} /> Complete & Save
+                    </>
+                  )}
                 </button>
               </div>
             </div>

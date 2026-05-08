@@ -1831,76 +1831,88 @@ export default function App() {
           visit={completionVisit}
           lead={completionLead}
           user={user}
-          onComplete={(data) => {
-             const completedAt = data.completedAt || new Date().toISOString();
-             
-             // 1. Update Visit
-             const updatedVisit: Visit = {
-               ...completionVisit,
-               visit_status: 'completed' as any,
-               client_feedback: data.feedback,
-               interest_level: data.interest,
-               outcome: data.outcome,
-               completed_at: completedAt
-             };
-              const exists = visits.some(v => v.id === completionVisit.id);
-              if (exists) {
-                setVisits(visits.map(v => v.id === completionVisit.id ? updatedVisit : v));
-              } else {
-                setVisits([updatedVisit, ...visits]);
-              }
-              api.save('visits', updatedVisit);
+          onComplete={async (data) => {
+            const completedAt = data.completedAt || new Date().toISOString();
+            
+            try {
+              const savePromise = (async () => {
+                // 1. Update Visit
+                const updatedVisit: Visit = {
+                  ...completionVisit,
+                  visit_status: 'completed' as any,
+                  client_feedback: data.feedback,
+                  interest_level: data.interest,
+                  outcome: data.outcome,
+                  completed_at: completedAt
+                };
+                const exists = visits.some(v => v.id === completionVisit.id);
+                if (exists) {
+                  setVisits(prev => prev.map(v => v.id === completionVisit.id ? updatedVisit : v));
+                } else {
+                  setVisits(prev => [updatedVisit, ...prev]);
+                }
+                await api.save('visits', updatedVisit);
 
-             // 2. Update Lead
-             if (completionLead) {
-               const updatedLead: Lead = {
-                 ...completionLead,
-                 status: 'visit_done' as any,
-                 quality: data.interest,
-                 updated_at: completedAt
-               };
-               setLeads(leads.map(l => l.id === completionLead.id ? updatedLead : l));
-               api.save('leads', updatedLead);
-             }
+                // 2. Update Lead
+                if (completionLead) {
+                  const updatedLead: Lead = {
+                    ...completionLead,
+                    status: 'visit_done' as any,
+                    quality: data.interest,
+                    updated_at: completedAt
+                  };
+                  setLeads(prev => prev.map(l => l.id === completionLead.id ? updatedLead : l));
+                  await api.save('leads', updatedLead);
+                }
 
-             // 3. Log Activity
-             const activity: Activity = {
-               id: generateId(),
-               type: 'visit_done',
-               userId: user.id,
-               userName: user.name,
-               projectId: completionVisit.projectId,
-               targetId: completionLead?.id || completionVisit.id,
-               targetName: completionLead?.name || completionVisit.client_name,
-               timestamp: completedAt,
-               details: `Outcome: ${data.outcome.toUpperCase()} | Feedback: ${data.feedback}`
-             };
-             setActivities([activity, ...activities]);
-             api.save('activities', activity);
+                // 3. Log Activity
+                const activity: Activity = {
+                  id: generateId(),
+                  type: 'visit_done',
+                  userId: user.id,
+                  userName: user.name,
+                  projectId: completionVisit.projectId,
+                  targetId: completionLead?.id || completionVisit.id,
+                  targetName: completionLead?.name || completionVisit.client_name,
+                  timestamp: completedAt,
+                  details: `Outcome: ${data.outcome.toUpperCase()} | Feedback: ${data.feedback}`
+                };
+                setActivities(prev => [activity, ...prev]);
+                await api.save('activities', activity);
 
-             // 4. Handle Next Followup
-             if (data.nextStep === 'followup' && data.nextDate) {
-               const f: FollowUp = {
-                 id: generateId(),
-                 leadId: completionLead?.id || '',
-                 visitId: completionVisit.id,
-                 projectId: completionVisit.projectId,
-                 date: data.nextDate,
-                 purpose: 'Follow up post-visit',
-                 status: 'pending',
-                 userId: user.id,
-                 userName: user.name,
-                 method: 'call',
-                 created_at: new Date().toISOString()
-               };
-               setFollowups([f, ...followups]);
-               api.save('followups', f);
-             }
+                // 4. Handle Next Followup
+                if (data.nextStep === 'followup' && data.nextDate) {
+                  const f: FollowUp = {
+                    id: generateId(),
+                    leadId: completionLead?.id || '',
+                    visitId: completionVisit.id,
+                    projectId: completionVisit.projectId,
+                    date: data.nextDate,
+                    purpose: 'Follow up post-visit',
+                    status: 'pending',
+                    userId: user.id,
+                    userName: user.name,
+                    method: 'call',
+                    created_at: new Date().toISOString()
+                  };
+                  setFollowups(prev => [f, ...prev]);
+                  await api.save('followups', f);
+                }
+              })();
 
-             setIsVisitCompletionModalOpen(false);
-             setCompletionVisit(null);
-             setCompletionLead(null);
-             toast.success('Visit details logged successfully');
+              await toast.promise(savePromise, {
+                loading: 'Finalizing visit details...',
+                success: 'Visit completed successfully!',
+                error: 'Error saving visit details. Please try again.'
+              });
+
+            } catch (error) {
+              console.error('Visit completion error:', error);
+            } finally {
+              setIsVisitCompletionModalOpen(false);
+              setCompletionVisit(null);
+              setCompletionLead(null);
+            }
           }}
         />
       )}

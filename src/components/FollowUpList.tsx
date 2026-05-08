@@ -78,9 +78,12 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
       const userObj = users.find(u => u.id === computedUserId);
       const userName = f.userName || lead?.assignedToName || userObj?.name || visit?.assigned_to || 'Unassigned';
       
+      const project = projects.find(p => p.id === f.projectId);
+      const projectName = project?.name || 'Unknown Project';
+      
       return {
         ...f, clientName, phone, source, priorityStr, statusGroup, daysOverdue, stage,
-        lead, visit, lastContactDate, quality, userName, computedUserId
+        lead, visit, lastContactDate, quality, userName, computedUserId, projectName
       };
     }).sort((a, b) => {
       // Sort by overdue first, then date
@@ -278,11 +281,9 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
           >
             <option value="all">All Projects</option>
             {/* Unique list of projects from the leads/visits */}
-            {Array.from(new Set(processedData.map(f => f.projectId).filter(Boolean))).map(pid => {
-              const leadWithProj = processedData.find(ld => ld.projectId === pid);
-              const projName = leadWithProj?.lead?.projectId || pid; // Fallback to ID if name not easily joined
-              return <option key={pid} value={pid}>{projName}</option>;
-            })}
+            {projects.filter(p => processedData.some(f => f.projectId === p.id)).map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
           </select>
 
           <select 
@@ -372,7 +373,7 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
                         {f.phone}
                         <MessageSquare size={12} className="text-green-500 ml-1 cursor-pointer" onClick={() => onNavigate('whatsapp', f.leadId || f.visitId)} />
                       </div>
-                      <p className="text-[10px] text-[#9A8262]">Source: {f.source}</p>
+                      <p className="text-[10px] text-[#9A8262]">Source: {f.source} | Project: {f.projectName}</p>
                     </td>
                     <td className="px-4 py-3">
                       <span className={cn("text-[10px] font-bold px-2.5 py-1 rounded-md border", getStageBadge(f.stage))}>
@@ -462,7 +463,7 @@ export default function FollowUpList({ followUps, leads, visits, user, users = [
                         <span className={cn("text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider", getPriorityColors(f.priorityStr))}>{f.priorityStr}</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-[#5C4820]">
-                        <Phone size={12} className="text-[#9A8262]" /> {f.phone}
+                        <div className="text-[10px] text-[#9A8262] mt-0.5">Project: {f.projectName}</div>
                       </div>
                     </div>
                   </div>

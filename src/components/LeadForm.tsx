@@ -97,6 +97,8 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
       quality: formData.quality,
       status: formData.status,
       assignedTo: formData.assignedTo || null,
+      assignedToName: users.find(u => u.id === formData.assignedTo)?.name || null,
+      projectId: projectId,
       property_interest: formData.property_interest || projectDefaults[projectId] || '',
       priority: formData.priority,
       created_at: new Date().toISOString(),

@@ -105,6 +105,7 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
     }
 
     onSave(visit, initialRemark, formData.lead_status);
+    onCancel();
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

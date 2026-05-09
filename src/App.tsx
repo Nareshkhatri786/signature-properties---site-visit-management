@@ -661,11 +661,6 @@ export default function App() {
 
   const handleCall = (v: Visit | Lead) => {
     window.open(`tel:${v.mobile}`, '_self');
-    
-    // Don't open modal if we're already on a detail page that has inline logging
-    if (currentPage === 'detail' || currentPage === 'lead-detail') {
-      return;
-    }
 
     if ('visit_date' in v) {
       setActiveCallVisit(v as Visit);
@@ -676,7 +671,7 @@ export default function App() {
     }
     setTimeout(() => {
       setIsCallModalOpen(true);
-    }, 1500);
+    }, 500); // Reduced delay for better UX
   };
 
   const handleWhatsApp = (v: Visit | Lead) => {
@@ -1121,7 +1116,7 @@ export default function App() {
                   const processedLead = runWorkflowEngine('status_changed', initialUpdate);
                   
                   setLeads(leads.map(l => l.id === id ? processedLead : l));
-                  apiService.save('leads', processedLead);
+                  api.save('leads', processedLead);
                   logActivity('lead_status_changed', id, lead.name, `Status changed from ${lead.status} to ${status}`);
                   toast.success('Lead status updated');
                 }
@@ -1208,6 +1203,7 @@ export default function App() {
               onTransferLead={handleTransferLead}
               onQuickVisitSave={(v) => {
                 setVisits(prev => [v, ...prev]);
+                api.save('visits', v);
                 logActivity('visit_scheduled', v.id, v.client_name, `Quick Schedule: ${v.visit_date}`);
               }}
             />
@@ -1296,10 +1292,10 @@ export default function App() {
                       created_at: new Date().toISOString(),
                       updated_at: new Date().toISOString(),
                       stats: {
-                        calls_attempted: 0,
-                        calls_answered: 0,
                         visits_planned: (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled') ? 1 : 0,
                         visits_done: v.visit_status === 'completed' ? 1 : 0,
+                        calls_attempted: 0,
+                        calls_answered: 0,
                         followups_done: 0
                       }
                     };

@@ -1,4 +1,5 @@
-export function normalizePhoneNumber(phone: string): string {
+export function normalizePhoneNumber(phone: string | null | undefined): string {
+  if (!phone) return '';
   // Remove all non-numeric characters except '+'
   let clean = phone.replace(/[^\d+]/g, '');
 

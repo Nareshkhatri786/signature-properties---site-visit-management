@@ -69,52 +69,61 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
       return;
     }
 
-    const digitsOnly = formData.mobile.replace(/\D/g, '');
-    const finalMobile = (digitsOnly.length === 12 && digitsOnly.startsWith('91')) 
-      ? digitsOnly.substring(2) 
-      : digitsOnly;
+    try {
+      const digitsOnly = formData.mobile.replace(/\D/g, '');
+      const finalMobile = (digitsOnly.length === 12 && digitsOnly.startsWith('91')) 
+        ? digitsOnly.substring(2) 
+        : digitsOnly;
 
-    if (finalMobile.length !== 10) {
-      toast.error('Mobile number must be exactly 10 digits');
-      return;
-    }
-
-    const normalizedMobile = normalizePhoneNumber(digitsOnly);
-
-    // Deduplication with normalized numbers
-    const isDuplicate = existingLeads.some(l => normalizePhoneNumber(l.mobile) === normalizedMobile);
-    if (isDuplicate) {
-      toast.error('A lead with this mobile number already exists!');
-      return;
-    }
-
-    const newLead: Lead = {
-      id: generateId(),
-      name: formData.name,
-      mobile: normalizedMobile,
-      email: formData.email,
-      source: formData.source,
-      quality: formData.quality,
-      status: formData.status,
-      assignedTo: formData.assignedTo || null,
-      assignedToName: users.find(u => u.id === formData.assignedTo)?.name || null,
-      projectId: projectId,
-      property_interest: formData.property_interest || projectDefaults[projectId] || '',
-      priority: formData.priority,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      stats: {
-        visits_planned: 0,
-        visits_done: 0,
-        calls_attempted: 0,
-        calls_answered: 0,
-        followups_done: 0
+      if (finalMobile.length !== 10) {
+        toast.error('Mobile number must be exactly 10 digits');
+        return;
       }
-    };
 
-    onSave(newLead);
-    toast.success('Lead added successfully');
-    onClose();
+      const normalizedMobile = normalizePhoneNumber(digitsOnly);
+
+      // Deduplication with normalized numbers - Added safety check for l.mobile
+      const isDuplicate = existingLeads.some(l => {
+        if (!l.mobile) return false;
+        return normalizePhoneNumber(l.mobile) === normalizedMobile;
+      });
+      
+      if (isDuplicate) {
+        toast.error('A lead with this mobile number already exists!');
+        return;
+      }
+
+      const newLead: Lead = {
+        id: generateId(),
+        name: formData.name,
+        mobile: normalizedMobile,
+        email: formData.email,
+        source: formData.source,
+        quality: formData.quality,
+        status: formData.status,
+        assignedTo: formData.assignedTo || null,
+        assignedToName: users?.find(u => u.id === formData.assignedTo)?.name || null,
+        projectId: projectId,
+        property_interest: formData.property_interest || projectDefaults[projectId] || '',
+        priority: formData.priority,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        stats: {
+          visits_planned: 0,
+          visits_done: 0,
+          calls_attempted: 0,
+          calls_answered: 0,
+          followups_done: 0
+        }
+      };
+
+      onSave(newLead);
+      toast.success('Lead added successfully');
+      onClose();
+    } catch (error) {
+      console.error('Lead save error:', error);
+      toast.error('An error occurred while saving the lead');
+    }
   };
 
   return (

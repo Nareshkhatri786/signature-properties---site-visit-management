@@ -25,6 +25,7 @@ export function useAppData() {
       return { initData, fullData };
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!localStorage.getItem('crm_token'),
   });
 }
 
@@ -36,6 +37,7 @@ export function useStats() {
     queryKey: queryKeys.stats,
     queryFn: () => apiService.getStats(),
     refetchInterval: 1000 * 60 * 2, // Every 2 mins
+    enabled: !!localStorage.getItem('crm_token'),
   });
 }
 

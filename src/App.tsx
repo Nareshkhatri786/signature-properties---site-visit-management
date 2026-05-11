@@ -31,6 +31,7 @@ import { aiService } from './lib/ai';
 import { generateId } from './lib/storage';
 import { cn } from './lib/utils';
 import { normalizePhoneNumber } from './lib/phoneUtils';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { apiService } from './lib/api-service';
 import { syncEngine } from './lib/syncEngine';
@@ -415,10 +416,12 @@ export default function App() {
     }
   };
 
+  const queryClient = useQueryClient();
   const handleLogout = () => {
     localStorage.removeItem('crm_token');
     storage.clearAuth();
     setUser(null);
+    queryClient.clear();
     toast.success('Logged out successfully');
     setTimeout(() => window.location.reload(), 500);
   };

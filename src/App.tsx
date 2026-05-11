@@ -339,7 +339,7 @@ export default function App() {
                 className="w-16 h-16 border-4 border-[#C9A84C] border-t-transparent rounded-full animate-spin"
               />
               <p className="text-[#C9A84C] font-['Jost'] tracking-[0.2em] uppercase text-xs font-semibold animate-pulse mt-4">
-                {initStep}
+                Please wait...
               </p>
             </>
           )}

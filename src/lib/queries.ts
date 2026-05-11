@@ -48,14 +48,56 @@ export function useSaveData() {
   return useMutation({
     mutationFn: ({ collection, data }: { collection: string, data: any }) => 
       apiService.save(collection, data),
-    onSuccess: (res, variables) => {
-      // Optimistically invalidate/refetch relevant data
+    
+    // Optimistic Update logic
+    onMutate: async (newRecord) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: queryKeys.all });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(queryKeys.all);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(queryKeys.all, (old: any) => {
+        if (!old) return old;
+        const { collection, data } = newRecord;
+        
+        // Deep copy of the state
+        const newState = JSON.parse(JSON.stringify(old));
+        const fullData = newState.fullData;
+        const initData = newState.initData;
+
+        // Find and update in the correct collection
+        const updateInArray = (arr: any[]) => {
+          const index = arr.findIndex((item: any) => item.id === data.id);
+          if (index > -1) {
+            arr[index] = { ...arr[index], ...data };
+          } else {
+            arr.unshift(data);
+          }
+        };
+
+        if (fullData[collection]) updateInArray(fullData[collection]);
+        else if (initData[collection]) updateInArray(initData[collection]);
+
+        return newState;
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousData };
+    },
+
+    // If the mutation fails, use the context returned from onMutate to roll back
+    onError: (err, newTodo, context) => {
+      queryClient.setQueryData(queryKeys.all, context?.previousData);
+      toast.error(err.message || 'Failed to sync with server');
+    },
+
+    // Always refetch after error or success to ensure we are in sync
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.stats });
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to save data');
-    }
   });
 }
 

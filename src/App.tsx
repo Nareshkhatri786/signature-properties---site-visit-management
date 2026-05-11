@@ -274,7 +274,7 @@ export default function App() {
     }
   }, [filteredLeads.length, filteredVisits.length, user?.id]);
 
-  if (isDataLoading && localStorage.getItem('crm_token')) {
+  if (isDataLoading && !appData && localStorage.getItem('crm_token')) {
     return (
       <div className="min-h-[100dvh] bg-[#1C1207] flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-4 max-w-md text-center">
@@ -1654,7 +1654,8 @@ export default function App() {
 
               const savePromise = (async () => {
                 // 1. Update State & Save
-                // Manual state updates removed
+                await api.save('leads', updatedLead);
+                await api.save('visits', updatedVisit);
                 await api.save('activities', activity);
 
                 // 2. Handle Next Followup

@@ -292,9 +292,6 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
           </div>
         </div>
       </div>
-       </div>
-        </div>
-      </div>
 
       {selectedIds.length > 0 && (
         <div className="bg-[#C9A84C] text-white px-6 py-3 rounded-xl flex items-center justify-between shadow-lg animate-in slide-in-from-top-4 duration-300">

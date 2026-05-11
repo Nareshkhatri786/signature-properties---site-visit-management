@@ -26,7 +26,7 @@ import WorkflowBuilder from './components/WorkflowBuilder';
 import VisitAnalysis from './components/VisitAnalysis';
 import VisitCompletionModal from './components/VisitCompletionModal';
 import { Toaster, toast } from 'react-hot-toast';
-import { CalendarCheck, Plus, Phone, MessageSquare } from 'lucide-react';
+import { CalendarCheck, Plus, Phone, MessageSquare, Home } from 'lucide-react';
 import { aiService } from './lib/ai';
 import { generateId } from './lib/storage';
 import { cn } from './lib/utils';

@@ -1,11 +1,17 @@
 import { GoogleGenAI } from "@google/genai";
 import { Visit, Remark, Lead, LeadQuality } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+let aiInstance: GoogleGenAI | null = null;
+const getAI = () => {
+  const key = import.meta.env.VITE_GEMINI_API_KEY || "";
+  if (!key) return null;
+  if (!aiInstance) aiInstance = new GoogleGenAI(key);
+  return aiInstance;
+};
 
 export const aiService = {
   generateFollowUp: async (visit: Visit, remarks: Remark[]) => {
-    if (!process.env.GEMINI_API_KEY) return null;
+    if (!import.meta.env.VITE_GEMINI_API_KEY) return null;
 
     const remarksText = remarks.map(r => `- ${r.text}`).join("\n");
     const prompt = `
@@ -33,6 +39,8 @@ export const aiService = {
     `;
 
     try {
+      const ai = getAI();
+      if (!ai) return null;
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
@@ -45,7 +53,8 @@ export const aiService = {
   },
 
   scoreLead: async (lead: Lead, remarks: Remark[]) => {
-    if (!process.env.GEMINI_API_KEY) return null;
+    const key = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!key) return null;
 
     const remarksText = remarks.map(r => `- ${r.text}`).join("\n");
     const prompt = `
@@ -73,6 +82,8 @@ export const aiService = {
     `;
 
     try {
+      const ai = getAI();
+      if (!ai) return null;
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,

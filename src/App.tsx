@@ -142,12 +142,7 @@ export default function App() {
   }, [appData]);
 
 
-  const handleLogout = () => {
-    localStorage.removeItem('crm_token');
-    storage.clearAuth();
-    setUser(null);
-    window.location.reload();
-  };
+
 
   useEffect(() => {
     // Viewport height fix for iOS Safari
@@ -446,10 +441,11 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    setUser(null);
     localStorage.removeItem('crm_token');
-    storage.saveAuth(null);
+    storage.clearAuth();
+    setUser(null);
     toast.success('Logged out successfully');
+    setTimeout(() => window.location.reload(), 500);
   };
 
   const navigate = (page: Page, id: string | null = null, filters: any = null) => {

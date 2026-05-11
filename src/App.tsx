@@ -34,21 +34,66 @@ import { normalizePhoneNumber } from './lib/phoneUtils';
 
 import { apiService } from './lib/api-service';
 import { syncEngine } from './lib/syncEngine';
+import { useAppData, useStats, useSaveData } from './lib/queries';
 import { pushService, urlBase64ToUint8Array } from './lib/push-service';
 import { motion } from 'motion/react';
 import ErrorBoundary from './components/ErrorBoundary';
 
-// REST API helpers — replaces Firebase service
-const api = {
-  fetchRemarks: (targetId: string) => apiService.getRemarks(targetId),
-  save: async (collection: string, h1: any, h2?: any) => {
-    const data = h2 || h1;
-    if (collection === 'remarks' && data.targetId) {
-      return apiService.saveRemark(data.targetId, data);
-    }
-    try {
-      const res = await apiService.save(collection, data);
+// (Logic moved inside App component to use React Query hooks)
+
+
+export default function App() {
+  const [user, setUser] = useState<User | null>(storage.getAuth());
+  const [currentPage, setCurrentPage] = useState<Page>('today');
+  const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
+  const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Data Fetching via React Query
+  const { data: appData, isLoading: isDataLoading, error: dataError } = useAppData();
+  const { data: statsData } = useStats();
+  
+  const leads = appData?.fullData.leads || [];
+  const visits = appData?.fullData.visits || [];
+  const remarks = appData?.fullData.remarks || {};
+  const templates = appData?.initData.templates || [];
+  const callLogs = appData?.fullData.call_logs || [];
+  const followups = appData?.fullData.followups || [];
+  const webhookConfigs = appData?.fullData.webhook_configs || [];
+  const settings = appData?.initData.settings || {
+    company: 'Signature Properties', 
+    phone: '', 
+    address: '',
+    sources: [],
+    budgets: [],
+    propertyInterests: []
+  };
+  const users = appData?.fullData.users || [];
+  const projects = appData?.initData.projects || [];
+  const activities = appData?.fullData.activities || [];
+  const attendance = appData?.fullData.attendance || [];
+  const notifications = appData?.fullData.notifications || [];
+  const workflows = appData?.initData.workflows || [];
+  const stats = statsData || null;
+
+  // Mutation for saving
+  const saveDataMutation = useSaveData();
+  // Centralized API helper inside component
+  const api = {
+    fetchRemarks: (targetId: string) => apiService.getRemarks(targetId),
+    save: async (collection: string, h1: any, h2?: any) => {
+      const data = h2 || h1;
       
+      // Specialized remark handling
+      if (collection === 'remarks' && data.targetId) {
+        const res = await apiService.saveRemark(data.targetId, data);
+        saveDataMutation.mutate({ collection: 'remarks', data }); // Trigger refresh
+        return res;
+      }
+
+      const res = await saveDataMutation.mutateAsync({ collection, data });
+      
+      // Push notifications logic
       try {
         const currentUser = storage.getAuth();
         if (collection === 'leads' && data.assignedTo && data.assignedTo !== currentUser?.id) {
@@ -61,44 +106,13 @@ const api = {
       }
       
       return res;
-    } catch (e: any) {
-      console.error(`Error saving ${collection}:`, e);
-      toast.error(`Failed to save ${collection}: ${e.message}`);
-      throw e;
+    },
+    delete: async (collection: string, id: string) => {
+      return apiService.delete(collection, id).then(() => {
+        saveDataMutation.mutate({ collection, data: null }); // Trigger refresh
+      });
     }
-  },
-  delete: (collection: string, id: string) => apiService.delete(collection, id),
-};
-
-export default function App() {
-  const [user, setUser] = useState<User | null>(storage.getAuth());
-  const [currentPage, setCurrentPage] = useState<Page>('today');
-  const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
-  const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
-  // Data State
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [visits, setVisits] = useState<Visit[]>([]);
-  const [remarks, setRemarks] = useState<Record<string, Remark[]>>({});
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [callLogs, setCallLogs] = useState<CallLog[]>([]);
-  const [followups, setFollowups] = useState<FollowUp[]>([]);
-  const [webhookConfigs, setWebhookConfigs] = useState<WebhookConfig[]>([]);
-  const [settings, setSettings] = useState<Settings>({ 
-    company: 'Signature Properties', 
-    phone: '', 
-    address: '',
-    sources: [],
-    budgets: [],
-    propertyInterests: []
-  });
-  const [users, setUsers] = useState<User[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [attendance, setAttendance] = useState<Attendance[]>([]);
-  const [notifications, setNotifications] = useState<UserNotification[]>([]);
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  };
 
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
   const [isPostCallWhatsAppOpen, setIsPostCallWhatsAppOpen] = useState(false);
@@ -107,176 +121,33 @@ export default function App() {
   const [activeCallVisit, setActiveCallVisit] = useState<Visit | null>(null);
   const [activeCallLead, setActiveCallLead] = useState<Lead | null>(null);
   const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
-  const [isAuthReady, setIsAuthReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
-  const [initStep, setInitStep] = useState<string>("Initializing...");
-  const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
   const [activeVisitFilters, setActiveVisitFilters] = useState<VisitFilters | null>(null);
   const [activeLeadFilters, setActiveLeadFilters] = useState<LeadFilters | null>(null);
   const [followUpPromptData, setFollowUpPromptData] = useState<{ leadId?: string, visitId?: string, projectId: string, clientName: string } | null>(null);
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [preferredFollowUpMethod, setPreferredFollowUpMethod] = useState<FollowUpMethod>('call');
-  const [stats, setStats] = useState<any>(null);
   const [isVisitCompletionModalOpen, setIsVisitCompletionModalOpen] = useState(false);
   const [completionVisit, setCompletionVisit] = useState<Visit | null>(null);
   const [completionLead, setCompletionLead] = useState<Lead | null>(null);
-  const lastSyncTime = React.useRef<string | null>(null);
-  const isFetching = React.useRef(false);
-  const repairRun = React.useRef(false);
 
   useEffect(() => {
-    if (isInitialLoadDone && user && visits.length > 0 && leads.length > 0 && !repairRun.current) {
-      const visitsWithoutLeads = visits.filter(v => !v.leadId);
-      if (visitsWithoutLeads.length > 0) {
-        repairRun.current = true;
-        console.log(`Found ${visitsWithoutLeads.length} visits without leads. Repairing...`);
-        
-        visitsWithoutLeads.forEach(async (v) => {
-          const normalizedMobile = normalizePhoneNumber(v.mobile);
-          const newLead: Lead = {
-            id: generateId(),
-            name: v.client_name,
-            mobile: normalizedMobile,
-            email: v.email || '',
-            source: v.source || 'Direct Site Visit',
-            projectId: v.projectId,
-            assignedTo: user.id || 0,
-            assignedToName: user.name,
-            quality: v.status || 'pending',
-            status: (v.visit_status === 'completed' ? 'visit_done' : 'visit_scheduled') as LeadStatus,
-            budget: v.budget || '',
-            property_interest: v.property_interest || '',
-            created_at: v.visit_date + 'T00:00:00Z',
-            updated_at: new Date().toISOString(),
-            stats: {
-              calls_attempted: 0,
-              calls_answered: 0,
-              visits_planned: (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled') ? 1 : 0,
-              visits_done: v.visit_status === 'completed' ? 1 : 0,
-              followups_done: 0
-            }
-          };
-
-          // Update visit with new leadId
-          const updatedVisit = { ...v, leadId: newLead.id };
-          
-          await api.save('leads', newLead);
-          await api.save('visits', updatedVisit);
-          
-          // Add auto-creation remark
-          const autoRemark: Remark = {
-            id: generateId(),
-            text: `Manual repair: Auto lead create as site visit ${v.visit_status === 'completed' ? 'completed' : 'scheduled'}`,
-            by: 'System Repair',
-            at: new Date().toISOString()
-          };
-          await api.save('remarks', { ...autoRemark, targetId: newLead.id });
-
-          setLeads(prev => [newLead, ...prev]);
-          setVisits(prev => prev.map(vis => vis.id === v.id ? updatedVisit : vis));
-        });
+    if (appData?.fullData?.currentUser) {
+      const serverUser = appData.fullData.currentUser;
+      if (JSON.stringify(serverUser) !== JSON.stringify(user)) {
+        setUser(serverUser);
+        storage.saveAuth(serverUser);
       }
     }
-  }, [isInitialLoadDone, user, visits, leads]);
+  }, [appData]);
 
-  const loadAllData = React.useCallback(async (force = false) => {
-    const token = localStorage.getItem('crm_token');
-    if (!token) return;
-    if (isFetching.current) return;
-    isFetching.current = true;
 
-    try {
-      if (!lastSyncTime.current || force) {
-        setInitStep('Fetching Global Data...');
-        const [initData, fullData] = await Promise.all([
-          apiService.getInit(),
-          apiService.getData()
-        ]);
-        
-        setProjects(initData.projects || []);
-        setTemplates(initData.templates || []);
-        setSettings(initData.settings || {});
-        setWorkflows(initData.workflows || []);
-        setLeads(fullData.leads || []);
-        setVisits(fullData.visits || []);
-        setFollowups(fullData.followups || []);
-        setCallLogs(fullData.call_logs || []);
-        setActivities(fullData.activities || []);
-        setAttendance(fullData.attendance || []);
-        setNotifications(fullData.notifications || []);
-        setWebhookConfigs(fullData.webhook_configs || []);
-        setUsers(fullData.users || []);
-        
-        console.log(`[Data Load Success] Leads: ${fullData.leads?.length}, Visits: ${fullData.visits?.length}`);
-        
-        if (fullData.currentUser) {
-          setUser(fullData.currentUser);
-          storage.saveAuth(fullData.currentUser);
-        }
-        
-        lastSyncTime.current = new Date().toISOString();
-        
-        // Fetch stats separately
-        apiService.getStats().then(setStats).catch(console.error);
-      } else {
-        const delta = await apiService.sync(lastSyncTime.current);
-        
-        if (delta.leads?.length > 0) {
-          setLeads(prev => {
-            const next = [...prev];
-            delta.leads.forEach((l: Lead) => {
-              const idx = next.findIndex(p => p.id === l.id);
-              if (idx > -1) next[idx] = l;
-              else next.unshift(l);
-            });
-            return next;
-          });
-        }
-        
-        if (delta.visits?.length > 0) {
-          setVisits(prev => {
-            const next = [...prev];
-            delta.visits.forEach((v: Visit) => {
-              const idx = next.findIndex(p => p.id === v.id);
-              if (idx > -1) next[idx] = v;
-              else next.unshift(v);
-            });
-            return next;
-          });
-        }
-
-        if (delta.followups?.length > 0) {
-          setFollowups(prev => {
-            const next = [...prev];
-            delta.followups.forEach((f: FollowUp) => {
-              const idx = next.findIndex(p => p.id === f.id);
-              if (idx > -1) next[idx] = f;
-              else next.unshift(f);
-            });
-            return next;
-          });
-        }
-
-        if (delta.notifications?.length > 0) {
-          setNotifications(prev => [...delta.notifications, ...prev].slice(0, 50));
-        }
-
-        lastSyncTime.current = delta.serverTime;
-        
-        // Refresh stats on changes
-        if (delta.leads?.length > 0) {
-          apiService.getStats().then(setStats).catch(console.error);
-        }
-      }
-      
-      setIsInitialLoadDone(true);
-    } catch (e: any) {
-      console.error('[Sync] Failed:', e.message);
-      if (e.message.includes('401')) handleLogout();
-    } finally {
-      isFetching.current = false;
-    }
-  }, []);
+  const handleLogout = () => {
+    localStorage.removeItem('crm_token');
+    storage.clearAuth();
+    setUser(null);
+    window.location.reload();
+  };
 
   useEffect(() => {
     // Viewport height fix for iOS Safari
@@ -433,7 +304,7 @@ export default function App() {
     }
   }, [filteredLeads.length, filteredVisits.length, user?.id]);
 
-  if (!isAuthReady || !isInitialLoadDone) {
+  if (isDataLoading && localStorage.getItem('crm_token')) {
     return (
       <div className="min-h-[100dvh] bg-[#1C1207] flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-4 max-w-md text-center">
@@ -518,7 +389,7 @@ export default function App() {
     if (!fup) return;
 
     const newFollowups = followups.map(f => f.id === id ? { ...f, ...updates } : f);
-    setFollowups(newFollowups);
+    // Manual update removed
     const updatedFup = newFollowups.find(f => f.id === id);
     if (updatedFup) api.save('followups', updatedFup);
 
@@ -531,7 +402,7 @@ export default function App() {
            followups_done: (lead.stats.followups_done || 0) + 1
          };
          const updatedLead = { ...lead, stats: newStats, updated_at: new Date().toISOString() };
-         setLeads(leads.map(l => l.id === lead.id ? updatedLead : l));
+         // Manual update removed
          api.save('leads', updatedLead);
        }
     }
@@ -581,9 +452,9 @@ export default function App() {
     toast.success('Logged out successfully');
   };
 
-  const navigate = (page: Page, id?: string, filters?: any) => {
+  const navigate = (page: Page, id: string | null = null, filters: any = null) => {
     setCurrentPage(page);
-    if (id) setSelectedVisitId(id);
+    setSelectedVisitId(id);
     
     if (page === 'visits') {
       setActiveVisitFilters(filters || null);
@@ -596,8 +467,10 @@ export default function App() {
     
     if (page !== 'whatsapp') setGeneratedMessage(null);
     setIsSidebarOpen(false);
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const isInitialLoadDone = !isDataLoading;
 
   const logActivity = (type: ActivityType, targetId: string, targetName: string, details?: string) => {
     if (!user) return;
@@ -613,7 +486,7 @@ export default function App() {
       details: details || null
     };
     const newActivities = [activity, ...activities];
-    setActivities(newActivities);
+    // Manual update removed
     api.save('activities', activity);
   };
 
@@ -720,7 +593,7 @@ export default function App() {
     };
 
     const newLogs = [log, ...callLogs];
-    setCallLogs(newLogs);
+    // Manual update removed
     api.save('call_logs', log);
     
     // Log activity
@@ -749,7 +622,7 @@ export default function App() {
       };
 
       const newLeads = leads.map(l => l.id === lead.id ? updatedLead : l);
-      setLeads(newLeads);
+      // Manual state update removed; TanStack Query will handle refetch
       api.save('leads', updatedLead);
 
       if (shouldMoveToCold) {
@@ -774,7 +647,7 @@ export default function App() {
     }
     if (!confirm(`Are you sure you want to delete ${ids.length} leads?`)) return;
     
-    setLeads(leads.filter(l => !ids.includes(l.id)));
+    // Manual state update removed; TanStack Query will handle refetch
     ids.forEach(id => api.delete('leads', id));
     toast.success(`${ids.length} leads deleted`);
   };
@@ -794,7 +667,7 @@ export default function App() {
       updated_at: new Date().toISOString() 
     } : l);
     
-    setLeads(newLeads);
+    // Manual state update removed; TanStack Query will handle refetch
     ids.forEach(id => {
       const lead = leads.find(l => l.id === id);
       if (lead) {
@@ -814,7 +687,7 @@ export default function App() {
           status: 'pending',
           created_at: new Date().toISOString()
         };
-        setFollowups(prev => [takeoverFup, ...prev]);
+        // Manual update removed
         api.save('followups', takeoverFup);
       }
     });
@@ -833,11 +706,8 @@ export default function App() {
     const newCallLogs = callLogs.map(c => c.leadId === leadId ? { ...c, projectId: targetProjectId } : c);
     const newActivities = activities.map(a => a.targetId === leadId || visits.some(v => v.leadId === leadId && v.id === a.targetId) ? { ...a, projectId: targetProjectId } : a);
 
-    setLeads(newLeads);
-    setVisits(newVisits);
-    setFollowups(newFollowups);
-    setCallLogs(newCallLogs);
-    setActivities(newActivities);
+    // Manual state update removed; TanStack Query will handle refetch
+    // Manual update removed
 
     // Save changes for the transferred lead and its related entities
     const lead = leads.find(l => l.id === leadId);
@@ -908,7 +778,7 @@ export default function App() {
       by: user.name,
       at: new Date().toISOString()
     };
-    setRemarks(prev => ({ ...prev, [lead.id]: [remark, ...(prev[lead.id] || [])] }));
+    // Manual update removed
     api.save('remarks', { ...remark, targetId: lead.id });
 
     setIsPostCallWhatsAppOpen(false);
@@ -925,7 +795,7 @@ export default function App() {
     
     if (newQuality) {
       const updatedLead = { ...lead, quality: newQuality, updated_at: new Date().toISOString() };
-      setLeads(leads.map(l => l.id === leadId ? updatedLead : l));
+      // Manual state update removed
       api.save('leads', updatedLead);
       
       const remark: Remark = {
@@ -934,7 +804,7 @@ export default function App() {
         by: "Gemini AI",
         at: new Date().toISOString()
       };
-      setRemarks(prev => ({ ...prev, [leadId]: [remark, ...(prev[leadId] || [])] }));
+      // Manual update removed
       api.save('remarks', { ...remark, targetId: leadId });
       
       toast.success(`AI updated lead quality to ${newQuality}`, { id: 'ai-scoring' });
@@ -975,7 +845,7 @@ export default function App() {
       }
     }
 
-    setLeads(updatedLeads);
+    // Manual state update removed
     toast.success(`Successfully analyzed ${successCount} leads`, { id: 'bulk-ai' });
   };
 
@@ -1021,13 +891,7 @@ export default function App() {
           notifications={notifications}
           attendance={attendance}
           onAttendanceUpdate={(record) => {
-            setAttendance(prev => {
-              const exists = prev.findIndex(a => a.id === record.id);
-              if (exists > -1) {
-                return prev.map((a, i) => i === exists ? record : a);
-              }
-              return [record, ...prev];
-            });
+            // Manual update removed
           }}
         />
         
@@ -1116,7 +980,7 @@ export default function App() {
                   const initialUpdate = { ...lead, status, updated_at: new Date().toISOString() };
                   const processedLead = runWorkflowEngine('status_changed', initialUpdate);
                   
-                  setLeads(leads.map(l => l.id === id ? processedLead : l));
+                  // Manual update removed
                   api.save('leads', processedLead);
                   logActivity('lead_status_changed', id, lead.name, `Status changed from ${lead.status} to ${status}`);
                   toast.success('Lead status updated');
@@ -1170,7 +1034,7 @@ export default function App() {
                   }
                   return;
                 }
-                setLeads(leads.map(lead => lead.id === l.id ? l : lead));
+                // Manual state update removed
                 api.save('leads', l);
               }}
               onAddVisit={(l) => navigate('add-visit', l.id)}
@@ -1182,13 +1046,13 @@ export default function App() {
                 );
                 if (isDuplicate) return;
 
-                setFollowups([f, ...followups]);
+                // Manual update removed
                 api.save('followups', f);
                 toast.success('Follow-up scheduled');
               }}
               onUpdateFollowUp={handleUpdateFollowUp}
               onAddRemark={(r) => {
-                setRemarks(prev => ({ ...prev, [selectedVisitId]: [r, ...(prev[selectedVisitId] || [])] }));
+                // Manual update removed
                 api.save('remarks', { ...r, targetId: selectedVisitId });
               }}
               onAIScore={() => {
@@ -1203,7 +1067,7 @@ export default function App() {
               onNavigate={navigate}
               onTransferLead={handleTransferLead}
               onQuickVisitSave={(v) => {
-                setVisits(prev => [v, ...prev]);
+                // Manual update removed
                 api.save('visits', v);
                 logActivity('visit_scheduled', v.id, v.client_name, `Quick Schedule: ${v.visit_date}`);
               }}
@@ -1221,13 +1085,13 @@ export default function App() {
               onCall={handleCall}
               onWhatsApp={handleWhatsApp}
               onDelete={(id) => {
-                setVisits(visits.filter(v => v.id !== id));
+                // Manual state update removed
                 api.delete('visits', id);
                 toast.success('Visit deleted');
               }}
               onUpdateVisit={(v) => {
                 const oldVisit = visits.find(vis => vis.id === v.id);
-                setVisits(visits.map(vis => vis.id === v.id ? v : vis));
+                // Manual state update removed
                 api.save('visits', v);
                 
                 if (v.leadId && oldVisit) {
@@ -1245,7 +1109,7 @@ export default function App() {
                     }
 
                     if (leadChanged) {
-                      setLeads(leads.map(l => l.id === lead.id ? updatedLead : l));
+                      // Manual state update removed
                       api.save('leads', updatedLead);
                     }
                   }
@@ -1302,7 +1166,7 @@ export default function App() {
                     };
                     
                     await api.save('leads', newLead);
-                    setLeads(prev => [newLead, ...prev]);
+                    // Manual state update removed
                     targetLeadId = newLead.id;
                     v.leadId = newLead.id;
                     
@@ -1314,15 +1178,12 @@ export default function App() {
                       at: new Date().toISOString()
                     };
                     await api.save('remarks', { ...autoRemark, targetId: newLead.id });
-                    setRemarks(prev => ({ ...prev, [newLead.id]: [autoRemark] }));
+                    // Manual update removed
                   }
                 }
 
                 await api.save('visits', v);
-                setVisits(prev => {
-                  const exists = prev.some(vis => vis.id === v.id);
-                  return exists ? prev : [v, ...prev];
-                });
+                // Manual update removed
                 
                 if (targetLeadId) {
                   const lead = leads.find(l => l.id === targetLeadId);
@@ -1337,7 +1198,7 @@ export default function App() {
                         visits_done: v.visit_status === 'completed' ? currentStats.visits_done + 1 : currentStats.visits_done
                       }
                     };
-                    setLeads(leads.map(l => l.id === targetLeadId ? updatedLead : l));
+                    // Manual state update removed
                     api.save('leads', updatedLead);
                   }
                 }
@@ -1345,7 +1206,7 @@ export default function App() {
                 logActivity('visit_scheduled', v.id, v.client_name, `Date: ${v.visit_date}`);
 
                 if (r) {
-                  setRemarks(prev => ({ ...prev, [v.id]: [r] }));
+                  // Manual update removed
                   api.save('remarks', { ...r, targetId: v.id });
                 }
                 navigate('detail', v.id);
@@ -1374,7 +1235,7 @@ export default function App() {
                 }
                 
                 await api.save('visits', newVis);
-                setVisits(prev => [newVis, ...prev]);
+                // Manual update removed
                 // Update lead stats if necessary
                 if (newVis.leadId) {
                   const lead = leads.find(l => l.id === newVis.leadId);
@@ -1387,14 +1248,14 @@ export default function App() {
                         visits_planned: currentStats.visits_planned + 1
                       }
                     };
-                    setLeads(leads.map(l => l.id === newVis.leadId ? updatedLead : l));
+                    // Manual state update removed
                     api.save('leads', updatedLead);
                   }
                 }
               }}
               onUpdateVisit={(v) => {
                 const oldVisit = visits.find(vis => vis.id === v.id);
-                setVisits(visits.map(vis => vis.id === v.id ? v : vis));
+                // Manual update removed
                 api.save('visits', v);
                 
                 if (v.leadId && oldVisit) {
@@ -1437,14 +1298,14 @@ export default function App() {
                     }
 
                     if (leadChanged) {
-                      setLeads(leads.map(l => l.id === lead.id ? updatedLead : l));
+                      // Manual state update removed
                       api.save('leads', updatedLead);
                     }
                   }
                 }
               }}
               onUpdateLead={(updatedLead) => {
-                setLeads(leads.map(l => l.id === updatedLead.id ? updatedLead : l));
+                // Manual state update removed
                 api.save('leads', updatedLead);
               }}
               onAddFollowUp={(f) => {
@@ -1455,7 +1316,7 @@ export default function App() {
                 );
                 if (isDuplicate) return;
 
-                setFollowups([f, ...followups]);
+                // Manual update removed
                 api.save('followups', f);
                 logActivity('followup_scheduled', selectedVisitId, visits.find(v => v.id === selectedVisitId)?.client_name || 'Visit', `Follow-up scheduled for ${f.date}${f.purpose ? `: ${f.purpose}` : ''}`);
                 
@@ -1468,7 +1329,7 @@ export default function App() {
                     at: new Date().toISOString(),
                     type: 'remark'
                   };
-                  setRemarks(prev => ({ ...prev, [selectedVisitId]: [remark, ...(prev[selectedVisitId] || [])] }));
+                  // Manual update removed
                   api.save('remarks', { ...remark, targetId: selectedVisitId });
                 }
                 
@@ -1524,15 +1385,12 @@ export default function App() {
               users={users}
               onSave={(c) => {
                 const exists = webhookConfigs.find(conf => conf.id === c.id);
-                setWebhookConfigs(exists 
-                  ? webhookConfigs.map(conf => conf.id === c.id ? c : conf)
-                  : [...webhookConfigs, c]
-                );
+                // Manual update removed
                 api.save('webhook_configs', c);
                 toast.success(exists ? 'Webhook updated' : 'Webhook created');
               }}
               onDelete={(id) => {
-                setWebhookConfigs(webhookConfigs.filter(c => c.id !== id));
+                // Manual update removed
                 api.delete('webhook_configs', id);
                 toast.success('Webhook deleted');
               }}
@@ -1567,15 +1425,12 @@ export default function App() {
               templates={templates}
               onSave={(t) => {
                 const exists = templates.find(temp => temp.id === t.id);
-                setTemplates(exists 
-                  ? templates.map(temp => temp.id === t.id ? t : temp)
-                  : [...templates, t]
-                );
+                // Manual update removed
                 api.save('templates', t);
                 toast.success(exists ? 'Template updated' : 'Template created');
               }}
               onDelete={(id) => {
-                setTemplates(templates.filter(t => t.id !== id));
+                // Manual update removed
                 api.delete('templates', id);
                 toast.success('Template deleted');
               }}
@@ -1596,18 +1451,12 @@ export default function App() {
                 webhookConfigs
               }}
               onSaveSettings={(s) => {
-                setSettings(s);
+                // Manual update removed
                 api.save('settings', s);
                 toast.success('Settings saved');
               }}
               onAddUser={(nu) => {
-                setUsers(prev => {
-                  const exists = prev.find(u => u.id === nu.id);
-                  if (exists) {
-                    return prev.map(u => u.id === nu.id ? nu : u);
-                  }
-                  return [...prev, nu];
-                });
+                // Manual update removed
                 
                 // If it's the currently logged-in user, update local state immediately for fast UI
                 if (user && nu.id === user.id) {
@@ -1622,18 +1471,12 @@ export default function App() {
                 });
               }}
               onRemoveUser={(id) => {
-                setUsers(prev => prev.filter(u => u.id !== id));
+                // Manual update removed
                 api.delete('users', id.toString());
                 toast.success('User removed');
               }}
               onAddProject={(np) => {
-                setProjects(prev => {
-                  const exists = prev.find(p => p.id === np.id);
-                  if (exists) {
-                    return prev.map(p => p.id === np.id ? np : p);
-                  }
-                  return [...prev, np];
-                });
+                // Manual update removed
                 toast.promise(api.save('projects', np.id, np), {
                   loading: 'Saving project...',
                   success: 'Project saved to database',
@@ -1641,7 +1484,7 @@ export default function App() {
                 });
               }}
               onRemoveProject={(id) => {
-                setProjects(prev => prev.filter(p => p.id !== id));
+                // Manual update removed
                 api.delete('projects', id);
                 toast.success('Project removed');
               }}
@@ -1658,12 +1501,12 @@ export default function App() {
               workflows={workflows}
               onSave={(wf) => {
                 const exists = workflows.find(w => w.id === wf.id);
-                setWorkflows(exists ? workflows.map(w => w.id === wf.id ? wf : w) : [wf, ...workflows]);
+                // Manual update removed
                 api.save('workflows', wf);
                 toast.success(exists ? 'Workflow updated' : 'Workflow created');
               }}
               onDelete={(id) => {
-                setWorkflows(workflows.filter(w => w.id !== id));
+                // Manual update removed
                 api.delete('workflows', id);
                 toast.success('Workflow deleted');
               }}
@@ -1691,7 +1534,7 @@ export default function App() {
             // Run workflow engine BEFORE saving to avoid race conditions
             const processedLead = runWorkflowEngine('lead_created', l);
             
-            setLeads([processedLead, ...leads]);
+            // Manual state update removed
             toast.promise(api.save('leads', processedLead), {
               loading: 'Saving lead...',
               success: 'Lead saved to database',
@@ -1792,7 +1635,7 @@ export default function App() {
           user={user}
           initialMethod={preferredFollowUpMethod}
           onSave={(f) => {
-            setFollowups([f, ...followups]);
+            // Manual update removed
             api.save('followups', f);
             
             setIsFollowUpModalOpen(false);
@@ -1840,16 +1683,7 @@ export default function App() {
 
               const savePromise = (async () => {
                 // 1. Update State & Save
-                setVisits(prev => {
-                  const exists = prev.some(v => v.id === updatedVisit.id);
-                  return exists ? prev.map(v => v.id === updatedVisit.id ? updatedVisit : v) : [updatedVisit, ...prev];
-                });
-                await api.save('visits', updatedVisit);
-
-                setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l));
-                await api.save('leads', updatedLead);
-
-                setActivities(prev => [activity, ...prev]);
+                // Manual state updates removed
                 await api.save('activities', activity);
 
                 // 2. Handle Next Followup
@@ -1867,7 +1701,7 @@ export default function App() {
                     method: 'call',
                     created_at: new Date().toISOString()
                   };
-                  setFollowups(prev => [f, ...prev]);
+                  // Manual update removed
                   await api.save('followups', f);
                 }
               })();

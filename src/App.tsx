@@ -419,21 +419,17 @@ export default function App() {
 
   const handleLogout = () => {
     try {
-      localStorage.removeItem('crm_token');
       storage.clearAuth();
       setUser(null);
       if (queryClient) {
         queryClient.clear();
       }
       toast.success('Logged out successfully');
-      // Use a slightly longer timeout and direct reload if needed
       setTimeout(() => {
-        window.location.href = '/'; // Force a full page reload to the root
+        window.location.href = '/'; 
       }, 300);
     } catch (error) {
       console.error("Logout error:", error);
-      // Fallback: at least clear storage and redirect
-      localStorage.removeItem('crm_token');
       storage.clearAuth();
       window.location.href = '/';
     }

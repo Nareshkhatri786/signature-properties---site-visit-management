@@ -20,6 +20,14 @@ export const storage = {
       console.warn("localStorage write failed:", e);
     }
   },
+  clearAuth: () => {
+    try {
+      localStorage.removeItem('sf_auth');
+      localStorage.removeItem('crm_token');
+    } catch (e) {
+      console.warn("localStorage clear failed:", e);
+    }
+  },
   
   // Legacy method placeholders to prevent breakages if called
   saveData: async (data: any) => {

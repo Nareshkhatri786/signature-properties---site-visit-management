@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
   Filter, 
@@ -140,7 +141,7 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
           <button
             onClick={() => setViewMode('list')}
             className={cn(
-              "flex-1 lg:flex-none flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
+              "flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
               viewMode === 'list' ? "bg-white text-[#C9A84C] shadow-sm" : "text-[#9A8262] hover:text-[#C9A84C]"
             )}
           >
@@ -149,7 +150,7 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
           <button
             onClick={() => setViewMode('kanban')}
             className={cn(
-              "flex-1 lg:flex-none flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
+              "flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
               viewMode === 'kanban' ? "bg-white text-[#C9A84C] shadow-sm" : "text-[#9A8262] hover:text-[#C9A84C]"
             )}
           >
@@ -157,24 +158,35 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
           </button>
         </div>
 
+        {/* Mobile Toggle Filters */}
+        <button 
+          onClick={() => {
+            const f = document.getElementById('leads-filters');
+            if (f) f.classList.toggle('hidden');
+          }}
+          className="lg:hidden flex items-center justify-center gap-2 bg-white border border-[#E6D8B8] text-[#9A8262] px-4 py-2.5 rounded-xl font-bold text-sm"
+        >
+          <Filter size={18} /> {search || status || quality || source || projectIdFilter || assignedToFilter || followUpFilter ? 'Filters Active' : 'Filter & Search'}
+        </button>
+
         {/* Filters */}
-        <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 items-end flex-1">
+        <div id="leads-filters" className="hidden lg:grid bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-4 shadow-sm grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 items-end flex-1">
           <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Search</label>
+            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Search</label>
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A8262]" />
               <input 
                 type="text" 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Name or mobile..."
+                placeholder="Name/mobile..."
                 className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-[#C9A84C]"
               />
             </div>
           </div>
   
           <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Status</label>
+            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Status</label>
             <select 
               value={status}
               onChange={(e) => setStatus(e.target.value as LeadStatus | '')}
@@ -191,7 +203,7 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
           </div>
   
           <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Quality</label>
+            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Quality</label>
             <select 
               value={quality}
               onChange={(e) => setQuality(e.target.value as LeadQuality | '')}
@@ -205,7 +217,7 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
           </div>
   
           <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Source</label>
+            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Source</label>
             <select 
               value={source}
               onChange={(e) => setSource(e.target.value)}
@@ -219,7 +231,7 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
           </div>
   
           <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Project</label>
+            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Project</label>
             <select 
               value={projectIdFilter}
               onChange={(e) => setProjectIdFilter(e.target.value)}
@@ -231,9 +243,9 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
               ))}
             </select>
           </div>
-
+ 
           <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Follow-up</label>
+            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Follow-up</label>
             <select 
               value={followUpFilter}
               onChange={(e) => setFollowUpFilter(e.target.value)}
@@ -247,9 +259,9 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
               <option value="none">⚪ No Follow-up</option>
             </select>
           </div>
-
+ 
           <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">User</label>
+            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">User</label>
             <select 
               value={assignedToFilter}
               onChange={(e) => setAssignedToFilter(e.target.value === '' ? '' : Number(e.target.value))}
@@ -273,11 +285,14 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
                 setFollowUpFilter('');
                 setSelectedIds([]); 
               }}
-              className="flex-1 h-[38px] flex items-center justify-center gap-2 text-[#9A8262] text-sm font-semibold hover:text-[#2A1C00] transition-colors"
+              className="flex-1 h-[38px] flex items-center justify-center gap-2 text-[#9A8262] text-[12px] font-bold hover:text-[#2A1C00] transition-colors"
             >
               <X size={14} /> Reset
             </button>
           </div>
+        </div>
+      </div>
+       </div>
         </div>
       </div>
 
@@ -351,9 +366,12 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
         <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
         {/* Mobile View: Card List */}
         <div className="md:hidden divide-y divide-[#E6D8B8]/50">
-          {filteredLeads.map(l => (
-            <div 
-              key={l.id} 
+          {filteredLeads.map((l, idx) => (
+            <motion.div 
+              key={l.id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: Math.min(idx * 0.03, 0.3) }}
               className={cn(
                 "p-4 active:bg-[#C9A84C]/5 transition-colors",
                 selectedIds.includes(l.id) && "bg-[#C9A84C]/5"
@@ -414,7 +432,7 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
                   </button>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
 

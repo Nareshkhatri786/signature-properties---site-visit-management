@@ -20,5 +20,30 @@
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
+
+  /* Custom Utilities for Mobile UX */
+  .mobile-modal-content {
+    max-height: calc(100dvh - 40px);
+    @apply flex flex-col;
+  }
+
+  .safe-bottom {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+
+  .glass-effect {
+    @apply backdrop-blur-md bg-white/80 border border-white/20;
+  }
+
+  /* Custom scrollbar for cleaner mobile look */
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-[#C9A84C]/20 rounded-full;
+  }
 }
 

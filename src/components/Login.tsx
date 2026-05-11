@@ -89,7 +89,8 @@ export default function Login({ onLogin, users }: LoginProps) {
             </div>
           </div>
 
-          <button
+          <motion.button
+            whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={isLoading}
             className="w-full bg-gradient-to-r from-[#C9A84C] to-[#E8C97A] text-[#1C1207] font-bold py-3 rounded-lg shadow-[0_4px_16px_rgba(201,168,76,0.3)] hover:translate-y-[-1px] hover:shadow-[0_6px_20px_rgba(201,168,76,0.45)] transition-all flex items-center justify-center gap-2 text-sm tracking-widest uppercase disabled:opacity-50"
@@ -99,7 +100,7 @@ export default function Login({ onLogin, users }: LoginProps) {
                 Login <ArrowRight size={16} />
               </>
             )}
-          </button>
+          </motion.button>
         </form>
 
         <p className="text-center text-[#C9A84C]/35 text-[11px] mt-8">

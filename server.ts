@@ -9,6 +9,8 @@ import { setupMISReports, generateDailyMISReport, generateWeekendMISReport, gene
 import { normalizePhoneNumber } from "./src/lib/phoneUtils.js";
 import webPush from "web-push";
 import dotenv from "dotenv";
+import { Server } from "socket.io";
+import { createServer } from "http";
 dotenv.config();
 
 const PUBLIC_VAPID_KEY = process.env.PUBLIC_VAPID_KEY || "BLraqx6JI2_b6uK3Q83waVcP2n8JXaAhzdPWrVJnqHhfLhusM8AextWDWwPx0_y51Ua9XxY-g-D4FvgJomgMpBE";
@@ -147,7 +149,60 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
 
 async function startServer() {
   const app = express();
+  const httpServer = createServer(app);
+  const io = new Server(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+
   const PORT = parseInt(process.env.PORT || "3000");
+
+  // Track connected users
+  const userSockets = new Map<string, string[]>();
+
+  io.use((socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (!token) return next(new Error("Authentication error"));
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      (socket as any).userId = decoded.id;
+      next();
+    } catch (err) {
+      next(new Error("Authentication error"));
+    }
+  });
+
+  io.on("connection", (socket) => {
+    const userId = (socket as any).userId;
+    if (userId) {
+      const current = userSockets.get(String(userId)) || [];
+      userSockets.set(String(userId), [...current, socket.id]);
+      console.log(`[Socket] User ${userId} connected (${socket.id})`);
+    }
+
+    socket.on("disconnect", () => {
+      if (userId) {
+        const current = userSockets.get(String(userId)) || [];
+        userSockets.set(String(userId), current.filter(id => id !== socket.id));
+        console.log(`[Socket] User ${userId} disconnected`);
+      }
+    });
+  });
+
+  // Global emitter helper
+  const notifyChanges = (type: string, data: any, targetUserId?: string) => {
+    if (targetUserId) {
+      io.to(targetUserId).emit("data_update", { type, data });
+    } else {
+      io.emit("data_update", { type, data });
+    }
+  };
+
+  // Inject io into app for routes
+  (app as any).io = io;
+  (app as any).notifyChanges = notifyChanges;
 
   app.use(express.json({ limit: "50mb" }));
   app.use((req, res, next) => {
@@ -474,6 +529,7 @@ async function startServer() {
             [fupId, d.id, d.projectId, tenMinsLater.split('T')[0], formatMySQLDate(tenMinsLater), `Welcome call for ${d.source || 'New'} Lead`]
           );
         }
+        (app as any).notifyChanges("leads", d);
       } else if (col === "visits") {
         const connection = await pool.getConnection();
         try {
@@ -534,6 +590,7 @@ async function startServer() {
         } finally {
           connection.release();
         }
+        (app as any).notifyChanges("visits", data);
       } else if (col === "followups") {
         const connection = await pool.getConnection();
         try {
@@ -685,6 +742,7 @@ async function startServer() {
           [d.id, d.name, d.description||null, d.isActive?1:0, d.trigger, d.conditions||"[]", d.actions||"[]", formatMySQLDate(d.createdAt||new Date().toISOString()), formatMySQLDate(new Date().toISOString())]
         );
       }
+      (app as any).notifyChanges(col, data);
       res.json({ success: true });
     } catch (e: any) {
       console.error(`POST /api/save error (${col}):`, e);
@@ -705,6 +763,7 @@ async function startServer() {
       const table = tableMap[col];
       if (!table) return res.status(400).json({ error: "Unknown collection" });
       await execute(`DELETE FROM ${table} WHERE id = ?`, [id]);
+      (app as any).notifyChanges(col, { id, deleted: true });
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -746,6 +805,7 @@ async function startServer() {
          ON DUPLICATE KEY UPDATE text=VALUES(text)`,
         [remark.id, targetId, remark.text, remark.by||"", formatMySQLDate(remark.at||new Date().toISOString()), remark.type||"remark", remark.category||"general", remark.sentiment||"neutral"]
       );
+      (app as any).notifyChanges("remarks", { ...remark, targetId });
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -762,6 +822,7 @@ async function startServer() {
       } else {
         await execute("UPDATE notifications SET `read` = 1 WHERE id = ?", [id]);
       }
+      (app as any).notifyChanges("notifications", { id });
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -1075,8 +1136,8 @@ async function startServer() {
     app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Server] Running on port ${PORT} (MySQL mode)`);
+  httpServer.listen(PORT, "0.0.0.0", () => {
+    console.log(`[Server] Running on port ${PORT} (Socket.io enabled)`);
     setDbPool(pool);
     setupMISReports();
     runAttendanceMaintenance();

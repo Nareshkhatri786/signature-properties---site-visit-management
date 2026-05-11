@@ -135,21 +135,22 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col">
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[92dvh] flex flex-col mx-auto">
         <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between shrink-0">
           <h3 className="font-['Cormorant_Garamond'] text-xl font-bold text-[#2A1C00] flex items-center gap-2">
             <UserPlus className="text-[#C9A84C]" />
             Add New Lead
           </h3>
-          <button onClick={onClose} className="text-[#9A8262] hover:text-[#2A1C00] transition-colors">
+          <button type="button" onClick={onClose} className="text-[#9A8262] hover:text-[#2A1C00] transition-colors p-1">
             <X size={24} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
-          <div className="p-6 space-y-5 flex-1">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-5 md:p-6 space-y-5">
+            {/* Form Content */}
             <div className="flex items-center justify-between bg-[#FDFAF2] p-3 rounded-xl border border-[#E6D8B8]">
-              <label className="text-xs font-bold text-[#9A8262] uppercase tracking-wider">Priority / Stars</label>
+              <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Priority / Stars</label>
               <div className="flex gap-1.5">
                 {[1, 2, 3].map((star) => (
                   <button
@@ -163,7 +164,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
                       className={cn(
                         star <= formData.priority 
                           ? "text-yellow-400 fill-yellow-400" 
-                          : "text-gray-300"
+                           : "text-gray-300"
                       )} 
                     />
                   </button>
@@ -172,7 +173,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Full Name *</label>
+              <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Full Name *</label>
               <div className="relative">
                 <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9A8262]" />
                 <input 
@@ -187,7 +188,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Mobile Number *</label>
+              <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Mobile Number *</label>
               <div className="relative flex items-center">
                 <Phone size={14} className="absolute left-3.5 text-[#9A8262]" />
                 <span className="absolute left-9 text-[10px] font-bold text-[#9A8262]/50 bg-[#F5F1E6] px-1 py-0.5 rounded border border-[#E6D8B8]/30 pointer-events-none">+91</span>
@@ -207,7 +208,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Property Interest (BHK)</label>
+              <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Property Interest (BHK)</label>
               <select 
                 value={formData.property_interest}
                 onChange={(e) => setFormData({ ...formData, property_interest: e.target.value })}
@@ -225,7 +226,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Quality</label>
+                <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Quality</label>
                 <select 
                   value={formData.quality}
                   onChange={(e) => setFormData({ ...formData, quality: e.target.value as LeadQuality })}
@@ -238,7 +239,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Assign To</label>
+                <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Assign To</label>
                 <select 
                   value={formData.assignedTo || ''}
                   onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value ? Number(e.target.value) : null })}
@@ -256,7 +257,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+              <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
                 <Tag size={12} /> Lead Source *
               </label>
               <select 
@@ -277,17 +278,17 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
 
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
               <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-blue-700 leading-relaxed">
-                <strong>Deduplication:</strong> The system will automatically check if a lead with the same mobile number already exists to prevent duplicates.
+              <p className="text-[10px] text-blue-700 leading-relaxed">
+                <strong>Deduplication:</strong> The system checks if a lead with the same mobile number already exists to prevent duplicates.
               </p>
             </div>
           </div>
 
-          <div className="p-6 border-t border-[#E6D8B8] bg-[#FDFAF2] flex gap-3 shrink-0">
+          <div className="p-4 md:p-6 border-t border-[#E6D8B8] bg-[#FDFAF2] flex gap-3 shrink-0">
             <button 
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 text-sm font-bold text-[#9A8262] hover:text-[#2A1C00] transition-colors"
+              className="flex-1 px-4 py-3 text-sm font-bold text-[#9A8262] hover:text-[#2A1C00] transition-colors"
             >
               Cancel
             </button>

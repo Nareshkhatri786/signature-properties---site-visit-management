@@ -17,7 +17,8 @@ import {
   Clock,
   Save,
   LayoutList,
-  Trello
+  Trello,
+  ChevronRight
 } from 'lucide-react';
 import { Visit, Remark, Page, LeadStatus, VisitStatus, LeadQuality, VisitFilters, User, Project, FollowUp, Lead } from '../types';
 import { cn, getLocalDateString } from '../lib/utils';
@@ -180,24 +181,35 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
         </div>
       </div>
 
+      {/* Mobile Toggle Filters */}
+      <button 
+        onClick={() => {
+          const f = document.getElementById('visits-filters');
+          if (f) f.classList.toggle('hidden');
+        }}
+        className="lg:hidden flex items-center justify-center gap-2 bg-white border border-[#E6D8B8] text-[#9A8262] px-4 py-2.5 rounded-xl font-bold text-sm"
+      >
+        <Filter size={18} /> {search || period || status || visitStatus || projectIdFilter || assignedToFilter || followUpFilter ? 'Filters Active' : 'Filter & Search'}
+      </button>
+
       {/* Filters */}
-      <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 items-end">
+      <div id="visits-filters" className="hidden lg:grid bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-4 shadow-sm grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 items-end flex-1">
         <div className="space-y-1.5">
-          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Search</label>
+          <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Search</label>
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A8262]" />
             <input 
               type="text" 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name or mobile..."
+              placeholder="Name/mobile..."
               className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-[#C9A84C]"
             />
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Period</label>
+          <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Period</label>
           <select 
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
@@ -211,10 +223,10 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Lead Status</label>
+          <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Lead Status</label>
           <select 
             value={status}
-            onChange={(e) => setStatus(e.target.value as LeadStatus | '')}
+            onChange={(e) => setStatus(e.target.value as LeadQuality | '')}
             className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
           >
             <option value="">All Status</option>
@@ -222,12 +234,11 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
             <option value="warm">🌡️ Warm</option>
             <option value="cold">❄️ Cold</option>
             <option value="pending">⏳ Pending</option>
-            <option value="disq">🚫 Disqualified</option>
           </select>
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Visit Status</label>
+          <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Visit Status</label>
           <select 
             value={visitStatus}
             onChange={(e) => setVisitStatus(e.target.value as VisitStatus | '')}
@@ -242,7 +253,7 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Project</label>
+          <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Project</label>
           <select 
             value={projectIdFilter}
             onChange={(e) => setProjectIdFilter(e.target.value)}
@@ -256,7 +267,7 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Follow-up</label>
+          <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Follow-up</label>
           <select 
             value={followUpFilter}
             onChange={(e) => setFollowUpFilter(e.target.value)}
@@ -272,7 +283,7 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">User</label>
+          <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">User</label>
           <select 
             value={assignedToFilter}
             onChange={(e) => setAssignedToFilter(e.target.value)}
@@ -295,7 +306,7 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
             setAssignedToFilter(''); 
             setFollowUpFilter('');
           }}
-          className="h-[38px] flex items-center justify-center gap-2 text-[#9A8262] text-sm font-semibold hover:text-[#2A1C00] transition-colors"
+          className="h-[38px] flex items-center justify-center gap-2 text-[#9A8262] text-[12px] font-bold hover:text-[#2A1C00] transition-colors"
         >
           <X size={14} /> Reset
         </button>
@@ -321,12 +332,15 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
         <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
         {/* Mobile View: Cards */}
         <div className="md:hidden divide-y divide-[#E6D8B8]/50">
-            {filteredVisits.length > 0 ? filteredVisits.map(v => {
+            {filteredVisits.length > 0 ? filteredVisits.map((v, idx) => {
               const lead = leads.find(l => l.id === v.leadId);
               const isLost = lead?.status === 'lost';
               return (
-                <div 
-                  key={v.id} 
+                <motion.div 
+                  key={v.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(idx * 0.03, 0.3) }}
                   className={cn("p-4 active:bg-[#C9A84C]/5 transition-colors border-l-4", {
                     'border-red-500': v.status === 'hot',
                     'border-orange-500': v.status === 'warm',
@@ -393,7 +407,7 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
                   </button>
                 </div>
               </div>
-                </div>
+                </motion.div>
               );
             }) : (
             <div className="p-10 text-center opacity-30">

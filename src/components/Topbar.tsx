@@ -3,6 +3,7 @@ import { Menu, Calendar, User as UserIcon } from 'lucide-react';
 import { User, Page, Attendance } from '../types';
 import { NotificationCenter } from './NotificationCenter';
 import { QuickAttendance } from './QuickAttendance';
+import { motion } from 'motion/react';
 import { apiService } from '../lib/api-service';
 import { format } from 'date-fns';
 
@@ -25,16 +26,26 @@ export default function Topbar({ user, title, onMenuClick, onNavigate, notificat
 
   return (
     <header className="h-[58px] bg-[#FFFDF6] border-b border-[#E6D8B8] flex items-center px-4 lg:px-7 gap-4 sticky top-0 z-30 shadow-[0_1px_0_#E6D8B8]">
-      <button 
+      <motion.button 
+        whileTap={{ scale: 0.95 }}
         onClick={onMenuClick}
         className="lg:hidden p-2 text-[#5C4820] hover:bg-[#F5EDD4] rounded-lg transition-colors"
       >
         <Menu size={20} />
-      </button>
+      </motion.button>
       
-      <h1 className="font-['Cormorant_Garamond'] text-xl font-semibold text-[#2A1C00] flex-1 truncate">
-        {title}
-      </h1>
+      <div className="flex-1 flex items-center gap-3 min-w-0">
+        <h1 className="font-['Cormorant_Garamond'] text-xl font-semibold text-[#2A1C00] truncate">
+          {title}
+        </h1>
+        <div className="flex items-center gap-1.5 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 hidden sm:flex">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+          </span>
+          <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Live</span>
+        </div>
+      </div>
 
       <div className="flex items-center gap-2 sm:gap-6">
         <QuickAttendance user={user} attendance={attendance} onUpdate={onAttendanceUpdate} />

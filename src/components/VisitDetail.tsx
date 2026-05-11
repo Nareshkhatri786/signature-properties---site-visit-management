@@ -469,8 +469,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
               )}
             </div>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
+           <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 w-full sm:w-auto">
           {isEditMode ? (
             <button 
               onClick={() => {
@@ -485,7 +484,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
                 toast.success('Visit details updated');
                 logActivity('lead_updated', `Updated client info (Mobile: ${normalizedMobile}) and priority`);
               }}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-green-700 transition-all text-sm"
+              className="col-span-2 sm:col-auto bg-green-600 text-white px-4 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-green-700 transition-all text-sm"
             >
               <Save size={18} /> Save Changes
             </button>
@@ -495,31 +494,31 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
                 setEditedVisit(visit);
                 setIsEditMode(true);
               }}
-              className="bg-white border border-[#C9A84C] text-[#C9A84C] px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-[#FDF6E3] transition-all text-sm"
+              className="bg-white border border-[#C9A84C] text-[#C9A84C] px-3 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#FDF6E3] transition-all text-sm"
             >
-              <Edit size={18} /> Edit Details
+              <Edit size={18} /> Edit
             </button>
           )}
           <button 
             onClick={onCall}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-green-700 transition-all text-sm"
+            className="bg-green-600 text-white px-3 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-green-700 transition-all text-sm"
           >
             <Phone size={18} /> Call
           </button>
           <button 
             onClick={() => setIsLoggingCall(!isLoggingCall)}
             className={cn(
-              "px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm transition-all text-sm",
+              "px-3 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm transition-all text-sm",
               isLoggingCall 
                 ? "bg-[#C9A84C] text-white" 
                 : "bg-white border border-green-600 text-green-600 hover:bg-green-50"
             )}
           >
-            <Phone size={18} className="rotate-12" /> {isLoggingCall ? 'Cancel Log' : 'Log Call'}
+            <Phone size={18} className="rotate-12" /> {isLoggingCall ? 'Cancel' : 'Log Call'}
           </button>
           <button 
             onClick={() => onNavigate('whatsapp', visit.id)}
-            className="bg-[#25D366] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-[#1DA851] transition-all text-sm"
+            className="bg-[#25D366] text-white px-3 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#1DA851] transition-all text-sm"
           >
             <MessageSquare size={18} /> WhatsApp
           </button>
@@ -528,15 +527,15 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
             <>
               <button 
                 onClick={() => setIsRescheduleModalOpen(true)}
-                className="bg-white border border-[#C9A84C] text-[#C9A84C] px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-[#FDF6E3] transition-all text-sm"
+                className="bg-white border border-[#C9A84C] text-[#C9A84C] px-3 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#FDF6E3] transition-all text-sm"
               >
                 <RefreshCw size={18} /> Reschedule
               </button>
               <button 
                 onClick={() => setIsCompletionModalOpen(true)}
-                className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-green-200 transition-all text-sm"
+                className="bg-green-100 text-green-700 px-3 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-green-200 transition-all text-sm"
               >
-                <CheckCircle2 size={18} /> Mark Completed
+                <CheckCircle2 size={18} /> Complete
               </button>
             </>
           )}
@@ -544,7 +543,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
           <div className="relative group">
             <button 
               onClick={() => setIsFollowUpModalOpen(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm hover:bg-blue-700 transition-all text-sm"
+              className="w-full bg-blue-600 text-white px-3 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-blue-700 transition-all text-sm"
             >
               <Bell size={18} /> Follow-up
             </button>
@@ -561,11 +560,12 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
           </div>
           <button 
             onClick={() => onNavigate('visits')}
-            className="bg-white border border-[#E6D8B8] text-[#9A8262] px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:text-[#2A1C00] transition-all text-sm"
+            className="bg-white border border-[#E6D8B8] text-[#9A8262] px-3 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 hover:text-[#2A1C00] transition-all text-sm"
           >
             <ArrowLeft size={18} /> Back
           </button>
         </div>
+     </div>
       </div>
 
       {/* Inline Call Logging Section */}

@@ -58,7 +58,7 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                 <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center shadow-sm border border-green-100">
                   <CheckCircle2 size={24} />
                 </div>
-                <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                   <X size={20} className="text-gray-400" />
                 </button>
               </div>
@@ -68,7 +68,7 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                 Recording details for visit with <span className="font-bold text-[#5C4820]">{visit.client_name}</span>.
               </p>
 
-              <div className="space-y-5 px-1">
+              <div className="space-y-5 px-1 pb-4">
                 {/* Back-entry Section */}
                 <div className="bg-[#FDFAF2] border border-[#E6D8B8] rounded-xl p-4">
                   <p className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -76,21 +76,21 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Date *</label>
+                      <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Date *</label>
                       <input
                         type="date"
                         value={data.visitDate}
                         onChange={(e) => setData({...data, visitDate: e.target.value})}
-                        className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                        className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Time</label>
+                      <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Time</label>
                       <input
                         type="time"
                         value={data.visitTime}
                         onChange={(e) => setData({...data, visitTime: e.target.value})}
-                        className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                        className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
                       />
                     </div>
                   </div>
@@ -98,13 +98,13 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
 
                 {/* Feedback */}
                 <div className="space-y-1.5">
-                  <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                  <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
                     <MessageSquare size={12} /> Client Feedback *
                   </label>
                   <textarea 
                     value={data.feedback}
                     onChange={(e) => setData({...data, feedback: e.target.value})}
-                    placeholder="Briefly describe what happened during the visit..."
+                    placeholder="Briefly describe what happened..."
                     className="w-full bg-white border border-[#E6D8B8] rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C] resize-none h-24"
                     required
                   />
@@ -113,13 +113,13 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                 {/* Outcome & Quality */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                      <Star size={12} /> Interest Level
+                    <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                      <Star size={12} /> Interest
                     </label>
                     <select 
                       value={data.interest}
                       onChange={(e) => setData({...data, interest: e.target.value as LeadQuality})}
-                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
                     >
                       <option value="hot">🔥 Hot</option>
                       <option value="warm">🌡️ Warm</option>
@@ -127,13 +127,13 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                      <AlertCircle size={12} /> Final Outcome
+                    <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertCircle size={12} /> Outcome
                     </label>
                     <select 
                       value={data.outcome}
                       onChange={(e) => setData({...data, outcome: e.target.value as VisitOutcome})}
-                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
                     >
                       <option value="booked">💰 Booked</option>
                       <option value="highly_interested">🌟 High Interest</option>
@@ -146,13 +146,13 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                 {/* Next Step */}
                 <div className="pt-4 border-t border-[#E6D8B8] space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                    <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
                       <ArrowRightLeft size={12} /> Next Action
                     </label>
                     <select 
                       value={data.nextStep}
                       onChange={(e) => setData({...data, nextStep: e.target.value as any})}
-                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                      className="w-full bg-white border border-[#E6D8B8] rounded-xl py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
                     >
                       <option value="none">No immediate action</option>
                       <option value="followup">📞 Schedule Follow-up Call</option>
@@ -186,17 +186,19 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
               </div>
             </div>
 
-            <div className="p-6 border-t border-[#F2ECD8] bg-[#FDFAF2] flex gap-3 shrink-0">
+            <div className="p-4 md:p-6 border-t border-[#F2ECD8] bg-[#FDFAF2] flex gap-3 shrink-0">
               <button 
+                type="button"
                 onClick={onClose}
-                className="flex-1 bg-white border border-[#E6D8B8] text-[#9A8262] font-bold py-3.5 rounded-xl hover:bg-[#FDFAF2] transition-colors text-sm"
+                className="flex-1 bg-white border border-[#E6D8B8] text-[#9A8262] font-bold py-3 rounded-xl hover:bg-[#FDFAF2] transition-colors text-sm"
               >
                 Cancel
               </button>
               <button 
+                type="button"
                 onClick={handleSubmit}
                 disabled={!data.feedback.trim() || !data.outcome || isSubmitting}
-                className="flex-[2] bg-[#C9A84C] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                className="flex-[2] bg-[#C9A84C] text-white font-bold py-3 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
               >
                 {isSubmitting ? (
                   <>

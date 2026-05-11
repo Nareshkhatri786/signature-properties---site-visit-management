@@ -39,6 +39,7 @@ import { useAppData, useStats, useSaveData } from './lib/queries';
 import { pushService, urlBase64ToUint8Array } from './lib/push-service';
 import { motion } from 'motion/react';
 import ErrorBoundary from './components/ErrorBoundary';
+import { socketService } from './lib/socket';
 
 // (Logic moved inside App component to use React Query hooks)
 
@@ -166,6 +167,50 @@ export default function App() {
     };
   }, []);
 
+  // Real-time Socket Integration
+  useEffect(() => {
+    const token = localStorage.getItem('crm_token');
+    if (!token || !user) {
+      socketService.disconnect();
+      return;
+    }
+
+    const socket = socketService.connect(token);
+
+    socket.on('data_update', ({ type, data }) => {
+      console.log(`[Real-time] Update received for ${type}`, data);
+      
+      // Invalidate specific queries based on update type
+      if (type === 'leads' || type === 'all') {
+        queryClient.invalidateQueries({ queryKey: ['appData'] });
+        queryClient.invalidateQueries({ queryKey: ['stats'] });
+      } else if (type === 'visits') {
+        queryClient.invalidateQueries({ queryKey: ['appData'] });
+      } else if (type === 'followups') {
+        queryClient.invalidateQueries({ queryKey: ['appData'] });
+      } else if (type === 'remarks') {
+        // Remarks are often fetched on-demand, but appData might contain them
+        queryClient.invalidateQueries({ queryKey: ['appData'] });
+        if (data.targetId) {
+          queryClient.invalidateQueries({ queryKey: ['remarks', data.targetId] });
+        }
+      } else {
+        // Fallback for any other data type
+        queryClient.invalidateQueries({ queryKey: ['appData'] });
+      }
+
+      // Show a subtle toast for background updates if they are important
+      // (e.g., if a new lead is assigned to current user)
+      if (type === 'leads' && data.assignedTo === user.id && !data.deleted) {
+        toast.success(`New lead assigned: ${data.name || 'New Lead'}`, { icon: '🔔', duration: 5000 });
+      }
+    });
+
+    return () => {
+      socket.off('data_update');
+    };
+  }, [user?.id, queryClient]);
+
   // Handle Push Registration separately
   useEffect(() => {
     if (!isInitialLoadDone || !user) return;
@@ -278,72 +323,45 @@ export default function App() {
 
   if (isDataLoading && !appData && localStorage.getItem('crm_token')) {
     return (
-      <div className="min-h-[100dvh] bg-[#1C1207] flex items-center justify-center p-4">
-        <div className="flex flex-col items-center gap-4 max-w-md text-center">
+      <div className="min-h-[100dvh] bg-[#1C1207] flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-8 max-w-sm w-full text-center">
           {initError ? (
-            <>
-              <div className="text-red-500 mb-2">⚠️</div>
-              <p className="text-red-400 font-['Jost'] text-md font-medium">{initError}</p>
-              <div className="flex gap-4 mt-6">
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="px-6 py-2 bg-[#C9A84C] text-[#1C1207] rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-[#D4BC7D] transition-colors"
-                >
-                  Retry
-                </button>
-                <button 
-                  onClick={() => {
-                    toast.loading('Checking backend health...', { id: 'health-check' });
-                    fetch('/api/config-test')
-                      .then(async r => {
-                        if (!r.ok) {
-                          const text = await r.text();
-                          if (text.includes('<!doctype')) {
-                             throw new Error("Server returned HTML Error Page");
-                          }
-                          throw new Error(`HTTP ${r.status}`);
-                        }
-                        return r.json();
-                      })
-                      .then(d => {
-                        if (d.firestoreCode === 5 || (d.firestoreError && d.firestoreError.includes('NOT_FOUND'))) {
-                          toast.error("Critical: Firestore Database Not Found.", { id: 'health-check', duration: 10000 });
-                          console.error("Troubleshooting:", d.troubleshooting);
-                        } else if (d.firestoreCode === 7 || (d.firestoreError && d.firestoreError.includes('PERMISSION_DENIED'))) {
-                          toast.error("Permission Denied (IAM Error)", { id: 'health-check', duration: 10000 });
-                          alert(`PERMISSION ERROR\n\nApp Identity: ${d.identity}\n\nYou MUST grant 'Cloud Datastore User' role to this email in your Google Cloud IAM console for project ${d.projectId}.`);
-                        } else {
-                          const state = d.firestoreConnection === 'ok' ? 'Online' : 'Database Error';
-                          const dbId = d.activeDatabaseId || d.databaseId || '(default)';
-                          toast.success(`Server: ${state} | Project: ${d.projectId} | DB: ${dbId}`, { 
-                            id: 'health-check',
-                            duration: 5000 
-                          });
-                        }
-                        console.log("Diagnostic Data:", d);
-                      })
-                      .catch(e => {
-                        toast.error(`Server Unreachable: ${e.message}`, { id: 'health-check' });
-                        console.error("Diagnostic Fetch Failed:", e);
-                      });
-                  }}
-                  className="px-6 py-2 border border-[#C9A84C] text-[#C9A84C] rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-[#C9A84C]/10 transition-colors"
-                >
-                  Check Server
-                </button>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-red-500/10 border border-red-500/20 p-8 rounded-[2rem] shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <X size={32} />
               </div>
-            </>
+              <h3 className="text-red-400 font-['Cormorant_Garamond'] text-2xl font-bold mb-4">Connection Failed</h3>
+              <p className="text-red-400/70 text-sm mb-8 leading-relaxed">{initError}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="w-full bg-red-500 text-white py-3.5 rounded-xl font-bold text-sm tracking-widest uppercase hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+              >
+                Retry Connection
+              </button>
+            </motion.div>
           ) : (
-            <>
-              <motion.div 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="w-16 h-16 border-4 border-[#C9A84C] border-t-transparent rounded-full animate-spin"
-              />
-              <p className="text-[#C9A84C] font-['Jost'] tracking-[0.2em] uppercase text-xs font-semibold animate-pulse mt-4">
-                Please wait...
-              </p>
-            </>
+            <div className="flex flex-col items-center">
+              <div className="relative mb-12">
+                <motion.div 
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                  className="w-24 h-24 border-2 border-[#C9A84C]/20 border-t-[#C9A84C] rounded-full shadow-[0_0_40px_rgba(201,168,76,0.15)]"
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Home className="text-[#C9A84C]/40" size={24} />
+                </div>
+              </div>
+              <h2 className="font-['Cormorant_Garamond'] text-[#E8C97A] text-3xl font-bold mb-2">Signature CRM</h2>
+              <div className="flex items-center gap-2 text-[#C9A84C]/40 font-['Jost'] tracking-[0.3em] uppercase text-[10px] font-bold">
+                <div className="w-8 h-[1px] bg-[#C9A84C]/20" />
+                Initializing
+                <div className="w-8 h-[1px] bg-[#C9A84C]/20" />
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -418,20 +436,24 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    console.log("[Auth] Logout initiated");
     try {
       storage.clearAuth();
+      localStorage.removeItem('crm_token');
+      localStorage.removeItem('sf_auth');
       setUser(null);
       if (queryClient) {
         queryClient.clear();
       }
       toast.success('Logged out successfully');
+      // Use a hard redirect to ensure all memory state is cleared
       setTimeout(() => {
-        window.location.href = '/'; 
-      }, 300);
+        window.location.replace('/'); 
+      }, 100);
     } catch (error) {
       console.error("Logout error:", error);
       storage.clearAuth();
-      window.location.href = '/';
+      window.location.replace('/');
     }
   };
 
@@ -883,8 +905,15 @@ export default function App() {
           }}
         />
         
-        <main className="p-4 lg:p-8 flex-1">
-          {currentPage === 'today' && (
+        <main className="p-4 lg:p-8 flex-1 overflow-x-hidden">
+          <motion.div
+            key={currentPage + (selectedVisitId || '')}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+          >
+            {currentPage === 'today' && (
             <TodayOverview
               leads={filteredLeads}
               visits={filteredVisits}
@@ -1509,6 +1538,7 @@ export default function App() {
               onNavigate={navigate}
             />
           )}
+          </motion.div>
         </main>
       </div>
       

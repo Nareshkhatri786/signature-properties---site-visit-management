@@ -102,8 +102,8 @@ export default function FollowUpForm({
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
-          <div className="p-6 space-y-5 flex-1">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {/* Client Context Info */}
             <div className="p-3 bg-[#C9A84C]/5 border border-[#C9A84C]/20 rounded-lg">
               <p className="text-[10px] text-[#9A8262] uppercase font-bold tracking-wider mb-0.5">Client Name</p>
@@ -163,7 +163,7 @@ export default function FollowUpForm({
                     onChange={(e) => setFormData(prev => ({ ...prev, purpose: e.target.value }))}
                     required
                     rows={3}
-                    placeholder="E.g., Discuss pricing, share brochure..."
+                    placeholder="E.g., Discuss pricing..."
                     className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C] resize-none"
                   />
                 </div>
@@ -172,14 +172,14 @@ export default function FollowUpForm({
               /* Completion Note (Outcome) */
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
-                  <CheckCircle2 size={12} /> Outcome / Discussion Summary
+                  <CheckCircle2 size={12} /> Outcome / Summary
                 </label>
                 <textarea 
                   value={formData.note}
                   onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
                   required
                   rows={4}
-                  placeholder="What was the result of this follow-up?"
+                  placeholder="What was the result?"
                   className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C] resize-none"
                   autoFocus
                 />
@@ -188,7 +188,7 @@ export default function FollowUpForm({
           </div>
 
           {/* Action Buttons */}
-          <div className="p-6 border-t border-[#E6D8B8] bg-[#FDFAF2] flex flex-col gap-3 shrink-0">
+          <div className="p-4 md:p-6 border-t border-[#E6D8B8] bg-[#FDFAF2] flex flex-col gap-3 shrink-0">
             {!isCompleting && followUp && (
               <button 
                 type="button"
@@ -216,7 +216,7 @@ export default function FollowUpForm({
                     : "bg-[#C9A84C] text-white hover:bg-[#B69741]"
                 )}
               >
-                <Save size={18} /> {isCompleting ? 'Save & Close' : followUp ? 'Update' : 'Schedule'}
+                <Save size={18} /> {isCompleting ? 'Save' : followUp ? 'Update' : 'Schedule'}
               </button>
             </div>
           </div>

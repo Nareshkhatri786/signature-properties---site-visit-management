@@ -52,6 +52,7 @@ export default function App() {
   // Data Fetching via React Query
   const { data: appData, isLoading: isDataLoading, error: dataError } = useAppData();
   const { data: statsData } = useStats();
+  const isInitialLoadDone = !isDataLoading;
   
   const leads = appData?.fullData.leads || [];
   const visits = appData?.fullData.visits || [];
@@ -440,7 +441,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const isInitialLoadDone = !isDataLoading;
+
 
   const logActivity = (type: ActivityType, targetId: string, targetName: string, details?: string) => {
     if (!user) return;

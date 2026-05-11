@@ -29,8 +29,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
-    email: '',
-    source: sources[0] || 'Manual Entry',
+    source: 'Social Media',
     quality: 'pending' as LeadQuality,
     status: 'new' as LeadStatus,
     assignedTo: currentUser.id as number | null,
@@ -103,7 +102,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
         id: generateId(),
         name: formData.name,
         mobile: normalizedMobile,
-        email: formData.email,
+        email: '',
         source: formData.source,
         quality: formData.quality,
         status: formData.status,
@@ -257,17 +256,23 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Email Address</label>
-              <div className="relative">
-                <Info size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9A8262]" />
-                <input 
-                  type="email" 
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="client@email.com"
-                  className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-[#C9A84C]"
-                />
-              </div>
+              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
+                <Tag size={12} /> Lead Source *
+              </label>
+              <select 
+                required
+                value={formData.source}
+                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+              >
+                <option value="Social Media">Social Media</option>
+                <option value="Google Ads">Google Ads</option>
+                <option value="Reference">Reference</option>
+                <option value="Walk-in">Walk-in</option>
+                <option value="Manual Entry">Manual Entry</option>
+                <option value="Website">Website</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
 
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">

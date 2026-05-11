@@ -135,15 +135,33 @@ export default function App() {
   const [completionVisit, setCompletionVisit] = useState<Visit | null>(null);
   const [completionLead, setCompletionLead] = useState<Lead | null>(null);
 
+  const [loadStartTime] = useState(Date.now());
+  const [showEmergencyReset, setShowEmergencyReset] = useState(false);
+
+  useEffect(() => {
+    if (isDataLoading) {
+      const timer = setTimeout(() => setShowEmergencyReset(true), 8000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowEmergencyReset(false);
+    }
+  }, [isDataLoading]);
+
+  const handleEmergencyReset = () => {
+    localStorage.clear();
+    window.location.replace('/');
+  };
+
   useEffect(() => {
     if (appData?.fullData?.currentUser) {
       const serverUser = appData.fullData.currentUser;
-      if (JSON.stringify(serverUser) !== JSON.stringify(user)) {
+      const currentAuth = storage.getAuth();
+      if (!currentAuth || serverUser.id !== currentAuth.id || serverUser.updated_at !== currentAuth.updated_at) {
         setUser(serverUser);
         storage.saveAuth(serverUser);
       }
     }
-  }, [appData]);
+  }, [appData?.fullData?.currentUser]);
 
 
 
@@ -215,24 +233,37 @@ export default function App() {
   useEffect(() => {
     if (!isInitialLoadDone || !user) return;
     
+    let isMounted = true;
     const registerPush = async () => {
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        try {
-          const registration = await navigator.serviceWorker.register('/sw.js');
-          const permission = await Notification.requestPermission();
-          if (permission === 'granted') {
-            const { publicKey } = await pushService.getPublicKey();
-            const subscription = await registration.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: urlBase64ToUint8Array(publicKey)
-            });
-            await pushService.subscribeToPush(subscription);
-          }
-        } catch (error) { console.warn('Push registration failed:', error); }
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        // If no registration, try to register
+        const activeReg = registration || await navigator.serviceWorker.register('/sw.js');
+        
+        if (!isMounted) return;
+
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted' && isMounted) {
+          const { publicKey } = await pushService.getPublicKey();
+          const subscription = await activeReg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey)
+          });
+          await pushService.subscribeToPush(subscription);
+        }
+      } catch (error) { 
+        console.warn('[Push] Registration/Subscription failed:', error); 
       }
     };
     
-    registerPush();
+    // Delay slightly to not block initial render
+    const timer = setTimeout(registerPush, 3000);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, [isInitialLoadDone, user?.id]);
 
   // User synchronization is handled by React Query appData query
@@ -868,6 +899,42 @@ export default function App() {
     setActiveCallVisit(null);
     setActiveCallLead(null);
   };
+
+  if (isDataLoading) {
+    return (
+      <div className="fixed inset-0 bg-[#1C1207] flex flex-col items-center justify-center z-[100] p-6 text-center">
+        <motion.div 
+          animate={{ scale: [1, 1.05, 1], opacity: [0.5, 1, 0.5] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          className="w-20 h-20 bg-gradient-to-br from-[#C9A84C] to-[#E8C97A] rounded-3xl flex items-center justify-center text-[#1C1207] shadow-[0_0_50px_rgba(201,168,76,0.3)] mb-8"
+        >
+          <Home size={40} />
+        </motion.div>
+        <h2 className="font-['Cormorant_Garamond'] text-[#E8C97A] text-2xl font-bold mb-2">Signature Properties</h2>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 bg-[#C9A84C] rounded-full animate-bounce [animation-delay:-0.3s]" />
+          <div className="w-1.5 h-1.5 bg-[#C9A84C] rounded-full animate-bounce [animation-delay:-0.15s]" />
+          <div className="w-1.5 h-1.5 bg-[#C9A84C] rounded-full animate-bounce" />
+        </div>
+        
+        {showEmergencyReset && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-12 space-y-4"
+          >
+            <p className="text-[#C9A84C]/60 text-xs max-w-[200px]">Taking longer than usual? Stale data might be causing a conflict.</p>
+            <button 
+              onClick={handleEmergencyReset}
+              className="bg-white/10 hover:bg-white/20 text-[#E8C97A] border border-[#C9A84C]/30 px-6 py-2 rounded-xl text-xs font-bold transition-all"
+            >
+              Clear Cache & Reset
+            </button>
+          </motion.div>
+        )}
+      </div>
+    );
+  }
 
   if (!user) {
     return (

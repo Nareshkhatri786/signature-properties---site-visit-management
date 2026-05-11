@@ -85,7 +85,8 @@ export default function SettingsPage({
       sample_house_video: '',
       walkthrough_video: '',
       testimonial_video: '',
-      brochure_link: ''
+      brochure_link: '',
+      google_maps_link: ''
     };
     onAddProject(newProject);
     setNewProjectName('');
@@ -582,6 +583,17 @@ export default function SettingsPage({
                               placeholder="URL to PDF Brochure"
                               value={editingProject.brochure_link || ''}
                               onChange={(e) => setEditingProject({...editingProject, brochure_link: e.target.value})}
+                              className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Google Maps Location Link</label>
+                            <input 
+                              type="text" 
+                              placeholder="Google Maps URL"
+                              value={editingProject.google_maps_link || ''}
+                              onChange={(e) => setEditingProject({...editingProject, google_maps_link: e.target.value})}
                               className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm"
                             />
                           </div>

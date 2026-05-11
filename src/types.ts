@@ -78,6 +78,7 @@ export interface Project {
   walkthrough_video?: string;
   testimonial_video?: string;
   brochure_link?: string;
+  google_maps_link?: string;
 }
 
 export interface Settings {

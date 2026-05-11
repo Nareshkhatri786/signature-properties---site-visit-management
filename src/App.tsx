@@ -721,7 +721,8 @@ export default function App() {
       .replace(/{sample_house_link}/g, project?.sample_house_video || '')
       .replace(/{walkthrough_link}/g, project?.walkthrough_video || '')
       .replace(/{testimonials_link}/g, project?.testimonial_video || '')
-      .replace(/{brochure_link}/g, project?.brochure_link || '');
+      .replace(/{brochure_link}/g, project?.brochure_link || '')
+      .replace(/{location_link}/g, project?.google_maps_link || '');
 
     if ('visit_date' in postCallTarget) {
       message = message.replace(/{visit_date}/g, postCallTarget.visit_date)

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS projects (
   walkthrough_video  TEXT,
   testimonial_video  TEXT,
   brochure_link      TEXT,
+  google_maps_link   TEXT,
   created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 

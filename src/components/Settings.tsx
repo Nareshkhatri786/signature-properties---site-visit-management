@@ -25,7 +25,7 @@ import { AttendanceReport } from './AttendanceReport';
 import { AttendanceSettings } from './AttendanceSettings';
 import { Clock, RefreshCw, ShieldCheck } from 'lucide-react';
 import { syncEngine } from '../lib/syncEngine';
-import * as api from '../lib/api';
+import { apiService } from '../lib/api-service';
 
 interface SettingsProps {
   user: User | null;
@@ -231,7 +231,7 @@ export default function SettingsPage({
         // Check if stats actually changed
         if (JSON.stringify(reconciledLead.stats) !== JSON.stringify(lead.stats)) {
           repairCount++;
-          api.save('leads', reconciledLead); // Background save
+          apiService.save('leads', reconciledLead); // Background save
           return reconciledLead;
         }
         return lead;

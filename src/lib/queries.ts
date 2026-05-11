@@ -59,7 +59,7 @@ export function useSaveData() {
 
       // Optimistically update to the new value
       queryClient.setQueryData(queryKeys.all, (old: any) => {
-        if (!old) return old;
+        if (!old || !newRecord.data) return old;
         const { collection, data } = newRecord;
         
         // Deep copy of the state
@@ -67,18 +67,26 @@ export function useSaveData() {
         const fullData = newState.fullData;
         const initData = newState.initData;
 
-        // Find and update in the correct collection
-        const updateInArray = (arr: any[]) => {
-          const index = arr.findIndex((item: any) => item.id === data.id);
-          if (index > -1) {
-            arr[index] = { ...arr[index], ...data };
-          } else {
-            arr.unshift(data);
-          }
-        };
+        const target = fullData[collection] ? fullData : (initData[collection] ? initData : null);
+        if (!target) return newState;
 
-        if (fullData[collection]) updateInArray(fullData[collection]);
-        else if (initData[collection]) updateInArray(initData[collection]);
+        const collectionData = target[collection];
+
+        // Handle Array collections (Leads, Visits, etc.)
+        if (Array.isArray(collectionData)) {
+          const index = collectionData.findIndex((item: any) => item.id === data.id);
+          if (index > -1) {
+            collectionData[index] = { ...collectionData[index], ...data };
+          } else {
+            collectionData.unshift(data);
+          }
+        } 
+        // Handle Object collections (Remarks)
+        else if (typeof collectionData === 'object' && collectionData !== null) {
+          // Remarks are usually nested by targetId, but in 'api.save' we pass the remark itself
+          // We don't optimistically update remarks for now as the structure is complex
+          // but we prevent it from crashing.
+        }
 
         return newState;
       });

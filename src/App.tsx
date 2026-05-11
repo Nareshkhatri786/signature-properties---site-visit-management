@@ -151,37 +151,17 @@ export default function App() {
     window.addEventListener('resize', setHeight);
 
     // Check JWT token in localStorage
-    setInitStep('Verifying Authentication...');
     const token = localStorage.getItem('crm_token');
     const authData = storage.getAuth();
 
-    if (token && authData) {
+    if (token && authData && !user) {
       setUser(authData as any);
-      setInitStep('Loading Data...');
-      loadAllData().finally(() => {
-        setIsAuthReady(true);
-        setIsInitialLoadDone(true);
-      });
-    } else {
-      setIsAuthReady(true);
-      setIsInitialLoadDone(true);
     }
 
-    // Recursive polling (Faster for changes, lighter for server)
-    let pollTimer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      const t = localStorage.getItem('crm_token');
-      if (t) await loadAllData();
-      pollTimer = setTimeout(poll, 15000); // Poll every 15s for delta changes
-    };
-    
-    pollTimer = setTimeout(poll, 15000);
-
     return () => {
-      clearTimeout(pollTimer);
       window.removeEventListener('resize', setHeight);
     };
-  }, [loadAllData]);
+  }, []);
 
   // Handle Push Registration separately
   useEffect(() => {
@@ -207,13 +187,7 @@ export default function App() {
     registerPush();
   }, [isInitialLoadDone, user?.id]);
 
-  // Reload data when user changes
-  useEffect(() => {
-    if (user?.id && isInitialLoadDone) {
-       // Only trigger a new fetch if the user object changed after the initial load
-       loadAllData();
-    }
-  }, [user?.id]);
+  // User synchronization is handled by React Query appData query
 
   // Fetch remarks when leads or visits change
   useEffect(() => {

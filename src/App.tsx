@@ -51,6 +51,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Data Fetching via React Query
+  const queryClient = useQueryClient();
   const { data: appData, isLoading: isDataLoading, error: dataError } = useAppData();
   const { data: statsData } = useStats();
   const isInitialLoadDone = !isDataLoading;
@@ -416,14 +417,26 @@ export default function App() {
     }
   };
 
-  const queryClient = useQueryClient();
   const handleLogout = () => {
-    localStorage.removeItem('crm_token');
-    storage.clearAuth();
-    setUser(null);
-    queryClient.clear();
-    toast.success('Logged out successfully');
-    setTimeout(() => window.location.reload(), 500);
+    try {
+      localStorage.removeItem('crm_token');
+      storage.clearAuth();
+      setUser(null);
+      if (queryClient) {
+        queryClient.clear();
+      }
+      toast.success('Logged out successfully');
+      // Use a slightly longer timeout and direct reload if needed
+      setTimeout(() => {
+        window.location.href = '/'; // Force a full page reload to the root
+      }, 300);
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Fallback: at least clear storage and redirect
+      localStorage.removeItem('crm_token');
+      storage.clearAuth();
+      window.location.href = '/';
+    }
   };
 
   const navigate = (page: Page, id: string | null = null, filters: any = null) => {

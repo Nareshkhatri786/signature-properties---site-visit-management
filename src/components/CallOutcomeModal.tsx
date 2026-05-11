@@ -35,16 +35,16 @@ export default function CallOutcomeModal({ isOpen, onClose, onSelect, clientName
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col"
           >
-            <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between shrink-0">
               <h3 className="font-['Cormorant_Garamond'] text-xl font-bold text-[#2A1C00]">
                 Call Outcome
               </h3>
               <button onClick={onClose} className="text-[#9A8262] hover:text-[#2A1C00]"><X size={24} /></button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
               <p className="text-sm text-[#5C4820] mb-4">
                 How was the call with <span className="font-bold">{clientName}</span>?
               </p>
@@ -68,7 +68,7 @@ export default function CallOutcomeModal({ isOpen, onClose, onSelect, clientName
                 ))}
               </div>
 
-              <div className="mt-6 space-y-2">
+              <div className="mt-6 space-y-2 pb-2">
                 <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Add a note (optional)</label>
                 <textarea
                   value={note}
@@ -79,10 +79,10 @@ export default function CallOutcomeModal({ isOpen, onClose, onSelect, clientName
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-gray-50 flex justify-end">
+            <div className="px-6 py-4 bg-[#FDFAF2] border-t border-[#E6D8B8] flex justify-end shrink-0">
               <button 
                 onClick={onClose}
-                className="text-sm font-semibold text-[#9A8262] hover:text-[#2A1C00]"
+                className="text-sm font-black uppercase tracking-widest text-[#9A8262] hover:text-[#2A1C00] py-2 px-4"
               >
                 Cancel
               </button>

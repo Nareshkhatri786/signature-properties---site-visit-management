@@ -136,8 +136,8 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between">
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col">
+        <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between shrink-0">
           <h3 className="font-['Cormorant_Garamond'] text-xl font-bold text-[#2A1C00] flex items-center gap-2">
             <UserPlus className="text-[#C9A84C]" />
             Add New Lead
@@ -147,136 +147,138 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          <div className="flex items-center justify-between bg-[#FDFAF2] p-3 rounded-xl border border-[#E6D8B8]">
-            <label className="text-xs font-bold text-[#9A8262] uppercase tracking-wider">Priority / Stars</label>
-            <div className="flex gap-1.5">
-              {[1, 2, 3].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, priority: formData.priority === star ? 0 : star })}
-                  className="transition-transform hover:scale-110 active:scale-95"
-                >
-                  <Star 
-                    size={24} 
-                    className={cn(
-                      star <= formData.priority 
-                        ? "text-yellow-400 fill-yellow-400" 
-                        : "text-gray-300"
-                    )} 
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Full Name *</label>
-            <div className="relative">
-              <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9A8262]" />
-              <input 
-                type="text" 
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Client's full name"
-                className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-[#C9A84C]"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Mobile Number *</label>
-            <div className="relative flex items-center">
-              <Phone size={14} className="absolute left-3.5 text-[#9A8262]" />
-              <span className="absolute left-9 text-[10px] font-bold text-[#9A8262]/50 bg-[#F5F1E6] px-1 py-0.5 rounded border border-[#E6D8B8]/30 pointer-events-none">+91</span>
-              <input 
-                type="tel" 
-                required
-                maxLength={10}
-                value={formData.mobile.replace(/^\+91/, '')}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  setFormData({ ...formData, mobile: val.substring(0, 10) });
-                }}
-                placeholder="10-digit mobile"
-                className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 pl-16 pr-4 text-sm focus:outline-none focus:border-[#C9A84C]"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Property Interest (BHK)</label>
-            <select 
-              value={formData.property_interest}
-              onChange={(e) => setFormData({ ...formData, property_interest: e.target.value })}
-              className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
-            >
-              <option value="">Select interest</option>
-              <option value="2 BHK">2 BHK</option>
-              <option value="3 BHK">3 BHK</option>
-              <option value="4 BHK">4 BHK</option>
-              <option value="Penthouse">Penthouse</option>
-              <option value="Shop">Shop</option>
-              <option value="Office">Office</option>
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Quality</label>
-              <select 
-                value={formData.quality}
-                onChange={(e) => setFormData({ ...formData, quality: e.target.value as LeadQuality })}
-                className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
-              >
-                <option value="pending">Pending</option>
-                <option value="hot">🔥 Hot</option>
-                <option value="warm">🌡️ Warm</option>
-                <option value="cold">❄️ Cold</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Assign To</label>
-              <select 
-                value={formData.assignedTo || ''}
-                onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value ? Number(e.target.value) : null })}
-                className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
-              >
-                <option value="">Unassigned</option>
-                {users.filter(u => {
-                  const isAdmin = currentUser.role.toLowerCase() === 'admin' || currentUser.role.toLowerCase() === 'adm';
-                  return isAdmin || u.projectId === projectId;
-                }).map(u => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
+          <div className="p-6 space-y-5 flex-1">
+            <div className="flex items-center justify-between bg-[#FDFAF2] p-3 rounded-xl border border-[#E6D8B8]">
+              <label className="text-xs font-bold text-[#9A8262] uppercase tracking-wider">Priority / Stars</label>
+              <div className="flex gap-1.5">
+                {[1, 2, 3].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, priority: formData.priority === star ? 0 : star })}
+                    className="transition-transform hover:scale-110 active:scale-95"
+                  >
+                    <Star 
+                      size={24} 
+                      className={cn(
+                        star <= formData.priority 
+                          ? "text-yellow-400 fill-yellow-400" 
+                          : "text-gray-300"
+                      )} 
+                    />
+                  </button>
                 ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Full Name *</label>
+              <div className="relative">
+                <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9A8262]" />
+                <input 
+                  type="text" 
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Client's full name"
+                  className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Mobile Number *</label>
+              <div className="relative flex items-center">
+                <Phone size={14} className="absolute left-3.5 text-[#9A8262]" />
+                <span className="absolute left-9 text-[10px] font-bold text-[#9A8262]/50 bg-[#F5F1E6] px-1 py-0.5 rounded border border-[#E6D8B8]/30 pointer-events-none">+91</span>
+                <input 
+                  type="tel" 
+                  required
+                  maxLength={10}
+                  value={formData.mobile.replace(/^\+91/, '')}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    setFormData({ ...formData, mobile: val.substring(0, 10) });
+                  }}
+                  placeholder="10-digit mobile"
+                  className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 pl-16 pr-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Property Interest (BHK)</label>
+              <select 
+                value={formData.property_interest}
+                onChange={(e) => setFormData({ ...formData, property_interest: e.target.value })}
+                className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
+              >
+                <option value="">Select interest</option>
+                <option value="2 BHK">2 BHK</option>
+                <option value="3 BHK">3 BHK</option>
+                <option value="4 BHK">4 BHK</option>
+                <option value="Penthouse">Penthouse</option>
+                <option value="Shop">Shop</option>
+                <option value="Office">Office</option>
               </select>
             </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Email Address</label>
-            <div className="relative">
-              <Info size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9A8262]" />
-              <input 
-                type="email" 
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="client@email.com"
-                className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-[#C9A84C]"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Quality</label>
+                <select 
+                  value={formData.quality}
+                  onChange={(e) => setFormData({ ...formData, quality: e.target.value as LeadQuality })}
+                  className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="hot">🔥 Hot</option>
+                  <option value="warm">🌡️ Warm</option>
+                  <option value="cold">❄️ Cold</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Assign To</label>
+                <select 
+                  value={formData.assignedTo || ''}
+                  onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value ? Number(e.target.value) : null })}
+                  className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                >
+                  <option value="">Unassigned</option>
+                  {users.filter(u => {
+                    const isAdmin = currentUser.role.toLowerCase() === 'admin' || currentUser.role.toLowerCase() === 'adm';
+                    return isAdmin || u.projectId === projectId;
+                  }).map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Email Address</label>
+              <div className="relative">
+                <Info size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9A8262]" />
+                <input 
+                  type="email" 
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="client@email.com"
+                  className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-[#C9A84C]"
+                />
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
+              <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-blue-700 leading-relaxed">
+                <strong>Deduplication:</strong> The system will automatically check if a lead with the same mobile number already exists to prevent duplicates.
+              </p>
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
-            <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
-            <p className="text-[11px] text-blue-700 leading-relaxed">
-              <strong>Deduplication:</strong> The system will automatically check if a lead with the same mobile number already exists to prevent duplicates.
-            </p>
-          </div>
-
-          <div className="pt-4 flex gap-3">
+          <div className="p-6 border-t border-[#E6D8B8] bg-[#FDFAF2] flex gap-3 shrink-0">
             <button 
               type="button"
               onClick={onClose}

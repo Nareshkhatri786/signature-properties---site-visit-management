@@ -51,9 +51,9 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="bg-white border border-[#E6D8B8] rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden"
+            className="bg-white border border-[#E6D8B8] rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden max-h-[95dvh] flex flex-col"
           >
-            <div className="p-8">
+            <div className="p-6 md:p-8 flex-1 overflow-y-auto custom-scrollbar">
               <div className="flex justify-between items-start mb-6">
                 <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center shadow-sm border border-green-100">
                   <CheckCircle2 size={24} />
@@ -68,7 +68,7 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                 Recording details for visit with <span className="font-bold text-[#5C4820]">{visit.client_name}</span>.
               </p>
 
-              <div className="space-y-5 mb-8 max-h-[60vh] overflow-y-auto px-1 custom-scrollbar">
+              <div className="space-y-5 px-1">
                 {/* Back-entry Section */}
                 <div className="bg-[#FDFAF2] border border-[#E6D8B8] rounded-xl p-4">
                   <p className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -184,31 +184,31 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                   )}
                 </div>
               </div>
+            </div>
 
-              <div className="flex gap-3">
-                <button 
-                  onClick={onClose}
-                  className="flex-1 bg-white border border-[#E6D8B8] text-[#9A8262] font-bold py-3.5 rounded-xl hover:bg-[#FDFAF2] transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleSubmit}
-                  disabled={!data.feedback.trim() || !data.outcome || isSubmitting}
-                  className="flex-[2] bg-[#C9A84C] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={18} /> Complete & Save
-                    </>
-                  )}
-                </button>
-              </div>
+            <div className="p-6 border-t border-[#F2ECD8] bg-[#FDFAF2] flex gap-3 shrink-0">
+              <button 
+                onClick={onClose}
+                className="flex-1 bg-white border border-[#E6D8B8] text-[#9A8262] font-bold py-3.5 rounded-xl hover:bg-[#FDFAF2] transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSubmit}
+                disabled={!data.feedback.trim() || !data.outcome || isSubmitting}
+                className="flex-[2] bg-[#C9A84C] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} /> Complete & Save
+                  </>
+                )}
+              </button>
             </div>
           </motion.div>
         </div>

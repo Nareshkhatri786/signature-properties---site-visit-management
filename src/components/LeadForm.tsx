@@ -38,6 +38,8 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
     property_interest: ''
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Project defaults mapping
   const projectDefaults: Record<string, string> = {
     'p1': '3 BHK', // Signature Properties
@@ -61,8 +63,9 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
     }
   }, [projectId]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     
     if (!formData.name || !formData.mobile) {
       toast.error('Name and Mobile are required');
@@ -70,6 +73,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
     }
 
     try {
+      setIsSubmitting(true);
       const digitsOnly = formData.mobile.replace(/\D/g, '');
       const finalMobile = (digitsOnly.length === 12 && digitsOnly.startsWith('91')) 
         ? digitsOnly.substring(2) 
@@ -77,6 +81,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
 
       if (finalMobile.length !== 10) {
         toast.error('Mobile number must be exactly 10 digits');
+        setIsSubmitting(false);
         return;
       }
 
@@ -90,6 +95,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
       
       if (isDuplicate) {
         toast.error('A lead with this mobile number already exists!');
+        setIsSubmitting(false);
         return;
       }
 
@@ -117,12 +123,13 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
         }
       };
 
-      onSave(newLead);
+      await onSave(newLead);
       toast.success('Lead added successfully');
       onClose();
     } catch (error) {
       console.error('Lead save error:', error);
       toast.error('An error occurred while saving the lead');
+      setIsSubmitting(false);
     }
   };
 
@@ -279,9 +286,17 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
             </button>
             <button 
               type="submit"
-              className="flex-1 bg-gradient-to-r from-[#C9A84C] to-[#E8C97A] text-[#1C1207] font-bold py-3 rounded-xl shadow-lg hover:translate-y-[-1px] transition-all"
+              disabled={isSubmitting}
+              className="flex-1 bg-gradient-to-r from-[#C9A84C] to-[#E8C97A] text-[#1C1207] font-bold py-3 rounded-xl shadow-lg hover:translate-y-[-1px] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              Save Lead
+              {isSubmitting ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-[#1C1207]/30 border-t-[#1C1207] rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Lead'
+              )}
             </button>
           </div>
         </form>

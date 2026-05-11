@@ -194,7 +194,7 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                 </button>
                 <button 
                   onClick={handleSubmit}
-                  disabled={!data.feedback.trim() || isSubmitting}
+                  disabled={!data.feedback.trim() || !data.outcome || isSubmitting}
                   className="flex-[2] bg-[#C9A84C] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isSubmitting ? (

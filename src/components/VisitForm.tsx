@@ -39,8 +39,11 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
     initial_remark: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     if (!formData.client_name || !formData.mobile) {
       toast.error('Client Name and Mobile are required');
@@ -104,8 +107,14 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
       };
     }
 
-    onSave(visit, initialRemark, formData.lead_status);
-    onCancel();
+    try {
+      setIsSubmitting(true);
+      await onSave(visit, initialRemark, formData.lead_status);
+      onCancel();
+    } catch (error) {
+      console.error('Save error:', error);
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -426,9 +435,19 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
             </p>
             <button 
               type="submit"
-              className="w-full bg-gradient-to-r from-[#C9A84C] to-[#E8C97A] text-[#1C1207] font-bold py-3 rounded-lg shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-[#C9A84C] to-[#E8C97A] text-[#1C1207] font-bold py-3 rounded-lg shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Save size={18} /> Save Visit
+              {isSubmitting ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-[#1C1207]/30 border-t-[#1C1207] rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={18} /> Save Visit
+                </>
+              )}
             </button>
           </div>
         </div>

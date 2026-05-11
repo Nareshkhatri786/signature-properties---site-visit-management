@@ -607,8 +607,21 @@ async function startServer() {
       } else if (col === "projects") {
         const d = stringifyJsonFields(data, JSON_FIELDS_PROJECTS);
         await pool.execute(
-          `INSERT INTO projects (id,name,description,location) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),location=VALUES(location)`,
-          [d.id, d.name, d.description||null, d.location||null]
+          `INSERT INTO projects (id,name,description,location,sample_house_video,walkthrough_video,testimonial_video,brochure_link) 
+           VALUES (?,?,?,?,?,?,?,?) 
+           ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),location=VALUES(location),
+           sample_house_video=VALUES(sample_house_video),walkthrough_video=VALUES(walkthrough_video),
+           testimonial_video=VALUES(testimonial_video),brochure_link=VALUES(brochure_link)`,
+          [
+            d.id, 
+            d.name, 
+            d.description||null, 
+            d.location||null,
+            d.sample_house_video||null,
+            d.walkthrough_video||null,
+            d.testimonial_video||null,
+            d.brochure_link||null
+          ]
         );
       } else if (col === "settings") {
         const d = stringifyJsonFields(data, JSON_FIELDS_SETTINGS);

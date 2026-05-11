@@ -81,7 +81,11 @@ export default function SettingsPage({
     const newProject: Project = { 
       id: generateId(), 
       name: newProjectName.trim(),
-      location: { lat: 0, lng: 0, address: '', radius: 100 }
+      location: { lat: 0, lng: 0, address: '', radius: 100 },
+      sample_house_video: '',
+      walkthrough_video: '',
+      testimonial_video: '',
+      brochure_link: ''
     };
     onAddProject(newProject);
     setNewProjectName('');
@@ -472,7 +476,7 @@ export default function SettingsPage({
                   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <div className="bg-white border border-[#E6D8B8] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
                       <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between">
-                        <h3 className="font-['Cormorant_Garamond'] text-xl font-bold text-[#2A1C00]">Edit Project Location</h3>
+                        <h3 className="font-['Cormorant_Garamond'] text-xl font-bold text-[#2A1C00]">Edit Project Details</h3>
                         <button onClick={() => setEditingProject(null)} className="text-[#9A8262] hover:text-[#2A1C00]">
                           <X size={20} />
                         </button>
@@ -533,6 +537,54 @@ export default function SettingsPage({
                             })}
                             className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm"
                           />
+                        </div>
+
+                        <div className="pt-4 border-t border-[#E6D8B8] space-y-4">
+                          <p className="text-[11px] font-bold text-[#2A1C00] uppercase tracking-widest">Dynamic WhatsApp Links (Instagram/URL)</p>
+                          
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Sample House Video Link</label>
+                            <input 
+                              type="text" 
+                              placeholder="Instagram link for Sample House"
+                              value={editingProject.sample_house_video || ''}
+                              onChange={(e) => setEditingProject({...editingProject, sample_house_video: e.target.value})}
+                              className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Walkthrough Video Link</label>
+                            <input 
+                              type="text" 
+                              placeholder="Instagram link for Walkthrough"
+                              value={editingProject.walkthrough_video || ''}
+                              onChange={(e) => setEditingProject({...editingProject, walkthrough_video: e.target.value})}
+                              className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Testimonial Video Link</label>
+                            <input 
+                              type="text" 
+                              placeholder="Instagram link for Testimonials"
+                              value={editingProject.testimonial_video || ''}
+                              onChange={(e) => setEditingProject({...editingProject, testimonial_video: e.target.value})}
+                              className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Brochure Download Link</label>
+                            <input 
+                              type="text" 
+                              placeholder="URL to PDF Brochure"
+                              value={editingProject.brochure_link || ''}
+                              onChange={(e) => setEditingProject({...editingProject, brochure_link: e.target.value})}
+                              className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm"
+                            />
+                          </div>
                         </div>
                         <div className="flex gap-3 mt-6">
                           <button 

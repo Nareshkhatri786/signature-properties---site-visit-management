@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS projects (
   name         VARCHAR(255) NOT NULL,
   location     JSON,
   description  TEXT,
+  sample_house_video TEXT,
+  walkthrough_video  TEXT,
+  testimonial_video  TEXT,
+  brochure_link      TEXT,
   created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 

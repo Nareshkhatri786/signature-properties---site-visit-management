@@ -74,6 +74,10 @@ export interface Project {
     address: string;
     radius: number;
   };
+  sample_house_video?: string;
+  walkthrough_video?: string;
+  testimonial_video?: string;
+  brochure_link?: string;
 }
 
 export interface Settings {

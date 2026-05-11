@@ -653,53 +653,55 @@ export default function SettingsPage({
 
           {/* Data Management */}
           {isAdmin && (
-            <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center gap-2">
-                <ShieldCheck className="text-[#C9A84C]" size={18} />
-                <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00]">Data Integrity Audit</h3>
-              </div>
-              <div className="p-6 space-y-4">
-                <p className="text-sm text-[#5C4820] leading-relaxed">
-                  Run a system audit to reconcile Lead counts with actual Visit records. This will fix any mismatches in 'Visits Done' or 'Planned' stats.
-                </p>
-                <button 
-                  onClick={handleDataAudit}
-                  className="bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-2 text-sm shadow-sm"
-                >
-                  <RefreshCw size={16} /> Run Data Audit & Repair
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center gap-2">
-                <Database className="text-[#C9A84C]" size={18} />
-                <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00]">Data Backup & Restore</h3>
-              </div>
-              <div className="p-6 space-y-6">
-                <p className="text-sm text-[#5C4820] leading-relaxed">
-                  Export all your data as a JSON file for backup, or import a previously exported backup to restore data.
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  <button 
-                    onClick={handleExport}
-                    className="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2 text-sm shadow-sm"
-                  >
-                    <Download size={16} /> Export Backup
-                  </button>
-                  <label className="bg-white border border-[#E6D8B8] text-[#9A8262] font-bold px-4 py-2 rounded-lg hover:text-[#2A1C00] transition-all flex items-center gap-2 text-sm shadow-sm cursor-pointer">
-                    <Upload size={16} /> Import Backup
-                    <input type="file" className="hidden" accept=".json" onChange={handleImport} />
-                  </label>
+            <>
+              <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center gap-2">
+                  <ShieldCheck className="text-[#C9A84C]" size={18} />
+                  <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00]">Data Integrity Audit</h3>
                 </div>
-                <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                  <Info size={18} className="text-blue-600 shrink-0 mt-0.5" />
-                  <p className="text-[12px] text-blue-800 leading-relaxed">
-                    Backup includes all visits, remarks, templates, and settings.
+                <div className="p-6 space-y-4">
+                  <p className="text-sm text-[#5C4820] leading-relaxed">
+                    Run a system audit to reconcile Lead counts with actual Visit records. This will fix any mismatches in 'Visits Done' or 'Planned' stats.
                   </p>
+                  <button 
+                    onClick={handleDataAudit}
+                    className="bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-2 text-sm shadow-sm"
+                  >
+                    <RefreshCw size={16} /> Run Data Audit & Repair
+                  </button>
                 </div>
               </div>
-            </div>
+
+              <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center gap-2">
+                  <Database className="text-[#C9A84C]" size={18} />
+                  <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00]">Data Backup & Restore</h3>
+                </div>
+                <div className="p-6 space-y-6">
+                  <p className="text-sm text-[#5C4820] leading-relaxed">
+                    Export all your data as a JSON file for backup, or import a previously exported backup to restore data.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <button 
+                      onClick={handleExport}
+                      className="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2 text-sm shadow-sm"
+                    >
+                      <Download size={16} /> Export Backup
+                    </button>
+                    <label className="bg-white border border-[#E6D8B8] text-[#9A8262] font-bold px-4 py-2 rounded-lg hover:text-[#2A1C00] transition-all flex items-center gap-2 text-sm shadow-sm cursor-pointer">
+                      <Upload size={16} /> Import Backup
+                      <input type="file" className="hidden" accept=".json" onChange={handleImport} />
+                    </label>
+                  </div>
+                  <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                    <Info size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                    <p className="text-[12px] text-blue-800 leading-relaxed">
+                      Backup includes all visits, remarks, templates, and settings.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>

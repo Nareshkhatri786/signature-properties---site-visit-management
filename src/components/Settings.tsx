@@ -23,7 +23,9 @@ import { toast } from 'react-hot-toast';
 import { generateId } from '../lib/storage';
 import { AttendanceReport } from './AttendanceReport';
 import { AttendanceSettings } from './AttendanceSettings';
-import { Clock } from 'lucide-react';
+import { Clock, RefreshCw, ShieldCheck } from 'lucide-react';
+import { syncEngine } from '../lib/syncEngine';
+import * as api from '../lib/api';
 
 interface SettingsProps {
   user: User | null;
@@ -214,6 +216,39 @@ export default function SettingsPage({
       }
     };
     reader.readAsText(file);
+  };
+  
+  const handleDataAudit = async () => {
+    if (!isAdmin) return;
+    const toastId = toast.loading('Auditing data integrity...');
+    
+    try {
+      let repairCount = 0;
+      const updatedLeads = allData.leads.map(lead => {
+        const leadVisits = allData.visits.filter(v => v.leadId === lead.id);
+        const reconciledLead = syncEngine.reconcileLeadStats(lead, leadVisits);
+        
+        // Check if stats actually changed
+        if (JSON.stringify(reconciledLead.stats) !== JSON.stringify(lead.stats)) {
+          repairCount++;
+          api.save('leads', reconciledLead); // Background save
+          return reconciledLead;
+        }
+        return lead;
+      });
+      
+      if (repairCount > 0) {
+        // We'd ideally want to update the parent state here, 
+        // but since it's a deep audit, a reload is safer or we just show success.
+        toast.success(`Audit complete! Repaired ${repairCount} lead records.`, { id: toastId });
+        setTimeout(() => window.location.reload(), 2000); // Reload to reflect changes
+      } else {
+        toast.success('Audit complete! Data is already healthy.', { id: toastId });
+      }
+    } catch (error) {
+      console.error('Audit Error:', error);
+      toast.error('Audit failed. Please check console.', { id: toastId });
+    }
   };
 
   return (
@@ -618,6 +653,24 @@ export default function SettingsPage({
 
           {/* Data Management */}
           {isAdmin && (
+            <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center gap-2">
+                <ShieldCheck className="text-[#C9A84C]" size={18} />
+                <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00]">Data Integrity Audit</h3>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-[#5C4820] leading-relaxed">
+                  Run a system audit to reconcile Lead counts with actual Visit records. This will fix any mismatches in 'Visits Done' or 'Planned' stats.
+                </p>
+                <button 
+                  onClick={handleDataAudit}
+                  className="bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-2 text-sm shadow-sm"
+                >
+                  <RefreshCw size={16} /> Run Data Audit & Repair
+                </button>
+              </div>
+            </div>
+
             <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center gap-2">
                 <Database className="text-[#C9A84C]" size={18} />

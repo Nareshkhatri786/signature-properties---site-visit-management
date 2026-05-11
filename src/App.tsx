@@ -33,6 +33,7 @@ import { cn } from './lib/utils';
 import { normalizePhoneNumber } from './lib/phoneUtils';
 
 import { apiService } from './lib/api-service';
+import { syncEngine } from './lib/syncEngine';
 import { pushService, urlBase64ToUint8Array } from './lib/push-service';
 import { motion } from 'motion/react';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -1828,61 +1829,36 @@ export default function App() {
           lead={completionLead}
           user={user}
           onComplete={async (data) => {
-            const completedAt = data.completedAt || new Date().toISOString();
-            
             try {
+              const { updatedLead, updatedVisit, activity } = syncEngine.handleVisitCompletion(
+                completionLead!,
+                completionVisit!,
+                data.outcome,
+                data.feedback,
+                user
+              );
+
               const savePromise = (async () => {
-                // 1. Update Visit
-                const updatedVisit: Visit = {
-                  ...completionVisit,
-                  visit_status: 'completed' as any,
-                  client_feedback: data.feedback,
-                  interest_level: data.interest,
-                  outcome: data.outcome,
-                  completed_at: completedAt
-                };
-                const exists = visits.some(v => v.id === completionVisit.id);
-                if (exists) {
-                  setVisits(prev => prev.map(v => v.id === completionVisit.id ? updatedVisit : v));
-                } else {
-                  setVisits(prev => [updatedVisit, ...prev]);
-                }
+                // 1. Update State & Save
+                setVisits(prev => {
+                  const exists = prev.some(v => v.id === updatedVisit.id);
+                  return exists ? prev.map(v => v.id === updatedVisit.id ? updatedVisit : v) : [updatedVisit, ...prev];
+                });
                 await api.save('visits', updatedVisit);
 
-                // 2. Update Lead
-                if (completionLead) {
-                  const updatedLead: Lead = {
-                    ...completionLead,
-                    status: 'visit_done' as any,
-                    quality: data.interest,
-                    updated_at: completedAt
-                  };
-                  setLeads(prev => prev.map(l => l.id === completionLead.id ? updatedLead : l));
-                  await api.save('leads', updatedLead);
-                }
+                setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l));
+                await api.save('leads', updatedLead);
 
-                // 3. Log Activity
-                const activity: Activity = {
-                  id: generateId(),
-                  type: 'visit_done',
-                  userId: user.id,
-                  userName: user.name,
-                  projectId: completionVisit.projectId,
-                  targetId: completionLead?.id || completionVisit.id,
-                  targetName: completionLead?.name || completionVisit.client_name,
-                  timestamp: completedAt,
-                  details: `Outcome: ${data.outcome.toUpperCase()} | Feedback: ${data.feedback}`
-                };
                 setActivities(prev => [activity, ...prev]);
                 await api.save('activities', activity);
 
-                // 4. Handle Next Followup
+                // 2. Handle Next Followup
                 if (data.nextStep === 'followup' && data.nextDate) {
                   const f: FollowUp = {
                     id: generateId(),
-                    leadId: completionLead?.id || '',
-                    visitId: completionVisit.id,
-                    projectId: completionVisit.projectId,
+                    leadId: updatedLead.id,
+                    visitId: updatedVisit.id,
+                    projectId: updatedVisit.projectId,
                     date: data.nextDate,
                     purpose: 'Follow up post-visit',
                     status: 'pending',
@@ -1897,13 +1873,14 @@ export default function App() {
               })();
 
               await toast.promise(savePromise, {
-                loading: 'Finalizing visit details...',
-                success: 'Visit completed successfully!',
-                error: 'Error saving visit details. Please try again.'
+                loading: 'Syncing visit details...',
+                success: 'Visit and Lead synchronized successfully!',
+                error: 'Error during synchronization. Please check your network.'
               });
 
             } catch (error) {
-              console.error('Visit completion error:', error);
+              console.error('Sync Error:', error);
+              toast.error('Failed to sync data');
             } finally {
               setIsVisitCompletionModalOpen(false);
               setCompletionVisit(null);

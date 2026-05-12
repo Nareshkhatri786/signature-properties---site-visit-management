@@ -164,6 +164,26 @@ export default function App() {
       }
     }
   }, [appData?.fullData?.currentUser]);
+  useEffect(() => {
+    if (isInitialLoadDone && user) {
+      const preLoad = () => {
+        import('./components/Dashboard');
+        import('./components/LeadList');
+        import('./components/VisitList');
+        import('./components/LeadDetail');
+      };
+      const timer = setTimeout(preLoad, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isInitialLoadDone, user]);
+
+  useEffect(() => {
+    if (user) {
+      storage.saveAuth(user);
+    } else {
+      storage.clearAuth();
+    }
+  }, [user]);
 
 
 

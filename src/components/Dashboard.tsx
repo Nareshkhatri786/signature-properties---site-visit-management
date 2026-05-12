@@ -177,24 +177,40 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
         return lead && lead.quality !== 'hot' && lead.status !== 'closed' && lead.status !== 'lost';
       }).length;
 
+    // Project performance
+    const projectStats = projects.map(p => {
+      const pLeads = leads.filter(l => l.projectId === p.id);
+      const pLeadsInRange = filteredLeadsList.filter(l => l.projectId === p.id);
+      const pVisits = visits.filter(v => v.projectId === p.id && v.visit_status === 'completed');
       return {
-        hotLeads, warmLeads, coldLeads, disqLeads, activeLeadsCount,
-        completedToday, completedYesterday, completedThisWeek, completedThisMonth, completedVisitsList,
-        scheduledToday, scheduledThisWeek, scheduledThisMonth, scheduledVisitsList,
-        filteredVisitsList, filteredLeadsList,
-        visitsInRangeDataList, upcoming, followUpRemindersList,
-        followupsDueToday: followUps.filter(f => f.status === 'pending' && f.date === todayStr).length,
-        followupsOverdue: overdueFollowupsCount,
-        // Funnel
-        visitedCount, completedLeadIds, closedLeads, visitRate, completionRate, closureRate,
-        // Missed
-        notContactedDays, visitedNoFollowup,
-        // Visit Insights
-        uniqueMonthlyVisitors,
-        repeatVisitorsCount: leadsWithMultipleVisits.length,
-        highPotentialGap
+        id: p.id,
+        name: p.name,
+        totalLeads: pLeads.length,
+        rangeLeads: pLeadsInRange.length,
+        visits: pVisits.length,
+        conversion: pLeads.length > 0 ? Math.round((pVisits.length / pLeads.length) * 100) : 0
       };
-  }, [leads, visits, followUps, dateRange, todayStr]);
+    }).sort((a, b) => b.rangeLeads - a.rangeLeads);
+
+    return {
+      hotLeads, warmLeads, coldLeads, disqLeads, activeLeadsCount,
+      completedToday, completedYesterday, completedThisWeek, completedThisMonth, completedVisitsList,
+      scheduledToday, scheduledThisWeek, scheduledThisMonth, scheduledVisitsList,
+      filteredVisitsList, filteredLeadsList,
+      visitsInRangeDataList, upcoming, followUpRemindersList,
+      followupsDueToday: followUps.filter(f => f.status === 'pending' && f.date === todayStr).length,
+      followupsOverdue: overdueFollowupsCount,
+      // Funnel
+      visitedCount, completedLeadIds, closedLeads, visitRate, completionRate, closureRate,
+      // Missed
+      notContactedDays, visitedNoFollowup,
+      // Visit Insights
+      uniqueMonthlyVisitors,
+      repeatVisitorsCount: leadsWithMultipleVisits.length,
+      highPotentialGap,
+      projectStats
+    };
+  }, [leads, visits, followUps, dateRange, todayStr, projects]);
 
   // Leaderboard: per-user stats this month
   const leaderboard = useMemo(() => {
@@ -325,38 +341,108 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
       </div>
 
       {/* ===== CONVERSION FUNNEL ===== */}
-      <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center"><TrendingUp size={20} /></div>
-          <div>
-            <h3 className="font-serif text-xl font-bold text-[#2A1C00]">Conversion Funnel</h3>
-            <p className="text-[10px] text-[#9A8262] font-bold uppercase tracking-widest">Lead → Visit → Booking pipeline</p>
+      <div className="bg-[#1C1207] border border-[#C9A84C]/20 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-10 opacity-5 rotate-12">
+          <TrendingUp size={200} className="text-[#C9A84C]" />
+        </div>
+        
+        <div className="relative z-10">
+          <div className="flex items-center gap-4 mb-10">
+            <div className="w-12 h-12 bg-[#C9A84C]/20 text-[#C9A84C] rounded-2xl flex items-center justify-center border border-[#C9A84C]/30 shadow-lg backdrop-blur-md">
+              <TrendingUp size={24} />
+            </div>
+            <div>
+              <h3 className="font-serif text-2xl font-bold text-white">Strategic Conversion Funnel</h3>
+              <p className="text-[10px] text-[#C9A84C] font-black uppercase tracking-[0.2em] mt-1">Lead Journey Optimization</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
+            {[
+              { label: 'Total Pool', sub: 'Gross Leads', value: leads.length, rate: '100%', color: 'from-[#9A8262] to-[#B59640]', icon: Users, nav: () => onNavigate('leads') },
+              { label: 'Visits Flow', sub: 'Engagement', value: calculatedStats.visitedCount, rate: `${calculatedStats.visitRate}%`, color: 'from-[#3498DB] to-[#2980B9]', icon: CalendarDays, nav: () => onNavigate('visits') },
+              { label: 'Site Footfall', sub: 'Qualified', value: calculatedStats.completedLeadIds.size, rate: `${calculatedStats.completionRate}%`, color: 'from-[#9B59B6] to-[#8E44AD]', icon: CheckCircle2, nav: () => onNavigate('visits', undefined, { visitStatus: 'completed' }) },
+              { label: 'Final Closures', sub: 'ROI Achieved', value: calculatedStats.closedLeads, rate: `${calculatedStats.closureRate}%`, color: 'from-[#27AE60] to-[#219150]', icon: Trophy, nav: () => onNavigate('leads', undefined, { status: 'closed' }) },
+            ].map((stage, i, arr) => (
+              <div key={i} className="relative flex flex-col group">
+                <button 
+                  onClick={stage.nav} 
+                  className="bg-white/5 border border-white/10 rounded-3xl p-6 text-left hover:bg-white/10 hover:border-white/20 transition-all backdrop-blur-xl relative z-10 h-full"
+                >
+                  <div className="flex justify-between items-start mb-6">
+                    <div className={cn("p-2 rounded-xl bg-gradient-to-br text-white shadow-lg", stage.color)}>
+                      <stage.icon size={18} />
+                    </div>
+                    <span className="text-[10px] font-black text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-1 rounded-full border border-[#C9A84C]/20">{stage.rate}</span>
+                  </div>
+                  <div className="text-4xl font-serif font-black text-white mb-1">{stage.value}</div>
+                  <p className="text-white/80 text-xs font-bold">{stage.label}</p>
+                  <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mt-0.5">{stage.sub}</p>
+                  
+                  <div className="mt-6 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div className={cn("h-full bg-gradient-to-r transition-all duration-1000", stage.color)} style={{ width: stage.rate }} />
+                  </div>
+                </button>
+                {i < arr.length - 1 && (
+                  <div className="hidden lg:flex absolute top-1/2 -right-4 -translate-y-1/2 z-20 w-8 h-8 bg-[#1C1207] border border-white/10 rounded-full items-center justify-center text-white/40">
+                    <ChevronRight size={16} />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: 'Total Leads', value: leads.length, rate: '100%', color: 'bg-slate-200', text: 'text-slate-700', width: 'w-full', nav: () => onNavigate('leads') },
-            { label: 'Visits Scheduled', value: calculatedStats.visitedCount, rate: `${calculatedStats.visitRate}%`, color: 'bg-purple-400', text: 'text-purple-700', width: `w-[${calculatedStats.visitRate}%]`, nav: () => onNavigate('visits') },
-            { label: 'Actual Visitors', value: calculatedStats.completedLeadIds.size, rate: `${calculatedStats.completionRate}%`, color: 'bg-blue-400', text: 'text-blue-700', width: `w-[${calculatedStats.completionRate}%]`, nav: () => onNavigate('visits', undefined, { visitStatus: 'completed' }) },
-            { label: 'Bookings Done', value: calculatedStats.closedLeads, rate: `${calculatedStats.closureRate}%`, color: 'bg-emerald-500', text: 'text-emerald-700', width: `w-[${calculatedStats.closureRate}%]`, nav: () => onNavigate('leads', undefined, { status: 'closed' }) },
-          ].map((stage, i) => (
-            <button key={i} onClick={stage.nav} className="bg-white border border-[#E6D8B8] rounded-xl p-4 text-left hover:shadow-md transition-all group">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">{stage.label}</span>
-                <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", stage.color.replace('bg-', 'bg-').replace('400','100').replace('500','100').replace('200','100'), stage.text)}>{stage.rate}</span>
-              </div>
-              <div className="text-3xl font-serif font-bold text-[#2A1C00] group-hover:text-[#C9A84C] transition-colors">{stage.value}</div>
-              <div className="mt-3 h-1.5 bg-[#F5EDD4] rounded-full overflow-hidden">
-                <div className={cn("h-full rounded-full transition-all", stage.color)} style={{ width: stage.rate }} />
-              </div>
-            </button>
-          ))}
+      </div>
+
+      {/* ===== PROJECT PULSE ===== */}
+      <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-[2.5rem] p-8 shadow-sm">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center border border-amber-200 shadow-sm">
+              <Sparkles size={20} />
+            </div>
+            <div>
+              <h3 className="font-serif text-xl font-bold text-[#2A1C00]">Project Pulse</h3>
+              <p className="text-[10px] text-[#9A8262] font-black uppercase tracking-widest mt-1">Inventory & performance breakdown</p>
+            </div>
+          </div>
         </div>
-        {leads.length > 0 && (
-          <p className="mt-4 text-center text-[11px] text-[#9A8262]">
-            Overall conversion: <span className="font-bold text-[#C9A84C]">{leads.length > 0 ? ((calculatedStats.closedLeads / leads.length) * 100).toFixed(1) : 0}%</span> of leads become bookings
-          </p>
-        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {calculatedStats.projectStats.map(p => (
+            <div key={p.id} className="bg-white border border-[#E6D8B8]/60 rounded-3xl p-6 hover:shadow-xl hover:border-[#C9A84C]/30 transition-all group">
+              <div className="flex justify-between items-start mb-6">
+                <div className="max-w-[70%]">
+                  <p className="font-serif text-lg font-bold text-[#2A1C00] truncate group-hover:text-[#C9A84C] transition-colors">{p.name}</p>
+                  <p className="text-[9px] text-[#9A8262] font-black uppercase tracking-widest">Total Leads: {p.totalLeads}</p>
+                </div>
+                <div className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg text-[9px] font-black border border-emerald-100">
+                  {p.conversion}% CONV
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-2xl font-serif font-black text-[#2A1C00]">{p.rangeLeads}</p>
+                    <p className="text-[9px] text-[#9A8262] font-bold uppercase">Leads in Range</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-serif font-black text-[#C9A84C]">{p.visits}</p>
+                    <p className="text-[9px] text-[#9A8262] font-bold uppercase">Visits Done</p>
+                  </div>
+                </div>
+                <div className="w-full h-1.5 bg-gray-50 rounded-full overflow-hidden">
+                   <div 
+                    className="h-full bg-gradient-to-r from-[#C9A84C] to-[#B59640] rounded-full transition-all duration-1000" 
+                    style={{ width: `${Math.min(100, (p.visits / (p.rangeLeads || 1)) * 100)}%` }} 
+                   />
+                </div>
+              </div>
+            </div>
+          ))}
+          {calculatedStats.projectStats.length === 0 && (
+            <div className="col-span-full py-10 text-center text-[#9A8262] italic text-xs">No project data to display.</div>
+          )}
+        </div>
       </div>
 
       {/* ===== MISSED OPPORTUNITIES ===== */}

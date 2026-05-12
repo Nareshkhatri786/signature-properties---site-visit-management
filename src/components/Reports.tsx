@@ -269,6 +269,15 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
     return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
+  // Leaderboard Scoring Logic
+  const leaderboardData = userPerformance.map((user, idx) => {
+    // Simple Score: (Visits * 10) + (Converted * 50)
+    const score = (user.visitsDone * 10) + (user.converted * 50);
+    return { ...user, score };
+  }).sort((a, b) => b.score - a.score);
+
+  const topThree = leaderboardData.slice(0, 3);
+
   const renderDrillDown = () => {
     if (!drillDownType) return null;
 
@@ -288,16 +297,8 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
       items = filteredActivities.filter(a => a.type === 'call_answered');
       title = "Calls Answered";
     } else if (drillDownType === 'visitsDone') {
-      items = filteredActivities.filter(a => a.type === 'visit_done');
       title = "Visits Completed";
-  // Leaderboard Scoring Logic
-  const leaderboardData = userPerformance.map((user, idx) => {
-    // Simple Score: (Visits * 10) + (Converted * 50)
-    const score = (user.visitsDone * 10) + (user.converted * 50);
-    return { ...user, score };
-  }).sort((a, b) => b.score - a.score);
-
-  const topThree = leaderboardData.slice(0, 3);
+    }
 
     return (
       <div className="mt-8 bg-white border border-[#C9A84C]/30 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -664,10 +665,9 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
                    </div>
                 )}
               </div>
-            </div>
           </div>
         </div>
-      </div>
+        
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

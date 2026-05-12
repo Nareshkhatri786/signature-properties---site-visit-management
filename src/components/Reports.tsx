@@ -290,10 +290,14 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
     } else if (drillDownType === 'visitsDone') {
       items = filteredActivities.filter(a => a.type === 'visit_done');
       title = "Visits Completed";
-    } else if (drillDownType === 'whatsapp') {
-      items = filteredActivities.filter(a => a.type === 'whatsapp_sent');
-      title = "WhatsApp Messages Sent";
-    }
+  // Leaderboard Scoring Logic
+  const leaderboardData = userPerformance.map((user, idx) => {
+    // Simple Score: (Visits * 10) + (Converted * 50)
+    const score = (user.visitsDone * 10) + (user.converted * 50);
+    return { ...user, score };
+  }).sort((a, b) => b.score - a.score);
+
+  const topThree = leaderboardData.slice(0, 3);
 
     return (
       <div className="mt-8 bg-white border border-[#C9A84C]/30 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -545,17 +549,125 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
 
       {renderDrillDown()}
 
-      {/* User Performance Highlights Section */}
-      <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-6 py-4 bg-[#FDFAF2] border-b border-[#E6D8B8] flex items-center justify-between">
-          <h3 className="font-['Cormorant_Garamond'] text-xl font-bold text-[#2A1C00] flex items-center gap-2">
-            <Trophy className="text-[#C9A84C]" size={20} />
-            User Performance Highlights
-          </h3>
-          <div className="text-[10px] font-black text-[#9A8262] uppercase tracking-widest">
-            Ranked by Conversion Rate
+      {/* Team Leaderboard Section */}
+      <div className="bg-[#1C1207] rounded-[2rem] p-8 border border-[#C9A84C]/30 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12">
+          <Trophy size={150} className="text-[#C9A84C]" />
+        </div>
+        
+        <div className="relative z-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
+            <div>
+              <h3 className="font-serif text-3xl font-bold text-white flex items-center gap-3">
+                <Trophy className="text-[#C9A84C]" size={32} />
+                Elite Performance Leaderboard
+              </h3>
+              <p className="text-white/60 text-sm mt-1">Celebrating our top sales warriors.</p>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-2xl px-6 py-3 backdrop-blur-sm">
+              <span className="text-[10px] font-black text-[#C9A84C] uppercase tracking-widest block mb-1">Total Team Closures</span>
+              <span className="text-2xl font-serif font-black text-white">{filteredLeadsGlobal.filter(l => l.status === 'closed').length}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Top 3 Podium */}
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+              {/* Rank 2 */}
+              {topThree[1] && (
+                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 text-center h-[280px] flex flex-col justify-center relative group hover:bg-white/10 transition-all">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-10 h-10 bg-slate-400 rounded-full flex items-center justify-center text-white font-black border-4 border-[#1C1207]">2</div>
+                  <div className="w-20 h-20 bg-slate-400/20 rounded-full mx-auto mb-4 flex items-center justify-center text-slate-400 text-3xl font-black">
+                    {topThree[1].name.charAt(0)}
+                  </div>
+                  <h4 className="text-white font-bold text-lg mb-1">{topThree[1].name}</h4>
+                  <p className="text-[#C9A84C] font-black text-sm mb-4">{topThree[1].score} PTS</p>
+                  <div className="grid grid-cols-2 gap-2 text-[10px] text-white/60">
+                    <div className="bg-white/5 p-2 rounded-xl">
+                      <span className="block font-bold text-white">{topThree[1].visitsDone}</span> Visits
+                    </div>
+                    <div className="bg-white/5 p-2 rounded-xl">
+                      <span className="block font-bold text-white">{topThree[1].converted}</span> Deals
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Rank 1 */}
+              {topThree[0] && (
+                <div className="bg-gradient-to-b from-[#C9A84C]/20 to-white/5 border-2 border-[#C9A84C]/50 rounded-[2.5rem] p-8 text-center h-[340px] flex flex-col justify-center relative shadow-2xl shadow-[#C9A84C]/20 group hover:scale-[1.02] transition-all">
+                  <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 bg-[#C9A84C] rounded-full flex items-center justify-center text-[#1C1207] text-xl font-black border-4 border-[#1C1207] shadow-xl">1</div>
+                  <div className="w-24 h-24 bg-[#C9A84C]/20 rounded-full mx-auto mb-6 flex items-center justify-center text-[#C9A84C] text-4xl font-black border-2 border-[#C9A84C]/30">
+                    {topThree[0].name.charAt(0)}
+                  </div>
+                  <h4 className="text-white font-serif text-2xl font-bold mb-1">{topThree[0].name}</h4>
+                  <p className="text-[#C9A84C] font-black text-lg mb-6">{topThree[0].score} PTS</p>
+                  <div className="grid grid-cols-2 gap-3 text-xs text-white/80">
+                    <div className="bg-white/10 p-3 rounded-2xl border border-white/5">
+                      <span className="block font-black text-white text-lg">{topThree[0].visitsDone}</span> Visits Done
+                    </div>
+                    <div className="bg-white/10 p-3 rounded-2xl border border-white/5">
+                      <span className="block font-black text-white text-lg">{topThree[0].converted}</span> Deals Closed
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Rank 3 */}
+              {topThree[2] && (
+                <div className="bg-white/5 border border-white/10 rounded-3xl p-6 text-center h-[240px] flex flex-col justify-center relative group hover:bg-white/10 transition-all">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-10 h-10 bg-orange-700 rounded-full flex items-center justify-center text-white font-black border-4 border-[#1C1207]">3</div>
+                  <div className="w-16 h-16 bg-orange-700/20 rounded-full mx-auto mb-4 flex items-center justify-center text-orange-700 text-2xl font-black">
+                    {topThree[2].name.charAt(0)}
+                  </div>
+                  <h4 className="text-white font-bold text-base mb-1">{topThree[2].name}</h4>
+                  <p className="text-[#C9A84C] font-black text-xs mb-4">{topThree[2].score} PTS</p>
+                  <div className="grid grid-cols-2 gap-2 text-[10px] text-white/60">
+                    <div className="bg-white/5 p-2 rounded-xl">
+                      <span className="block font-bold text-white">{topThree[2].visitsDone}</span> Visits
+                    </div>
+                    <div className="bg-white/5 p-2 rounded-xl">
+                      <span className="block font-bold text-white">{topThree[2].converted}</span> Deals
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Runner Ups List */}
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col">
+              <h4 className="text-white font-bold text-sm uppercase tracking-widest mb-6 border-b border-white/10 pb-4 flex items-center justify-between">
+                Rising Stars
+                <span className="text-[10px] text-[#C9A84C]">Points System</span>
+              </h4>
+              <div className="flex-1 space-y-4 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+                {leaderboardData.slice(3).map((user, idx) => (
+                  <div key={user.name} className="flex items-center justify-between p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-all border border-transparent hover:border-white/10">
+                    <div className="flex items-center gap-3">
+                      <span className="text-white/40 font-bold text-xs w-4">{idx + 4}</span>
+                      <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-xs">
+                        {user.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-white font-bold text-xs">{user.name}</p>
+                        <p className="text-[9px] text-[#C9A84C] font-black uppercase">{user.score} Points</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-white/60 font-medium">{user.converted} Closures</span>
+                    </div>
+                  </div>
+                ))}
+                {leaderboardData.length <= 3 && (
+                   <div className="h-full flex items-center justify-center text-center p-10 opacity-30">
+                     <p className="text-xs text-white italic">Competition is heating up!</p>
+                   </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
+      </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

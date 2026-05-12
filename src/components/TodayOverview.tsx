@@ -337,7 +337,3 @@ export default function TodayOverview({ leads, visits, followUps, callLogs, user
     </div>
   );
 }
->
-    </div>
-  );
-}

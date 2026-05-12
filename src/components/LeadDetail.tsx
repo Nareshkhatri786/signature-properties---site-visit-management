@@ -359,44 +359,63 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
                 )}
               </div>
             </div>
-            {/* Follow-up & Scheduled Visit Highlight */}
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <div className="bg-[#FFFDF6] border border-[#E6D8B8] px-3 py-2 rounded-xl shadow-sm flex items-center gap-3">
-                <span className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Next Follow-up:</span>
+            {/* Lead Journey Pipeline */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black text-[#9A8262] uppercase tracking-[0.2em]">Lead Journey Progress</span>
+                <span className="text-[10px] font-bold text-[#C9A84C] uppercase bg-[#C9A84C]/10 px-2 py-0.5 rounded-full border border-[#C9A84C]/20">
+                  {Math.round((['new', 'contacted', 'visit_scheduled', 'visit_done', 'closed'].indexOf(lead.status) + 1) / 5 * 100)}% Complete
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {['new', 'contacted', 'visit_scheduled', 'visit_done', 'closed'].map((stage, i, arr) => {
+                  const isActive = stage === lead.status;
+                  const isPast = arr.indexOf(lead.status) > i;
+                  return (
+                    <React.Fragment key={stage}>
+                      <div 
+                        onClick={() => handleUpdateStatus('status', stage)}
+                        className={cn(
+                          "h-1.5 flex-1 rounded-full transition-all cursor-pointer relative group",
+                          isActive ? "bg-[#C9A84C] ring-4 ring-[#C9A84C]/10" : isPast ? "bg-emerald-500" : "bg-[#E6D8B8]/30 hover:bg-[#E6D8B8]/60"
+                        )}
+                      >
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                          <span className="text-[9px] font-black text-[#5C4820] uppercase bg-white border border-[#E6D8B8] px-2 py-1 rounded shadow-sm">
+                            {stage.replace('_', ' ')}
+                          </span>
+                        </div>
+                      </div>
+                      {i < arr.length - 1 && <div className="w-1 h-1 rounded-full bg-[#E6D8B8]/30" />}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick Intelligence Summary */}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="bg-[#FFFDF6] border border-[#E6D8B8] px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-2">
+                 <div className={cn("w-2 h-2 rounded-full", lead.quality === 'hot' ? 'bg-red-500 animate-pulse' : lead.quality === 'warm' ? 'bg-orange-500' : 'bg-blue-500')} />
+                 <span className="text-[10px] font-black text-[#5C4820] uppercase tracking-wider">{lead.quality}</span>
+              </div>
+              
+              <div className="bg-white border border-[#E6D8B8] px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-2">
+                <span className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Next Action:</span>
                 <FollowUpStatusBadge 
                   status={followUpStatus}
                   date={nextFollowUp?.date}
                   isLost={lead.status === 'lost'}
                   onClick={() => setIsFollowUpModalOpen(true)}
                 />
-                {nextFollowUp?.purpose && (
-                  <span className="text-xs text-[#5C4820] border-l border-[#E6D8B8] pl-3 italic truncate max-w-[200px]">
-                    "{nextFollowUp.purpose}"
-                  </span>
-                )}
               </div>
 
               {nextScheduledVisit && (
-                <div className="bg-[#F0F9FF] border border-blue-200 px-3 py-2 rounded-xl shadow-sm flex items-center gap-3">
-                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1">
-                    <CalendarCheck size={12} /> Next Visit:
+                <div className="bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-2">
+                  <CalendarCheck size={12} className="text-blue-600" />
+                  <span className="text-[10px] font-black text-blue-700 uppercase tracking-wider">
+                    Visit: {format(new Date(nextScheduledVisit.visit_date), 'dd MMM')}
                   </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-blue-900">
-                      {new Date(nextScheduledVisit.visit_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                    </span>
-                    {nextScheduledVisit.visit_time && (
-                      <span className="text-[10px] font-medium text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1">
-                        <Clock size={10} /> {nextScheduledVisit.visit_time}
-                      </span>
-                    )}
-                  </div>
-                  <button 
-                    onClick={() => onNavigate('detail', nextScheduledVisit.id)}
-                    className="text-[10px] font-bold text-blue-600 hover:underline border-l border-blue-200 pl-3"
-                  >
-                    Reschedule
-                  </button>
                 </div>
               )}
             </div>
@@ -598,46 +617,74 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Stats & Info */}
         <div className="space-y-8">
+        {/* Left Column: Stats & Info */}
+        <div className="space-y-6">
+          {/* Property Preference Card */}
+          <div className="bg-[#1C1207] border border-[#C9A84C]/20 rounded-[2rem] p-6 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-6 opacity-5">
+              <MapPin size={80} className="text-[#C9A84C]" />
+            </div>
+            <div className="relative z-10">
+              <h3 className="text-white font-serif text-lg font-bold mb-4 flex items-center gap-2">
+                <Sparkles size={18} className="text-[#C9A84C]" />
+                Client Intent
+              </h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <p className="text-white/40 text-[9px] font-bold uppercase tracking-wider mb-1">Budget</p>
+                    <p className="text-white font-serif text-sm font-bold">{lead.budget || 'Not specified'}</p>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <p className="text-white/40 text-[9px] font-bold uppercase tracking-wider mb-1">Configuration</p>
+                    <p className="text-white font-serif text-sm font-bold">{lead.property_interest || 'Not specified'}</p>
+                  </div>
+                </div>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                  <p className="text-white/40 text-[9px] font-bold uppercase tracking-wider mb-1">Primary Interest</p>
+                  <p className="text-white font-serif text-sm font-bold">Interested in {projects.find(p => p.id === lead.projectId)?.name || 'Project Selection'}</p>
+                </div>
+                <div className="flex gap-2">
+                   <button className="flex-1 bg-[#C9A84C]/20 border border-[#C9A84C]/30 text-[#C9A84C] py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#C9A84C]/30 transition-all">Update Preferences</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Site Visit Summary */}
-          <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-6 shadow-sm">
+          <div className="bg-white border border-[#E6D8B8] rounded-2xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00] flex items-center gap-2">
                 <CalendarCheck className="text-[#C9A84C]" size={18} />
-                Visit Summary
+                Visit Health
               </h3>
-              <button 
-                onClick={() => onAddVisit(lead)}
-                className="text-[10px] font-bold text-[#C9A84C] uppercase tracking-widest hover:underline"
-              >
-                + New Visit
-              </button>
+              <div className="flex items-center gap-1 bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">
+                <CheckCircle2 size={10} /> Verified
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white border border-[#E6D8B8]/50 rounded-xl p-4 text-center">
-                <div className="text-xl font-black text-[#2A1C00]">{visits.length}</div>
+              <div className="bg-[#FDFBF7] border border-[#E6D8B8]/50 rounded-xl p-4 text-center">
+                <div className="text-2xl font-serif font-black text-[#2A1C00]">{visits.length}</div>
                 <div className="text-[9px] font-bold text-[#9A8262] uppercase tracking-wider">Total Visits</div>
               </div>
-              <div className="bg-white border border-[#E6D8B8]/50 rounded-xl p-4 text-center text-xs">
-                <div className="flex justify-center">
-                  {lastVisit ? <VisitBadge status={lastVisit.visit_status} /> : <span className="text-[#9A8262]">No history</span>}
+              <div className="bg-[#FDFBF7] border border-[#E6D8B8]/50 rounded-xl p-4 text-center">
+                <div className="flex justify-center mb-1">
+                  {lastVisit ? <VisitBadge status={lastVisit.visit_status} /> : <span className="text-[#9A8262] text-[10px] italic">None</span>}
                 </div>
-                <div className="text-[9px] font-bold text-[#9A8262] uppercase tracking-wider mt-1">Last Status</div>
+                <div className="text-[9px] font-bold text-[#9A8262] uppercase tracking-wider">Last Status</div>
               </div>
               <div className="col-span-2 bg-[#FDFAF2] border border-[#E6D8B8]/50 rounded-xl p-4 flex items-center justify-between">
                  <div className="text-left">
-                   <div className="text-[9px] font-bold text-[#9A8262] uppercase tracking-wider">Next Visit Date</div>
-                   <div className="text-[13px] font-bold text-[#5C4820]">
-                     {nextScheduledVisit ? format(new Date(nextScheduledVisit.visit_date), 'dd MMM yyyy') : 'No upcoming visit'}
+                   <div className="text-[9px] font-bold text-[#9A8262] uppercase tracking-wider">Engagement Level</div>
+                   <div className="text-[13px] font-bold text-[#5C4820] flex items-center gap-2">
+                     {lead.stats?.visits_done ? 'High Engagement' : 'In Discovery'}
+                     <div className="flex gap-0.5">
+                       {[1, 2, 3, 4, 5].map(i => (
+                         <div key={i} className={cn("w-1 h-3 rounded-full", i <= (lead.stats?.visits_done || 0) + 1 ? "bg-emerald-500" : "bg-gray-200")} />
+                       ))}
+                     </div>
                    </div>
                  </div>
-                 {nextScheduledVisit && (
-                   <button 
-                     onClick={() => onNavigate('detail', nextScheduledVisit.id)}
-                     className="text-[10px] font-bold text-[#C9A84C] uppercase tracking-widest flex items-center gap-1"
-                   >
-                     Manage <Plus size={12} className="rotate-45" />
-                   </button>
-                 )}
               </div>
             </div>
           </div>

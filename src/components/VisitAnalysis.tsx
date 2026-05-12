@@ -114,7 +114,7 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
 
     const trend = last14Days.map(day => {
       const dayStr = format(day, 'yyyy-MM-dd');
-      const dayVisits = visits.filter(v => v.visit_status === 'completed' && v.visit_date === dayStr);
+      const dayVisits = visits.filter(v => v.visit_status === 'completed' && v.visit_date?.startsWith(dayStr));
       return {
         name: format(day, 'dd MMM'),
         visits: dayVisits.length,
@@ -142,8 +142,8 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
       conversionRatio,
       closedLeadsFromVisits,
       totalCompletedVisits,
-      today: visits.filter(v => v.visit_status === 'completed' && v.visit_date === format(new Date(), 'yyyy-MM-dd')).length,
-      yesterday: visits.filter(v => v.visit_status === 'completed' && v.visit_date === format(subDays(new Date(), 1), 'yyyy-MM-dd')).length,
+      today: visits.filter(v => v.visit_status === 'completed' && v.visit_date?.startsWith(format(new Date(), 'yyyy-MM-dd'))).length,
+      yesterday: visits.filter(v => v.visit_status === 'completed' && v.visit_date?.startsWith(format(subDays(new Date(), 1), 'yyyy-MM-dd'))).length,
       thisWeek: visits.filter(v => v.visit_status === 'completed' && isWithinInterval(parseISO(v.visit_date || ''), { start: startOfWeek(new Date()), end: endOfWeek(new Date()) })).length,
       thisMonth: visits.filter(v => v.visit_status === 'completed' && isWithinInterval(parseISO(v.visit_date || ''), { start: startOfMonth(new Date()), end: endOfMonth(new Date()) })).length
     };

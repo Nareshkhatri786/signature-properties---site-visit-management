@@ -3,30 +3,32 @@ import { storage } from './lib/storage';
 import { User, Visit, Remark, Template, Settings, Page, CallLog, CallOutcome, Lead, LeadQuality, WebhookConfig, FollowUp, Activity, ActivityType, Project, LeadStatus, VisitStatus, VisitFilters, FollowUpMethod, Workflow } from './types';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
-import Dashboard from './components/Dashboard';
-import TodayOverview from './components/TodayOverview';
-import LeadList from './components/LeadList';
-import LeadDetail from './components/LeadDetail';
-import LeadForm from './components/LeadForm';
-import VisitList from './components/VisitList';
-import VisitForm from './components/VisitForm';
-import VisitDetail from './components/VisitDetail';
-import FollowUpList from './components/FollowUpList';
-import FollowUpForm from './components/FollowUpForm';
-import WhatsAppSender from './components/WhatsAppSender';
-import TemplateManager from './components/TemplateManager';
-import SettingsPage from './components/Settings';
-import Reports from './components/Reports';
-import WebhookSettings from './components/WebhookSettings';
-import HRMS from './components/HRMS';
-import CallOutcomeModal from './components/CallOutcomeModal';
-import PostCallWhatsAppModal from './components/PostCallWhatsAppModal';
-import Login from './components/Login';
-import WorkflowBuilder from './components/WorkflowBuilder';
-import VisitAnalysis from './components/VisitAnalysis';
-import VisitCompletionModal from './components/VisitCompletionModal';
 import { Toaster, toast } from 'react-hot-toast';
 import { CalendarCheck, Plus, Phone, MessageSquare, Home } from 'lucide-react';
+
+// Lazy load non-critical components for faster initial load
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
+const LeadList = React.lazy(() => import('./components/LeadList'));
+const LeadDetail = React.lazy(() => import('./components/LeadDetail'));
+const LeadForm = React.lazy(() => import('./components/LeadForm'));
+const VisitList = React.lazy(() => import('./components/VisitList'));
+const VisitForm = React.lazy(() => import('./components/VisitForm'));
+const VisitDetail = React.lazy(() => import('./components/VisitDetail'));
+const FollowUpList = React.lazy(() => import('./components/FollowUpList'));
+const FollowUpForm = React.lazy(() => import('./components/FollowUpForm'));
+const TemplateManager = React.lazy(() => import('./components/TemplateManager'));
+const SettingsPage = React.lazy(() => import('./components/Settings'));
+const Reports = React.lazy(() => import('./components/Reports'));
+const WebhookSettings = React.lazy(() => import('./components/WebhookSettings'));
+const HRMS = React.lazy(() => import('./components/HRMS'));
+const WorkflowBuilder = React.lazy(() => import('./components/WorkflowBuilder'));
+const VisitAnalysis = React.lazy(() => import('./components/VisitAnalysis'));
+const VisitCompletionModal = React.lazy(() => import('./components/VisitCompletionModal'));
+import TodayOverview from './components/TodayOverview';
+import CallOutcomeModal from './components/CallOutcomeModal';
+import PostCallWhatsAppModal from './components/PostCallWhatsAppModal';
+import WhatsAppSender from './components/WhatsAppSender';
+import Login from './components/Login';
 import { aiService } from './lib/ai';
 import { generateId } from './lib/storage';
 import { cn } from './lib/utils';
@@ -973,13 +975,19 @@ export default function App() {
         />
         
         <main className="p-4 lg:p-8 flex-1 overflow-x-hidden">
-          <motion.div
-            key={currentPage + (selectedVisitId || '')}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-          >
+          <React.Suspense fallback={
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+              <div className="w-10 h-10 border-4 border-[#C9A84C]/20 border-t-[#C9A84C] rounded-full animate-spin" />
+              <p className="text-[10px] font-black text-[#C9A84C] uppercase tracking-[0.2em] animate-pulse">Loading Module...</p>
+            </div>
+          }>
+            <motion.div
+              key={currentPage + (selectedVisitId || '')}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+            >
             {currentPage === 'today' && (
             <TodayOverview
               leads={filteredLeads}
@@ -1606,6 +1614,7 @@ export default function App() {
             />
           )}
           </motion.div>
+          </React.Suspense>
         </main>
       </div>
       

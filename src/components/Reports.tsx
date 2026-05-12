@@ -270,13 +270,13 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
      return dateA - dateB; // Oldest first
   });
 
-  // Source Quality Calculations
-  const sourceQualityStats = projects[0]?.sources?.map(source => {
+  // Source Quality Calculations - derive sources from actual lead data, not project config
+  const uniqueSources = Array.from(new Set(leads.map(l => l.source).filter(Boolean))) as string[];
+  const sourceQualityStats = uniqueSources.map(source => {
     const sourceLeads = filteredLeadsGlobal.filter(l => l.source === source);
     const sourceVisits = sourceLeads.filter(l => l.status === 'visit_done' || l.status === 'closed').length;
     const sourceClosed = sourceLeads.filter(l => l.status === 'closed').length;
     const visitRate = sourceLeads.length > 0 ? Math.round((sourceVisits / sourceLeads.length) * 100) : 0;
-    
     return {
       name: source,
       leads: sourceLeads.length,
@@ -284,7 +284,7 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
       closed: sourceClosed,
       rate: visitRate
     };
-  }).filter(s => s.leads > 0).sort((a, b) => b.leads - a.leads) || [];
+  }).filter(s => s.leads > 0).sort((a, b) => b.leads - a.leads);
 
   const getActivityIcon = (type: ActivityType) => {
     switch (type) {

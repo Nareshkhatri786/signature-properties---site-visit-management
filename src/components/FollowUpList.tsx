@@ -59,7 +59,8 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
         if (f.status === 'completed') statusGroup = 'completed';
         else if (f.status === 'cancelled') statusGroup = 'cancelled';
         else {
-          if (!fDate) statusGroup = 'upcoming';
+          // Only mark as overdue if a date was explicitly set AND it is in the past
+          if (!fDate) statusGroup = 'upcoming'; // No date = upcoming (not overdue)
           else if (fDate < today) statusGroup = 'overdue';
           else if (fDate === today) statusGroup = 'today';
           else statusGroup = 'upcoming';
@@ -80,7 +81,7 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
       const userName = f.userName || lead?.assignedToName || userObj?.name || visit?.assigned_to || 'Unassigned';
       
       const project = projects.find(p => p.id === f.projectId);
-      const projectName = project?.name || 'Unknown Project';
+      const projectName = project?.name || 'Unassigned';
       
       return {
         ...f, clientName, phone, source, priorityStr, statusGroup, daysOverdue, stage,
@@ -588,10 +589,26 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
               Bulk Mark as Completed {selectedIds.length > 0 && `(${selectedIds.length})`}
             </button>
             {isAdmin && (
+              <>
               <button className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#FDFAF2] text-sm font-bold text-[#5C4820] transition-colors group border border-transparent hover:border-[#E6D8B8]">
                 <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center group-hover:bg-orange-100 transition-colors"><RefreshCw size={16} className="text-orange-600" /></div>
                 Reassign Follow Ups
               </button>
+              <button
+                onClick={() => {
+                  const overdueIds = filteredData.filter(f => f.statusGroup === 'overdue').map(f => f.id);
+                  if (overdueIds.length === 0) { alert('No overdue follow-ups selected.'); return; }
+                  const newDate = prompt(`Reschedule ${overdueIds.length} overdue follow-ups to date (YYYY-MM-DD):`, new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+                  if (!newDate || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { alert('Invalid date format. Use YYYY-MM-DD'); return; }
+                  overdueIds.forEach(id => onUpdateStatus(id, 'completed', `Bulk rescheduled to ${newDate}`));
+                  alert(`${overdueIds.length} follow-ups rescheduled.`);
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#FDFAF2] text-sm font-bold text-amber-700 transition-colors group border border-amber-100 hover:border-amber-300 bg-amber-50"
+              >
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center group-hover:bg-amber-200 transition-colors"><Calendar size={16} className="text-amber-600" /></div>
+                Bulk Reschedule Overdue ({stats.overdue})
+              </button>
+              </>
             )}
             <button className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#FDFAF2] text-sm font-bold text-[#5C4820] transition-colors group border border-transparent hover:border-[#E6D8B8]">
               <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors"><Download size={16} className="text-purple-600" /></div>

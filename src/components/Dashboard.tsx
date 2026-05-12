@@ -781,8 +781,13 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
           <div className="divide-y divide-[#E6D8B8]/30">
             {calculatedStats.followUpRemindersList.map(v => (
               <div key={v.id} className="px-7 py-5 flex items-center justify-between">
-                <div><p className="font-bold text-[#2A1C00]">{v.client_name}</p><p className="text-rose-600/70 text-[11px] font-bold">Missed on {v.visit_date}</p></div>
-                <button onClick={() => onNavigate('detail', v.id)} className="bg-rose-100 text-rose-800 px-3 py-1 rounded-lg text-[10px] font-black uppercase">Retrieve</button>
+                <div>
+                  <p className="font-bold text-[#2A1C00]">{v.client_name}</p>
+                  <p className="text-rose-600/70 text-[11px] font-bold">
+                    Missed on {(() => { try { const d = new Date(v.visit_date || ''); return isNaN(d.getTime()) ? v.visit_date : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return v.visit_date || 'N/A'; } })()}
+                  </p>
+                </div>
+                <button onClick={() => onNavigate('detail', v.id)} className="bg-amber-100 text-amber-800 px-3 py-1 rounded-lg text-[10px] font-black uppercase hover:bg-amber-200 transition-colors">Reschedule</button>
               </div>
             ))}
           </div>
@@ -792,7 +797,13 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
           <div className="divide-y divide-[#E6D8B8]/30">
             {calculatedStats.upcoming.map(v => (
               <div key={v.id} className="px-7 py-5 flex items-center justify-between">
-                <div><p className="font-bold text-[#2A1C00]">{v.client_name}</p><p className="text-[#9A8262] text-[11px] font-bold">{v.visit_date}</p></div>
+                <div>
+                  <p className="font-bold text-[#2A1C00]">{v.client_name}</p>
+                  <p className="text-[#9A8262] text-[11px] font-bold">
+                    {(() => { try { const d = new Date(v.visit_date || ''); return isNaN(d.getTime()) ? v.visit_date : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return v.visit_date || 'N/A'; } })()}
+                    {v.visit_time ? ` at ${v.visit_time}` : ''}
+                  </p>
+                </div>
                 <button onClick={() => onNavigate('detail', v.id)} className="p-2 text-[#9A8262] hover:text-[#C9A84C]"><Eye size={17} /></button>
               </div>
             ))}

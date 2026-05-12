@@ -89,16 +89,19 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
   });
 
   const filteredVisitsGlobal = visits.filter(v => {
-    const matchesUser = selectedUser === '' || v.assigned_to === selectedUserName;
+    const salesmanName = users.find(u => u.id.toString() === selectedUser)?.name;
+    const matchesUser = selectedUser === '' || v.assigned_to === salesmanName;
     const matchesProject = selectedProject === '' || v.projectId === selectedProject;
     const matchesDate = isDateInRange(v.visit_date, dateRange);
     return matchesUser && matchesProject && matchesDate;
   });
 
   const filteredCallLogsGlobal = callLogs.filter(log => {
-    const matchesUser = selectedUser === '' || log.by === selectedUserName;
+    const salesmanName = users.find(u => u.id.toString() === selectedUser)?.name;
+    const matchesUser = selectedUser === '' || log.by === salesmanName;
     const matchesProject = selectedProject === '' || log.projectId === selectedProject;
-    return matchesUser && matchesProject;
+    const matchesDate = isDateInRange(log.timestamp, dateRange);
+    return matchesUser && matchesProject && matchesDate;
   });
 
   // Calculations for enhanced charts
@@ -190,10 +193,10 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
   }));
 
   const funnelData = [
-    { name: 'Total Leads', value: leads.length, color: '#9A8262' },
-    { name: 'Contacted', value: leads.filter(l => l.status !== 'new').length, color: '#3498DB' },
-    { name: 'Visits Done', value: leads.filter(l => l.status === 'visit_done' || l.status === 'closed').length, color: '#9B59B6' },
-    { name: 'Closed', value: leads.filter(l => l.status === 'closed').length, color: '#27AE60' },
+    { name: 'Total Leads', value: filteredLeadsGlobal.length, color: '#9A8262', icon: Users },
+    { name: 'Contacted', value: filteredLeadsGlobal.filter(l => l.status !== 'new').length, color: '#3498DB', icon: Phone },
+    { name: 'Visits Done', value: filteredLeadsGlobal.filter(l => l.status === 'visit_done' || l.status === 'closed').length, color: '#9B59B6', icon: Calendar },
+    { name: 'Closed', value: filteredLeadsGlobal.filter(l => l.status === 'closed').length, color: '#27AE60', icon: Trophy },
   ];
 
   const getActivityIcon = (type: ActivityType) => {
@@ -301,21 +304,67 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
 
   return (
     <div className="space-y-8 pb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="font-serif text-3xl font-bold text-[#2A1C00] flex items-center gap-3">
-            <div className="p-2 bg-[#C9A84C]/10 rounded-xl">
-              <TrendingUp className="text-[#C9A84C]" size={24} />
-            </div>
-            Strategic Analytics
-          </h2>
-          <p className="text-[#9A8262] text-sm mt-1 ml-14">Data-driven insights & performance audits.</p>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="font-serif text-3xl font-bold text-[#2A1C00] flex items-center gap-3">
+              <div className="p-2 bg-[#C9A84C]/10 rounded-xl">
+                <TrendingUp className="text-[#C9A84C]" size={24} />
+              </div>
+              Strategic Analytics
+            </h2>
+            <p className="text-[#9A8262] text-sm mt-1 ml-14">Data-driven insights & performance audits.</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button className="bg-white border border-[#E6D8B8] px-4 py-2 rounded-xl text-sm font-bold text-[#C9A84C] flex items-center gap-2 hover:bg-[#FDFAF2] transition-colors shadow-sm">
+              <Download size={16} /> Export
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <DateRangeSelector selectedRange={dateRange} onChange={setDateRange} />
-          <button className="bg-white border border-[#E6D8B8] px-4 py-2 rounded-xl text-sm font-bold text-[#C9A84C] flex items-center gap-2 hover:bg-[#FDFAF2] transition-colors shadow-sm">
-            <Download size={16} /> Export
-          </button>
+
+        {/* Top Filters Bar */}
+        <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl p-4 shadow-sm flex flex-wrap items-center gap-4">
+          <div className="flex-1 min-w-[200px]">
+             <DateRangeSelector selectedRange={dateRange} onChange={setDateRange} />
+          </div>
+          
+          <div className="h-8 w-px bg-[#E6D8B8]/50 hidden sm:block" />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C9A84C]" />
+              <select 
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+                className="bg-white border border-[#E6D8B8] rounded-xl py-2 pl-9 pr-8 text-xs font-bold text-[#5C4820] focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
+              >
+                <option value="">All Projects</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+
+            <div className="relative">
+              <UserIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C9A84C]" />
+              <select 
+                value={selectedUser}
+                onChange={(e) => setSelectedUser(e.target.value)}
+                className="bg-white border border-[#E6D8B8] rounded-xl py-2 pl-9 pr-8 text-xs font-bold text-[#5C4820] focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
+              >
+                <option value="">All Salesmen</option>
+                {users.map(u => <option key={u.id} value={u.id.toString()}>{u.name}</option>)}
+              </select>
+            </div>
+
+            {(selectedProject || selectedUser) && (
+              <button 
+                onClick={() => { setSelectedProject(''); setSelectedUser(''); }}
+                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                title="Clear Filters"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -526,69 +575,6 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
         </div>
       </div>
 
-      {/* Filters for Audit Trail */}
-      <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="space-y-1.5">
-          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Project</label>
-          <div className="relative">
-            <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A8262]" />
-            <select 
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
-            >
-              <option value="">All Projects</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Salesman</label>
-          <div className="relative">
-            <UserIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9A8262]" />
-            <select 
-              value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
-            >
-              <option value="">All Salesmen</option>
-              {users.map(u => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Activity Type</label>
-          <select 
-            value={selectedActivityType}
-            onChange={(e) => setSelectedActivityType(e.target.value as ActivityType | '')}
-            className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
-          >
-            <option value="">All Activities</option>
-            <option value="lead_created">Lead Created</option>
-            <option value="lead_updated">Lead Updated</option>
-            <option value="call_attempted">Call Attempted</option>
-            <option value="call_answered">Call Answered</option>
-            <option value="whatsapp_sent">WhatsApp Sent</option>
-            <option value="visit_scheduled">Visit Scheduled</option>
-            <option value="visit_done">Visit Done</option>
-          </select>
-        </div>
-
-        <div className="flex gap-2 items-end">
-          <button 
-            onClick={() => { setSelectedUser(''); setSelectedProject(''); setSelectedActivityType(''); }}
-            className="flex-1 h-[38px] flex items-center justify-center gap-2 text-[#9A8262] text-sm font-semibold hover:text-[#2A1C00] transition-colors bg-white border border-[#E6D8B8] rounded-lg"
-          >
-            <X size={14} /> Clear Filters
-          </button>
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-6 shadow-sm">
@@ -619,10 +605,84 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
           </div>
         </div>
 
+        {/* Conversion Funnel Chart */}
+        <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-8 shadow-sm lg:col-span-2 overflow-hidden relative">
+          <div className="flex items-center justify-between mb-10">
+            <div>
+              <h3 className="font-['Cormorant_Garamond'] text-2xl font-bold text-[#2A1C00] flex items-center gap-2">
+                <BarChart3 className="text-[#C9A84C]" size={22} />
+                Sales Conversion Funnel
+              </h3>
+              <p className="text-xs text-[#9A8262] mt-1">Measuring the journey from lead to closure.</p>
+            </div>
+            <div className="flex gap-4">
+               {funnelData.slice(1).map((step, idx) => {
+                 const prevValue = funnelData[idx].value;
+                 const dropRate = prevValue > 0 ? Math.round(((prevValue - step.value) / prevValue) * 100) : 0;
+                 return (
+                   <div key={idx} className="text-right">
+                     <div className="text-[10px] font-black text-red-500 uppercase tracking-tighter">Drop Rate</div>
+                     <div className="text-sm font-bold text-red-600">{dropRate}%</div>
+                   </div>
+                 );
+               })}
+            </div>
+          </div>
+
+          <div className="relative flex flex-col items-center gap-2 max-w-2xl mx-auto">
+            {funnelData.map((step, idx) => {
+              const maxWidth = 100 - (idx * 15); // Funnel shape narrowing
+              const percentage = funnelData[0].value > 0 ? Math.round((step.value / funnelData[0].value) * 100) : 0;
+              
+              return (
+                <div key={step.name} className="w-full flex flex-col items-center group">
+                  <div 
+                    className="h-16 relative flex items-center justify-center transition-all duration-500 hover:scale-[1.02] shadow-sm overflow-hidden"
+                    style={{ 
+                      width: `${maxWidth}%`, 
+                      backgroundColor: step.color,
+                      borderRadius: '8px',
+                      opacity: 0.9 + (idx * 0.03)
+                    }}
+                  >
+                    {/* Glass effect */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent pointer-events-none" />
+                    
+                    <div className="relative z-10 flex items-center justify-between w-full px-8 text-white">
+                      <div className="flex items-center gap-3">
+                        <step.icon size={20} className="opacity-80" />
+                        <span className="font-bold text-sm uppercase tracking-widest">{step.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-2xl font-serif font-black">{step.value}</span>
+                        {idx > 0 && (
+                          <div className="bg-white/20 px-2 py-1 rounded text-[10px] font-black">
+                            {percentage}% of Total
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Transition arrow/connector */}
+                  {idx < funnelData.length - 1 && (
+                    <div className="h-6 w-px bg-gradient-to-b from-[#E6D8B8] to-transparent my-1" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Background Decorative */}
+          <div className="absolute -bottom-10 -right-10 opacity-[0.03] rotate-12 pointer-events-none">
+            <BarChart3 size={300} />
+          </div>
+        </div>
+
         <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-6 shadow-sm">
           <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00] mb-6 flex items-center gap-2">
             <Building2 className="text-[#C9A84C]" size={18} />
-            Project Performance (Leads vs Closed)
+            Project Lead Volume
           </h3>
           <div className="w-full min-w-0 h-[300px]">
             {projectPerformance.length > 0 ? (

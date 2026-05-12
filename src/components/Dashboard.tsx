@@ -5,7 +5,7 @@ import {
   FireExtinguisher, Thermometer, Snowflake, Ban,
   Eye, MessageSquare, Plus, Phone, Users, AlertCircle,
   Filter, LayoutDashboard, TrendingUp, ArrowRight,
-  Trophy, Target, Zap, ChevronRight
+  Trophy, Target, Zap, ChevronRight, Sparkles
 } from 'lucide-react';
 import { Visit, Page, Lead, FollowUp, User, VisitFilters, Project, CallLog } from '../types';
 import { cn, getLocalDateString } from '../lib/utils';

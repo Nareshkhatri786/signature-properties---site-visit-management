@@ -1149,7 +1149,6 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
 
         {/* Audit Trail List */}
         <div className="bg-white border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden lg:col-span-2">

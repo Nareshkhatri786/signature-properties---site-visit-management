@@ -35,7 +35,9 @@ import {
   Trophy,
   BarChart3,
   Sparkles,
-  X
+  X,
+  Share2,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import DateRangeSelector, { DateRange, isDateInRange } from './DateRangeSelector';
@@ -225,6 +227,22 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
      const dateB = new Date(b.updated_at || b.created_at).getTime();
      return dateA - dateB; // Oldest first
   });
+
+  // Source Quality Calculations
+  const sourceQualityStats = projects[0]?.sources?.map(source => {
+    const sourceLeads = filteredLeadsGlobal.filter(l => l.source === source);
+    const sourceVisits = sourceLeads.filter(l => l.status === 'visit_done' || l.status === 'closed').length;
+    const sourceClosed = sourceLeads.filter(l => l.status === 'closed').length;
+    const visitRate = sourceLeads.length > 0 ? Math.round((sourceVisits / sourceLeads.length) * 100) : 0;
+    
+    return {
+      name: source,
+      leads: sourceLeads.length,
+      visits: sourceVisits,
+      closed: sourceClosed,
+      rate: visitRate
+    };
+  }).filter(s => s.leads > 0).sort((a, b) => b.leads - a.leads) || [];
 
   const getActivityIcon = (type: ActivityType) => {
     switch (type) {
@@ -781,7 +799,73 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
           </div>
         </div>
 
-        <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-6 shadow-sm overflow-hidden flex flex-col">
+        {/* Source Quality Analysis */}
+        <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-6 shadow-sm lg:col-span-2">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="font-['Cormorant_Garamond'] text-xl font-bold text-[#2A1C00] flex items-center gap-2">
+                <Share2 className="text-[#C9A84C]" size={20} />
+                Source Quality & ROI Analysis
+              </h3>
+              <p className="text-xs text-[#9A8262] mt-1">Comparing lead volume vs. site visit conversion per source.</p>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#9A8262]" />
+                <span className="text-[10px] font-bold text-[#9A8262]">LEADS</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#C9A84C]" />
+                <span className="text-[10px] font-bold text-[#C9A84C]">VISITS</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="md:col-span-2 h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={sourceQualityStats}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6D8B8" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9A8262', fontWeight: 'bold' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9A8262' }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#FFFDF6', border: '1px solid #E6D8B8', borderRadius: '8px' }}
+                    cursor={{ fill: 'rgba(201,168,76,0.05)' }}
+                  />
+                  <Bar dataKey="leads" fill="#9A8262" radius={[4, 4, 0, 0]} barSize={30} />
+                  <Bar dataKey="visits" fill="#C9A84C" radius={[4, 4, 0, 0]} barSize={30} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div className="space-y-4">
+               <h4 className="text-[10px] font-black text-[#9A8262] uppercase tracking-widest border-b border-[#E6D8B8] pb-2">Top Performing Sources</h4>
+               {sourceQualityStats.map(source => (
+                 <div key={source.name} className="p-3 bg-white border border-[#E6D8B8]/40 rounded-xl">
+                   <div className="flex justify-between items-center mb-2">
+                     <span className="font-bold text-sm text-[#2A1C00]">{source.name}</span>
+                     <span className="text-xs font-bold text-[#C9A84C]">{source.rate}% Visit Rate</span>
+                   </div>
+                   <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                     <div 
+                       className="h-full bg-gradient-to-r from-[#C9A84C] to-[#E8C97A]" 
+                       style={{ width: `${source.rate}%` }}
+                     />
+                   </div>
+                   <div className="mt-2 flex justify-between text-[10px] text-[#9A8262]">
+                     <span>{source.leads} Leads</span>
+                     <span className="font-bold text-[#2A1C00]">{source.visits} Visits</span>
+                   </div>
+                 </div>
+               ))}
+               {sourceQualityStats.length === 0 && (
+                 <div className="p-10 text-center text-[#9A8262] italic text-xs">No source data available.</div>
+               )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-6 shadow-sm overflow-hidden lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00] flex items-center gap-2">
               <AlertCircle className="text-red-500" size={18} />

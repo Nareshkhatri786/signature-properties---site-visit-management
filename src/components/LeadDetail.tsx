@@ -616,8 +616,6 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Stats & Info */}
-        <div className="space-y-8">
-        {/* Left Column: Stats & Info */}
         <div className="space-y-6">
           {/* Property Preference Card */}
           <div className="bg-[#1C1207] border border-[#C9A84C]/20 rounded-[2rem] p-6 shadow-xl relative overflow-hidden">

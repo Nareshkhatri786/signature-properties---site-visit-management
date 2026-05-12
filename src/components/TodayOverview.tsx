@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { CheckCircle2, Calendar, Phone, AlertCircle, TrendingUp, Users, ArrowRight, ChevronRight, Clock, Target, Sparkles } from 'lucide-react';
+import { CheckCircle2, Calendar, Phone, AlertCircle, TrendingUp, Users, ArrowRight, ChevronRight, Clock, Target, Sparkles, MessageSquare, TrendingDown } from 'lucide-react';
 import { Lead, Visit, FollowUp, CallLog, User, Page } from '../types';
 import { cn, getLocalDateString } from '../lib/utils';
 import { isToday, parseISO } from 'date-fns';
@@ -46,6 +46,14 @@ export default function TodayOverview({ leads, visits, followUps, callLogs, user
     const bookings = leads.filter(l => l.status === 'closed' && l.updated_at?.startsWith(todayStr)).length;
     const hotLeads = leads.filter(l => l.quality === 'hot').length;
 
+    // Yesterday stats for trend indicators
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    const yStr = getLocalDateString(d);
+    const yCalls = callLogs.filter(c => c.timestamp?.startsWith(yStr)).length;
+    const yVisits = visits.filter(v => v.visit_date === yStr && v.visit_status === 'completed').length;
+    const yFollowups = followUps.filter(f => f.status === 'completed' && (f.completed_at?.startsWith(yStr) || normalizeDate(f.date) === yStr)).length;
+    const trend = { calls: callsMade - yCalls, visits: visitsDone - yVisits, followups: followupsDone - yFollowups };
+
     // Team performance today
     const teamPerf = users.filter(u => u.role !== 'admin' && u.role !== 'adm').map(u => {
       const uFollowups = followUps.filter(f => f.userName === u.name && f.status === 'completed' && (f.completed_at?.startsWith(todayStr) || normalizeDate(f.date) === todayStr)).length;
@@ -90,7 +98,7 @@ export default function TodayOverview({ leads, visits, followUps, callLogs, user
       visitsDone, visitsScheduled, followupsDone, followupsPending, followupsOverdue, 
       callsMade, bookings, hotLeads, teamPerf, visitPieData, followupPieData, 
       todayVisitsTotal: todayVisits.length, todayCalls,
-      nextActions: [...todayFollowUps, ...todayVisitsNext]
+      nextActions: [...todayFollowUps, ...todayVisitsNext], trend
     };
   }, [leads, visits, followUps, callLogs, users, todayStr, user.name]);
 
@@ -175,10 +183,10 @@ export default function TodayOverview({ leads, visits, followUps, callLogs, user
             </h3>
             <div className="flex flex-wrap items-center gap-4">
               {[
-                { label: 'Pipeline', value: leads.length, icon: Users, color: 'bg-indigo-50 text-indigo-600', nav: () => onNavigate('leads') },
-                { label: 'Activity', value: s.callsMade, icon: Phone, color: 'bg-orange-50 text-orange-600', nav: () => onNavigate('reports') },
-                { label: 'Visits', value: s.visitsDone, icon: Calendar, color: 'bg-emerald-50 text-emerald-600', nav: () => onNavigate('visits') },
-                { label: 'Closures', value: s.bookings, icon: Target, color: 'bg-purple-50 text-purple-600', nav: () => onNavigate('leads') },
+                { label: 'Pipeline', value: leads.length, icon: Users, color: 'bg-indigo-50 text-indigo-600', trend: null, nav: () => onNavigate('leads') },
+                { label: 'Calls Today', value: s.callsMade, icon: Phone, color: 'bg-orange-50 text-orange-600', trend: s.trend.calls, nav: () => onNavigate('reports') },
+                { label: 'Visits Done', value: s.visitsDone, icon: Calendar, color: 'bg-emerald-50 text-emerald-600', trend: s.trend.visits, nav: () => onNavigate('visits') },
+                { label: 'Closures', value: s.bookings, icon: Target, color: 'bg-purple-50 text-purple-600', trend: null, nav: () => onNavigate('leads') },
               ].map((item, i, arr) => (
                 <React.Fragment key={i}>
                   <button 
@@ -186,7 +194,15 @@ export default function TodayOverview({ leads, visits, followUps, callLogs, user
                     className={cn('flex-1 min-w-[140px] rounded-[2rem] p-6 text-left hover:shadow-lg transition-all border border-transparent hover:border-[#E6D8B8]', item.color)}
                   >
                     <item.icon size={18} className="mb-2 opacity-60" />
-                    <div className="text-3xl font-serif font-black">{item.value}</div>
+                    <div className="flex items-end gap-2">
+                      <div className="text-3xl font-serif font-black">{item.value}</div>
+                      {item.trend !== null && item.trend !== undefined && (
+                        <span className={cn('text-[10px] font-black mb-1 flex items-center gap-0.5', item.trend > 0 ? 'text-emerald-600' : item.trend < 0 ? 'text-red-500' : 'opacity-40')}>
+                          {item.trend > 0 ? <TrendingUp size={10}/> : item.trend < 0 ? <TrendingDown size={10}/> : null}
+                          {item.trend > 0 ? `+${item.trend}` : item.trend === 0 ? '—' : item.trend} vs yday
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[10px] font-black uppercase tracking-widest mt-1 opacity-70">{item.label}</div>
                   </button>
                   {i < arr.length - 1 && <ChevronRight size={20} className="text-[#E6D8B8] hidden xl:block" />}
@@ -216,38 +232,46 @@ export default function TodayOverview({ leads, visits, followUps, callLogs, user
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-[#FDFAF2]/50 border-b border-[#E6D8B8]">
-                      {['Rank', 'Salesman', 'F-Ups', 'Visits', 'Calls', 'Deals', 'Pulse'].map(h => (
-                        <th key={h} className="px-6 py-4 text-[10px] font-black text-[#9A8262] uppercase tracking-[0.15em]">{h}</th>
+                      {['Rank', 'Salesman', 'F-Ups', 'Visits', 'Calls', 'Deals', 'Grade', 'Score'].map(h => (
+                        <th key={h} className="px-4 py-4 text-[10px] font-black text-[#9A8262] uppercase tracking-[0.15em]">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E6D8B8]/30">
-                    {s.teamPerf.map((row, i) => (
-                      <tr key={row.user.id} className="hover:bg-[#FDFAF2]/40 transition-colors">
-                        <td className="px-6 py-4">
-                          <span className={cn(
-                            'w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shadow-sm', 
-                            i === 0 ? 'bg-yellow-100 text-yellow-700' : 
-                            i === 1 ? 'bg-slate-100 text-slate-600' : 
-                            i === 2 ? 'bg-orange-100 text-orange-700' : 
-                            'bg-gray-50 text-gray-400'
-                          )}>{i + 1}</span>
+                    {s.teamPerf.map((row, i) => {
+                      const grade = row.perfPct >= 90 ? 'A' : row.perfPct >= 70 ? 'B' : row.perfPct >= 50 ? 'C' : 'D';
+                      const gradeColor = row.perfPct >= 90 ? 'bg-emerald-100 text-emerald-700' : row.perfPct >= 70 ? 'bg-blue-100 text-blue-700' : row.perfPct >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600';
+                      const avgCalls = s.teamPerf.reduce((a, r) => a + r.calls, 0) / (s.teamPerf.length || 1);
+                      return (
+                      <tr key={row.user.id} className={cn('hover:bg-[#FDFAF2]/40 transition-colors', row.perfPct >= 70 ? 'border-l-2 border-l-emerald-400' : row.perfPct < 50 ? 'border-l-2 border-l-red-300' : '')}>
+                        <td className="px-4 py-4">
+                          <span className={cn('w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shadow-sm', i === 0 ? 'bg-yellow-100 text-yellow-700' : i === 1 ? 'bg-slate-100 text-slate-600' : i === 2 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-400')}>{i + 1}</span>
                         </td>
-                        <td className="px-6 py-4 font-bold text-[#2A1C00]">{row.user.name}</td>
-                        <td className="px-6 py-4 text-sm font-bold text-[#2A1C00]">{row.followupsDone}</td>
-                        <td className="px-6 py-4 text-sm font-bold text-[#2A1C00]">{row.visitsDone}</td>
-                        <td className="px-6 py-4 text-sm font-bold text-[#2A1C00]">{row.calls}</td>
-                        <td className="px-6 py-4 font-black text-emerald-600">{row.bookings}</td>
-                        <td className="px-6 py-4">
-                           <div className="flex flex-col gap-1">
-                             <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                               <div className={cn('h-full', row.perfPct >= 70 ? 'bg-emerald-500' : 'bg-amber-500')} style={{ width: `${row.perfPct}%` }} />
-                             </div>
-                             <span className="text-[10px] font-bold opacity-60">{row.perfPct}%</span>
-                           </div>
+                        <td className="px-4 py-4 font-bold text-[#2A1C00] text-sm">{row.user.name}</td>
+                        <td className="px-4 py-4">
+                          <span className={cn('text-sm font-bold', row.followupsDone === 0 ? 'text-[#9A8262] italic text-[11px]' : 'text-[#2A1C00]')}>{row.followupsDone === 0 ? 'Pending' : row.followupsDone}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={cn('text-sm font-bold', row.visitsDone === 0 ? 'text-[#9A8262] italic text-[11px]' : 'text-emerald-600')}>{row.visitsDone === 0 ? 'Pending' : row.visitsDone}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={cn('text-sm font-bold', row.calls > avgCalls ? 'text-emerald-600' : row.calls === 0 ? 'text-[#9A8262] italic text-[11px]' : 'text-[#2A1C00]')}>{row.calls === 0 ? 'Pending' : row.calls}</span>
+                        </td>
+                        <td className="px-4 py-4 font-black text-emerald-600">{row.bookings || <span className="text-[#9A8262] font-normal text-[11px] italic">—</span>}</td>
+                        <td className="px-4 py-4">
+                          <span className={cn('px-2 py-0.5 rounded-lg text-xs font-black', gradeColor)}>{grade}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-14 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className={cn('h-full rounded-full', row.perfPct >= 70 ? 'bg-emerald-500' : row.perfPct >= 50 ? 'bg-amber-400' : 'bg-red-400')} style={{ width: `${row.perfPct}%` }} />
+                            </div>
+                            <span className="text-[10px] font-bold text-[#9A8262]">{row.perfPct}%</span>
+                          </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -269,29 +293,39 @@ export default function TodayOverview({ leads, visits, followUps, callLogs, user
               </div>
             </div>
             
-            <div className="space-y-4">
-              {s.nextActions.map((action: any, idx) => (
-                <div 
-                  key={idx}
-                  onClick={() => onNavigate('id' in action ? ('leadId' in action ? 'visit-detail' : 'lead-detail') : 'followups', action.id || action.leadId)}
-                  className="p-4 bg-white border border-[#E6D8B8] rounded-2xl hover:border-[#C9A84C] hover:shadow-md transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-xl bg-[#FDFAF2] flex items-center justify-center group-hover:bg-[#C9A84C]/10 transition-colors">
-                      {'visit_date' in action ? <Calendar size={14} className="text-purple-500" /> : <Phone size={14} className="text-blue-500" />}
+            <div className="space-y-3">
+              {s.nextActions.map((action: any, idx) => {
+                const name = action.client_name || action.name || 'Client';
+                const mobile = action.mobile || '';
+                const isVisit = 'visit_date' in action;
+                return (
+                <div key={idx} className="p-4 bg-white border border-[#E6D8B8] rounded-2xl hover:border-[#C9A84C] hover:shadow-md transition-all group">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-[#FDFAF2] flex items-center justify-center group-hover:bg-[#C9A84C]/10 transition-colors shrink-0">
+                        {isVisit ? <Calendar size={14} className="text-purple-500" /> : <Phone size={14} className="text-blue-500" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-[#2A1C00] line-clamp-1 cursor-pointer hover:text-[#C9A84C]" onClick={() => onNavigate(isVisit ? 'detail' : 'followups', action.id || action.leadId)}>{name}</p>
+                        {mobile && <p className="text-[10px] text-[#9A8262] font-mono">{mobile}</p>}
+                        <p className="text-[10px] text-[#9A8262] font-bold mt-0.5">{isVisit ? (action.visit_time || 'All Day Visit') : action.method === 'call' ? '📞 Call' : '✅ Follow-up'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-black text-[#2A1C00] uppercase tracking-tight line-clamp-1">{action.client_name || action.name || 'Client'}</p>
-                      <p className="text-[10px] text-[#9A8262] font-bold">
-                        {'visit_time' in action ? action.visit_time || 'All Day' : action.method === 'call' ? '📞 Call Scheduled' : '✅ Follow-up'}
-                      </p>
-                    </div>
+                    {mobile && (
+                      <div className="flex gap-1.5 shrink-0">
+                        <a href={`tel:${mobile}`} onClick={e => e.stopPropagation()} className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors">
+                          <Phone size={13} />
+                        </a>
+                        <a href={`https://wa.me/91${mobile.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="p-2 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
+                          <MessageSquare size={13} />
+                        </a>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-[11px] text-[#5C4820] italic line-clamp-2 bg-[#FDFAF2] p-2 rounded-lg">
-                    {action.purpose || 'No special notes'}
-                  </p>
+                  {action.purpose && <p className="text-[11px] text-[#5C4820] italic line-clamp-1 bg-[#FDFAF2] px-2 py-1 rounded-lg mt-1">{action.purpose}</p>}
                 </div>
-              ))}
+                );
+              })}
               {s.nextActions.length === 0 && (
                 <div className="text-center py-10">
                   <CheckCircle2 size={32} className="mx-auto text-[#C9A84C] opacity-20 mb-3" />

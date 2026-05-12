@@ -39,7 +39,7 @@ import {
   Share2,
   AlertCircle
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, formatDate, formatDateTime } from '../lib/utils';
 import DateRangeSelector, { DateRange, isDateInRange } from './DateRangeSelector';
 import { 
   startOfToday, 
@@ -166,7 +166,11 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
       visitsScheduled: visitsScheduled + visitsCompleted,
       visitsDone: visitsCompleted
     };
-  }).filter(u => u.leads > 0).sort((a, b) => b.rate - a.rate);
+  }).filter(u => u.leads > 0).sort((a, b) => b.rate - a.rate).map(u => ({
+    ...u,
+    // Mark users with < 5 leads as insufficient data
+    insufficientData: u.leads < 5
+  }));
 
   const projectPerformance = projects.map(project => {
     const projectLeads = filteredLeadsGlobal.filter(l => l.projectId === project.id);
@@ -752,15 +756,19 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
                     <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-full text-xs font-bold">{user.visitsDone}</span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex flex-col items-end">
-                      <span className="font-bold text-[#C9A84C]">{user.rate}%</span>
-                      <div className="w-16 h-1 bg-gray-100 rounded-full overflow-hidden mt-1">
-                        <div 
-                          className="h-full bg-[#C9A84C]" 
-                          style={{ width: `${Math.min(user.rate, 100)}%` }}
-                        />
+                    {user.leads < 5 ? (
+                      <span className="text-[10px] font-bold text-[#9A8262] italic bg-slate-50 px-2 py-1 rounded-full border border-slate-200">Insufficient Data</span>
+                    ) : (
+                      <div className="flex flex-col items-end">
+                        <span className="font-bold text-[#C9A84C]">{user.rate}%</span>
+                        <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
+                          <div 
+                            className="h-full bg-gradient-to-r from-[#C9A84C] to-[#E8C97A] rounded-full" 
+                            style={{ width: `${Math.min(user.rate, 100)}%` }}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </td>
                 </tr>
               ))}

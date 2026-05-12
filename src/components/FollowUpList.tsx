@@ -5,7 +5,7 @@ import {
   Download, RefreshCw, Bell, BellRing, ChevronDown, CheckSquare, Users, Edit3, Zap
 } from 'lucide-react';
 import { FollowUp, Lead, Visit, Page, VisitFilters, User as UserType } from '../types';
-import { cn, getLocalDateString } from '../lib/utils';
+import { cn, getLocalDateString, formatDate, formatDateTime } from '../lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
@@ -388,16 +388,16 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                         {f.method === 'call' ? 'Call' : 'WhatsApp'}
                       </div>
                       <div className={cn("text-xs font-bold", f.statusGroup === 'overdue' ? 'text-red-500' : f.statusGroup === 'today' ? 'text-blue-500' : 'text-[#9A8262]')}>
-                        {f.statusGroup === 'today' ? 'Today' : f.statusGroup === 'overdue' ? 'Overdue' : format(parseISO(f.date), 'dd MMM yyyy')}
+                      {f.statusGroup === 'today' ? 'Today' : f.statusGroup === 'overdue' ? 'Overdue' : formatDate(f.date)}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-[#2A1C00] mb-1">
                         <Calendar size={14} className="text-[#9A8262]" />
-                        {format(parseISO(f.date), 'dd MMM yyyy')}
+                        {formatDate(f.date)}
                       </div>
-                      {f.statusGroup === 'overdue' && <p className="text-[10px] font-bold text-red-500">Overdue by {f.daysOverdue} days</p>}
-                      {f.status === 'completed' && f.completed_at && <p className="text-[10px] font-bold text-green-600">Done: {format(parseISO(f.completed_at), 'dd MMM')}</p>}
+                      {f.statusGroup === 'overdue' && <p className="text-[10px] font-bold text-red-500">Overdue by {f.daysOverdue} {f.daysOverdue === 1 ? 'day' : 'days'}</p>}
+                      {f.status === 'completed' && f.completed_at && <p className="text-[10px] font-bold text-green-600">Done: {formatDate(f.completed_at)}</p>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -413,8 +413,8 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                     <td className="px-4 py-3">
                       {f.lastContactDate ? (
                         <>
-                          <p className="text-xs font-semibold text-[#2A1C00]">{format(parseISO(f.lastContactDate), 'dd MMM yyyy')}</p>
-                          <p className="text-[10px] text-[#9A8262]">{differenceInDays(new Date(), parseISO(f.lastContactDate))} days ago</p>
+                          <p className="text-xs font-semibold text-[#2A1C00]">{formatDate(f.lastContactDate)}</p>
+                          <p className="text-[10px] text-[#9A8262]">{differenceInDays(new Date(), new Date(f.lastContactDate!))} days ago</p>
                         </>
                       ) : (
                         <p className="text-[10px] text-[#9A8262]">No prior contact</p>
@@ -489,7 +489,7 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                   <div className="bg-[#FDFAF2] p-2 rounded-lg border border-[#E6D8B8]/50">
                     <p className="text-[9px] text-[#9A8262] font-bold uppercase mb-1">Due Date</p>
                     <div className={cn("text-xs font-bold", f.statusGroup === 'overdue' ? 'text-red-500' : f.statusGroup === 'today' ? 'text-blue-500' : 'text-[#2A1C00]')}>
-                      {f.statusGroup === 'today' ? 'Today' : format(parseISO(f.date), 'dd MMM yyyy')}
+                      {f.statusGroup === 'today' ? 'Today' : formatDate(f.date)}
                     </div>
                   </div>
                 </div>

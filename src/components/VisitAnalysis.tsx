@@ -5,7 +5,7 @@ import {
   TrendingUp, Clock, CheckCircle2, AlertCircle, Star
 } from 'lucide-react';
 import { Visit, Lead, Project as AppProject, LeadQuality, LeadStatus } from '../types';
-import { cn, getLocalDateString } from '../lib/utils';
+import { cn, getLocalDateString, formatDate } from '../lib/utils';
 import { 
   startOfToday, endOfToday, startOfYesterday, endOfYesterday,
   startOfWeek, endOfWeek, subWeeks,
@@ -268,14 +268,14 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
             <h4 className="text-[10px] font-black text-[#9A8262] uppercase tracking-widest">Project Popularity</h4>
             <div className="w-2 h-2 bg-[#C9A84C] rounded-full animate-pulse" />
           </div>
-          <div className="h-[120px]">
+          <div className="h-[160px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={analyticsData.projectDist}
-                  innerRadius={35}
-                  outerRadius={55}
-                  paddingAngle={5}
+                  innerRadius={45}
+                  outerRadius={70}
+                  paddingAngle={4}
                   dataKey="value"
                 >
                   {analyticsData.projectDist.map((entry, index) => (
@@ -288,6 +288,21 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
                 />
               </PieChart>
             </ResponsiveContainer>
+          </div>
+          {/* Project legend */}
+          <div className="space-y-1.5 mt-2">
+            {analyticsData.projectDist.map((entry, index) => (
+              <div key={entry.name} className="flex items-center justify-between text-[10px]">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                  <span className="text-[#5C4820] font-semibold truncate max-w-[90px]">{entry.name}</span>
+                </div>
+                <span className="font-black text-[#2A1C00]">{entry.value}</span>
+              </div>
+            ))}
+            {analyticsData.projectDist.length === 0 && (
+              <p className="text-center text-[#9A8262] text-[10px] italic">No visit data</p>
+            )}
           </div>
         </div>
       </div>

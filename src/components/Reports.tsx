@@ -199,6 +199,33 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
     { name: 'Closed', value: filteredLeadsGlobal.filter(l => l.status === 'closed').length, color: '#27AE60', icon: Trophy },
   ];
 
+  // Lead Aging Calculations
+  const now = new Date();
+  const agingStats = [
+    { name: '0-7 Days', value: 0, color: '#22c55e', range: [0, 7] },
+    { name: '7-15 Days', value: 0, color: '#eab308', range: [7, 15] },
+    { name: '15-30 Days', value: 0, color: '#f97316', range: [15, 30] },
+    { name: '30+ Days', value: 0, color: '#ef4444', range: [30, 9999] },
+  ];
+
+  filteredLeadsGlobal.forEach(lead => {
+    const created = new Date(lead.created_at);
+    const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+    const stat = agingStats.find(s => diffDays >= s.range[0] && diffDays < s.range[1]);
+    if (stat) stat.value++;
+  });
+
+  const staleLeads = filteredLeadsGlobal.filter(l => {
+    if (l.status === 'closed' || l.status === 'lost') return false;
+    const lastUpdate = new Date(l.updated_at || l.created_at);
+    const daysSinceUpdate = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
+    return daysSinceUpdate > 7; // No activity for 7+ days
+  }).sort((a, b) => {
+     const dateA = new Date(a.updated_at || a.created_at).getTime();
+     const dateB = new Date(b.updated_at || b.created_at).getTime();
+     return dateA - dateB; // Oldest first
+  });
+
   const getActivityIcon = (type: ActivityType) => {
     switch (type) {
       case 'lead_created': return <PlusCircle className="text-blue-500" size={16} />;
@@ -709,7 +736,90 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
           </div>
         </div>
 
-        {/* Charts Section */}
+        {/* Lead Aging Section */}
+        <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00] flex items-center gap-2">
+              <Clock className="text-[#C9A84C]" size={18} />
+              Lead Aging Audit
+            </h3>
+            <span className="text-[10px] font-bold text-[#9A8262] uppercase bg-[#E6D8B8]/20 px-2 py-0.5 rounded">
+              Time in System
+            </span>
+          </div>
+          <div className="w-full min-w-0 h-[250px]">
+            {agingStats.some(s => s.value > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={agingStats}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6D8B8" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9A8262' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9A8262' }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#FFFDF6', border: '1px solid #E6D8B8', borderRadius: '8px' }}
+                    cursor={{ fill: 'rgba(201,168,76,0.05)' }}
+                  />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {agingStats.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-[#9A8262] italic text-sm">
+                No aging data available
+              </div>
+            )}
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {agingStats.map(s => (
+               <div key={s.name} className="flex items-center justify-between p-2 bg-white rounded border border-[#E6D8B8]/30">
+                 <span className="text-[10px] font-bold text-[#9A8262]">{s.name}</span>
+                 <span className="text-xs font-black" style={{ color: s.color }}>{s.value}</span>
+               </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-6 shadow-sm overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00] flex items-center gap-2">
+              <AlertCircle className="text-red-500" size={18} />
+              Stale Leads Alert
+            </h3>
+            <span className="text-[9px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">
+              {staleLeads.length} ACTION REQUIRED
+            </span>
+          </div>
+          <p className="text-[11px] text-[#9A8262] mb-4">Leads with no activity or updates for more than 7 days.</p>
+          <div className="flex-1 overflow-y-auto space-y-3 max-h-[300px] custom-scrollbar pr-2">
+            {staleLeads.map(l => (
+              <div 
+                key={l.id} 
+                onClick={() => onNavigate('lead-detail', l.id)}
+                className="p-3 bg-white border border-[#E6D8B8]/50 rounded-xl hover:border-red-200 transition-all cursor-pointer group"
+              >
+                <div className="flex justify-between items-start mb-1">
+                  <span className="font-bold text-xs text-[#2A1C00] group-hover:text-[#C9A84C]">{l.name}</span>
+                  <span className="text-[9px] text-red-500 font-bold">
+                    {Math.floor((now.getTime() - new Date(l.updated_at || l.created_at).getTime()) / (1000 * 60 * 60 * 24))} Days Idle
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-[#9A8262]">
+                  <span>Status: {l.status.toUpperCase()}</span>
+                  <span className="flex items-center gap-1"><UserIcon size={10} /> {users.find(u => u.id === l.assignedTo)?.name || 'Unassigned'}</span>
+                </div>
+              </div>
+            ))}
+            {staleLeads.length === 0 && (
+              <div className="h-full flex flex-col items-center justify-center text-center p-10">
+                <CheckCircle2 size={32} className="text-green-500 mb-2 opacity-30" />
+                <p className="text-xs text-[#9A8262] italic">Great! All leads have been contacted recently.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-6 shadow-sm">
           <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00] mb-6 flex items-center gap-2">
             <Users className="text-[#C9A84C]" size={18} />

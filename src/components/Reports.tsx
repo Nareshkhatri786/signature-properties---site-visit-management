@@ -62,6 +62,48 @@ interface ReportsProps {
   currentUserRole?: string;
 }
 
+function ReportSummaryCard({ label, value, icon: Icon, color, onClick }: any) {
+  const colors: any = {
+    gold: 'bg-[#C9A84C]/10 text-[#C9A84C] border-[#C9A84C]/20',
+    green: 'bg-emerald-50 text-emerald-600 border-emerald-500/10',
+    blue: 'bg-indigo-50 text-indigo-600 border-indigo-500/10',
+    orange: 'bg-amber-50 text-amber-600 border-amber-500/10',
+    gray: 'bg-slate-50 text-slate-600 border-slate-500/10',
+  };
+
+  return (
+    <div 
+      onClick={onClick}
+      className={cn(
+        "bg-white border border-[#E6D8B8] rounded-2xl p-5 shadow-sm group hover:border-[#C9A84C]/40 transition-all hover:scale-[1.02]",
+        onClick && "cursor-pointer"
+      )}
+    >
+      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-3", colors[color])}>
+        <Icon size={20} strokeWidth={2.5} />
+      </div>
+      <div className="text-2xl font-serif font-bold text-[#2A1C00] group-hover:text-[#C9A84C] transition-colors">{value}</div>
+      <div className="text-[10px] text-[#9A8262] font-black uppercase tracking-widest mt-1">{label}</div>
+    </div>
+  );
+}
+
+function ReportTimelineStat({ label, value, onClick }: { label: string, value: number, onClick?: () => void }) {
+  return (
+    <div 
+      onClick={onClick}
+      className={cn(
+        "group bg-white/40 border border-[#E6D8B8]/30 rounded-2xl p-6 hover:bg-white hover:shadow-2xl transition-all",
+        onClick && "cursor-pointer"
+      )}
+    >
+      <div className="text-4xl font-serif font-bold text-[#2A1C00] mb-2 group-hover:text-[#C9A84C] transition-all tabular-nums">{value}</div>
+      <div className="h-1 w-10 bg-gradient-to-r from-[#C9A84C] to-[#E8C97A] mb-4 scale-x-0 group-hover:scale-x-100 transition-transform origin-left rounded-full" />
+      <div className="text-[10px] text-[#9A8262] font-black uppercase tracking-[0.15em] leading-tight">{label}</div>
+    </div>
+  );
+}
+
 export default function Reports({ callLogs, visits, leads, activities, users, projects, onNavigate, currentUserRole }: ReportsProps) {
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [selectedProject, setSelectedProject] = useState<string>('');
@@ -731,6 +773,7 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
           )}
         </div>
       </div>
+    </div>
 
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -830,7 +873,6 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
             })}
           </div>
 
-          {/* Background Decorative */}
           <div className="absolute -bottom-10 -right-10 opacity-[0.03] rotate-12 pointer-events-none">
             <BarChart3 size={300} />
           </div>
@@ -1149,6 +1191,7 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
 
         {/* Audit Trail List */}
         <div className="bg-white border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden lg:col-span-2">
@@ -1199,46 +1242,3 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
     </div>
   );
 }
-
-function ReportSummaryCard({ label, value, icon: Icon, color, onClick }: any) {
-  const colors: any = {
-    gold: 'bg-[#C9A84C]/10 text-[#C9A84C] border-[#C9A84C]/20',
-    green: 'bg-emerald-50 text-emerald-600 border-emerald-500/10',
-    blue: 'bg-indigo-50 text-indigo-600 border-indigo-500/10',
-    orange: 'bg-amber-50 text-amber-600 border-amber-500/10',
-    gray: 'bg-slate-50 text-slate-600 border-slate-500/10',
-  };
-
-  return (
-    <div 
-      onClick={onClick}
-      className={cn(
-        "bg-white border border-[#E6D8B8] rounded-2xl p-5 shadow-sm group hover:border-[#C9A84C]/40 transition-all hover:scale-[1.02]",
-        onClick && "cursor-pointer"
-      )}
-    >
-      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-3", colors[color])}>
-        <Icon size={20} strokeWidth={2.5} />
-      </div>
-      <div className="text-2xl font-serif font-bold text-[#2A1C00] group-hover:text-[#C9A84C] transition-colors">{value}</div>
-      <div className="text-[10px] text-[#9A8262] font-black uppercase tracking-widest mt-1">{label}</div>
-    </div>
-  );
-}
-
-function ReportTimelineStat({ label, value, onClick }: { label: string, value: number, onClick?: () => void }) {
-  return (
-    <div 
-      onClick={onClick}
-      className={cn(
-        "group bg-white/40 border border-[#E6D8B8]/30 rounded-2xl p-6 hover:bg-white hover:shadow-2xl transition-all",
-        onClick && "cursor-pointer"
-      )}
-    >
-      <div className="text-4xl font-serif font-bold text-[#2A1C00] mb-2 group-hover:text-[#C9A84C] transition-all tabular-nums">{value}</div>
-      <div className="h-1 w-10 bg-gradient-to-r from-[#C9A84C] to-[#E8C97A] mb-4 scale-x-0 group-hover:scale-x-100 transition-transform origin-left rounded-full" />
-      <div className="text-[10px] text-[#9A8262] font-black uppercase tracking-[0.15em] leading-tight">{label}</div>
-    </div>
-  );
-}
-

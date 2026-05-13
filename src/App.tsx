@@ -323,11 +323,16 @@ export default function App() {
   const filteredVisits = useMemo(() => {
     if (!user) return [];
     if (isAdminRole) return visits;
-    if (isManagerRole) return visits.filter(v => managedProjectIds.includes(v.projectId));
+    // Manager: sees all visits in their project(s)
+    if (isManagerRole) return visits.filter(v =>
+      managedProjectIds.includes(v.projectId) ||
+      v.assigned_to === user.name
+    );
     
+    // Regular user: visits assigned to them (by NAME) OR unassigned visits in their project
     return visits.filter(v => {
-      const isAssignedToMe = String(v.assigned_to) === String(user.id);
-      const isMyProject = v.projectId === user.projectId || v.projectId === 'p1';
+      const isAssignedToMe = v.assigned_to === user.name; // assigned_to stores NAME, not ID
+      const isMyProject = v.projectId === user.projectId;
       return isAssignedToMe || (isMyProject && !v.assigned_to);
     });
   }, [visits, user, isAdminRole, isManagerRole, managedProjectIds]);
@@ -335,22 +340,19 @@ export default function App() {
   const filteredFollowups = useMemo(() => {
     if (!user) return [];
     if (isAdminRole) return followups;
-    if (isManagerRole) return followups.filter(f => managedProjectIds.includes(f.projectId));
+    if (isManagerRole) return followups.filter(f =>
+      managedProjectIds.includes(f.projectId) || f.userName === user.name
+    );
     
-    // Optimize: include follow-ups for leads user owns OR visits user owns
     const ownedLeadIds = new Set(filteredLeads.map(l => l.id));
     const ownedVisitIds = new Set(filteredVisits.map(v => v.id));
     
     return followups.filter(f => {
-      const basicProjectMatch = (f.projectId === user.projectId || f.projectId === 'p1');
-      if (!basicProjectMatch) return false;
-      
-      const leadMatch = !f.leadId || ownedLeadIds.has(f.leadId);
-      const visitMatch = !f.visitId || ownedVisitIds.has(f.visitId);
-      
-      // If a follow-up has leadId, it must belong to an owned lead.
-      // If it only has visitId, it must belong to an owned visit.
-      return leadMatch || visitMatch;
+      // Match by userName (name-based) OR by owned lead/visit
+      const isMyFollowup = f.userName === user.name;
+      const leadMatch = f.leadId ? ownedLeadIds.has(f.leadId) : false;
+      const visitMatch = f.visitId ? ownedVisitIds.has(f.visitId) : false;
+      return isMyFollowup || leadMatch || visitMatch;
     });
   }, [followups, user, isAdminRole, isManagerRole, managedProjectIds, filteredLeads, filteredVisits]);
 

@@ -114,6 +114,16 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
     end: endOfToday()
   });
   const [drillDownType, setDrillDownType] = useState<'leads' | 'calls' | 'visits' | 'whatsapp' | null>(null);
+  const [misLastSent, setMisLastSent] = useState<Record<string, Date | null>>({ daily: null, weekend: null, detailed_monthly: null });
+
+  const getMisLastSentLabel = (type: string) => {
+    const d = misLastSent[type];
+    if (!d) return null;
+    const diffMins = Math.floor((new Date().getTime() - d.getTime()) / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    return `${Math.floor(diffMins / 60)}h ago`;
+  };
 
   const outcomes: Record<CallOutcome, { label: string; color: string }> = {
     answered: { label: 'Answered', color: '#22c55e' },
@@ -236,8 +246,8 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
 
   const dailyData = last7Days.map(date => ({
     date: new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
-    calls: callLogs.filter(log => log.timestamp.startsWith(date)).length,
-    answered: callLogs.filter(log => log.timestamp.startsWith(date) && log.outcome === 'answered').length,
+    calls: filteredCallLogsGlobal.filter(log => log.timestamp.startsWith(date)).length,
+    answered: filteredCallLogsGlobal.filter(log => log.timestamp.startsWith(date) && log.outcome === 'answered').length,
   }));
 
   const funnelData = [
@@ -267,12 +277,12 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
     if (l.status === 'closed' || l.status === 'lost') return false;
     const lastUpdate = new Date(l.updated_at || l.created_at);
     const daysSinceUpdate = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
-    return daysSinceUpdate > 7; // No activity for 7+ days
+    return daysSinceUpdate > 3; // No activity for 3+ days (reduced from 7)
   }).sort((a, b) => {
      const dateA = new Date(a.updated_at || a.created_at).getTime();
      const dateB = new Date(b.updated_at || b.created_at).getTime();
      return dateA - dateB; // Oldest first
-  });
+  }).slice(0, 10); // Show top 10 stale leads
 
   // Source Quality Calculations - derive sources from actual lead data, not project config
   const uniqueSources = Array.from(new Set(leads.map(l => l.source).filter(Boolean))) as string[];
@@ -479,87 +489,110 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
                 <p className="text-white/60 text-sm max-w-xl font-medium">Daily operations audit at 8 PM and Weekend performance planning every Saturday 9 AM delivered to your inbox.</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
-                <button 
-                  onClick={async () => {
-                    toast.loading('Generating Daily MIS Report...', { id: 'mis-report' });
-                    try {
-                      const res = await fetch('/api/reports/trigger', {
-                        method: 'POST',
-                        headers: { 
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
-                        },
-                        body: JSON.stringify({ type: 'daily' })
-                      });
-                      const data = await res.json();
-                      if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
-                      toast.success('Daily MIS Report sent to email', { id: 'mis-report' });
-                    } catch (e: any) {
-                      toast.error(e.message || 'Failed to trigger report', { id: 'mis-report', duration: 5000 });
-                    }
-                  }}
-                  className="px-6 py-4 bg-[#C9A84C] text-[#1C1207] rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-[#D4BC7D] transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
-                >
-                  <div className="flex items-center gap-2">
-                    <BarChart3 size={18} />
-                    <span>Daily MIS</span>
-                  </div>
-                  <span className="text-[10px] opacity-60">Run Now (8 PM Cycle)</span>
-                </button>
-                <button 
-                  onClick={async () => {
-                    toast.loading('Generating Weekend planning...', { id: 'mis-report' });
-                    try {
-                      const res = await fetch('/api/reports/trigger', {
-                        method: 'POST',
-                        headers: { 
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
-                        },
-                        body: JSON.stringify({ type: 'weekend' })
-                      });
-                      const data = await res.json();
-                      if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
-                      toast.success('Weekend MIS Report sent to email', { id: 'mis-report' });
-                    } catch (e: any) {
-                      toast.error(e.message || 'Failed to trigger report', { id: 'mis-report', duration: 5000 });
-                    }
-                  }}
-                  className="px-6 py-4 bg-white/10 text-white border border-white/20 backdrop-blur-md rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-white/20 transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
-                >
-                  <div className="flex items-center gap-2">
-                    <CalendarIcon size={18} />
-                    <span>Weekend MIS</span>
-                  </div>
-                  <span className="text-[10px] opacity-60">Saturday 9 AM</span>
-                </button>
-                <button 
-                  onClick={async () => {
-                    toast.loading('Generating Detailed Monthly Report...', { id: 'mis-report' });
-                    try {
-                      const res = await fetch('/api/reports/trigger', {
-                        method: 'POST',
-                        headers: { 
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
-                        },
-                        body: JSON.stringify({ type: 'detailed_monthly' })
-                      });
-                      const data = await res.json();
-                      if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
-                      toast.success('Detailed Monthly Report sent to email', { id: 'mis-report' });
-                    } catch (e: any) {
-                      toast.error(e.message || 'Failed to trigger report', { id: 'mis-report', duration: 5000 });
-                    }
-                  }}
-                  className="px-6 py-4 bg-[#C9A84C]/20 text-[#C9A84C] border border-[#C9A84C]/30 backdrop-blur-md rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-[#C9A84C]/30 transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
-                >
-                  <div className="flex items-center gap-2">
-                    <BarChart3 size={18} />
-                    <span>Monthly Detailed</span>
-                  </div>
-                  <span className="text-[10px] opacity-60">Monday 10 AM</span>
-                </button>
+                {/* Daily MIS */}
+                <div className="flex flex-col gap-1.5">
+                  <button 
+                    onClick={async () => {
+                      toast.loading('Generating Daily MIS Report...', { id: 'mis-daily' });
+                      try {
+                        const res = await fetch('/api/reports/trigger', {
+                          method: 'POST',
+                          headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
+                          },
+                          body: JSON.stringify({ type: 'daily' })
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
+                        setMisLastSent(prev => ({ ...prev, daily: new Date() }));
+                        toast.success('Daily MIS Report sent to email', { id: 'mis-daily' });
+                      } catch (e: any) {
+                        toast.error(e.message || 'Failed to trigger report', { id: 'mis-daily', duration: 5000 });
+                      }
+                    }}
+                    className="px-6 py-4 bg-[#C9A84C] text-[#1C1207] rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-[#D4BC7D] transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <BarChart3 size={18} />
+                      <span>Daily MIS</span>
+                    </div>
+                    <span className="text-[10px] opacity-60">📅 Schedule: Daily 8 PM · Send Now →</span>
+                  </button>
+                  <span className="text-[10px] pl-1 text-[#C9A84C]/70">
+                    {getMisLastSentLabel('daily') ? `✅ Last Sent: ${getMisLastSentLabel('daily')}` : '⏳ Not sent this session'}
+                  </span>
+                </div>
+
+                {/* Weekend MIS */}
+                <div className="flex flex-col gap-1.5">
+                  <button 
+                    onClick={async () => {
+                      toast.loading('Generating Weekend planning...', { id: 'mis-weekend' });
+                      try {
+                        const res = await fetch('/api/reports/trigger', {
+                          method: 'POST',
+                          headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
+                          },
+                          body: JSON.stringify({ type: 'weekend' })
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
+                        setMisLastSent(prev => ({ ...prev, weekend: new Date() }));
+                        toast.success('Weekend MIS Report sent to email', { id: 'mis-weekend' });
+                      } catch (e: any) {
+                        toast.error(e.message || 'Failed to trigger report', { id: 'mis-weekend', duration: 5000 });
+                      }
+                    }}
+                    className="px-6 py-4 bg-white/10 text-white border border-white/20 backdrop-blur-md rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-white/20 transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon size={18} />
+                      <span>Weekend MIS</span>
+                    </div>
+                    <span className="text-[10px] opacity-60">📅 Schedule: Sat 9 AM · Send Now →</span>
+                  </button>
+                  <span className="text-[10px] pl-1 text-white/50">
+                    {getMisLastSentLabel('weekend') ? `✅ Last Sent: ${getMisLastSentLabel('weekend')}` : '⏳ Not sent this session'}
+                  </span>
+                </div>
+
+                {/* Monthly Detailed */}
+                <div className="flex flex-col gap-1.5">
+                  <button 
+                    onClick={async () => {
+                      toast.loading('Generating Detailed Monthly Report...', { id: 'mis-monthly' });
+                      try {
+                        const res = await fetch('/api/reports/trigger', {
+                          method: 'POST',
+                          headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('crm_token')}`
+                          },
+                          body: JSON.stringify({ type: 'detailed_monthly' })
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Failed to trigger report');
+                        setMisLastSent(prev => ({ ...prev, detailed_monthly: new Date() }));
+                        toast.success('Detailed Monthly Report sent to email', { id: 'mis-monthly' });
+                      } catch (e: any) {
+                        toast.error(e.message || 'Failed to trigger report', { id: 'mis-monthly', duration: 5000 });
+                      }
+                    }}
+                    className="px-6 py-4 bg-[#C9A84C]/20 text-[#C9A84C] border border-[#C9A84C]/30 backdrop-blur-md rounded-2xl font-bold flex flex-col items-start gap-1 hover:bg-[#C9A84C]/30 transition-all shadow-xl hover:translate-y-[-2px] active:translate-y-[0px]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <BarChart3 size={18} />
+                      <span>Monthly Detailed</span>
+                    </div>
+                    <span className="text-[10px] opacity-60">📅 Schedule: Mon 10 AM · Send Now →</span>
+                  </button>
+                  <span className="text-[10px] pl-1 text-[#C9A84C]/70">
+                    {getMisLastSentLabel('detailed_monthly') ? `✅ Last Sent: ${getMisLastSentLabel('detailed_monthly')}` : '⏳ Not sent this session'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -864,18 +897,41 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
                       <div className="flex items-center gap-4">
                         <span className="text-2xl font-serif font-black">{step.value}</span>
                         {idx > 0 && (
-                          <div className="bg-white/20 px-2 py-1 rounded text-[10px] font-black">
-                            {percentage}% of Total
+                          <div className="flex flex-col items-end gap-0.5">
+                            <div className="bg-white/20 px-2 py-1 rounded text-[10px] font-black">
+                              {percentage}% of Total
+                            </div>
+                            <div className="bg-black/20 px-2 py-0.5 rounded text-[9px] font-bold">
+                              {Math.round(((funnelData[idx-1].value - step.value) / (funnelData[idx-1].value || 1)) * 100)}% dropped
+                            </div>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
                   
-                  {/* Transition arrow/connector */}
-                  {idx < funnelData.length - 1 && (
-                    <div className="h-6 w-px bg-gradient-to-b from-[#E6D8B8] to-transparent my-1" />
-                  )}
+                  {/* Transition connector with drop-rate callout */}
+                  {idx < funnelData.length - 1 && (() => {
+                    const nextVal = funnelData[idx + 1].value;
+                    const dropRate = step.value > 0 ? Math.round(((step.value - nextVal) / step.value) * 100) : 0;
+                    const isHighDrop = dropRate > 50;
+                    return (
+                      <div className="flex flex-col items-center gap-0.5 my-1">
+                        <div className="h-4 w-px bg-gradient-to-b from-[#E6D8B8] to-transparent" />
+                        <div className={cn(
+                          "flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold border",
+                          isHighDrop
+                            ? "bg-red-50 border-red-300 text-red-600"
+                            : "bg-[#E6D8B8]/30 border-[#E6D8B8] text-[#9A8262]"
+                        )}>
+                          {isHighDrop && <span>⚠️</span>}
+                          <span>{dropRate}% drop here</span>
+                          {isHighDrop && <span className="opacity-80">— consider follow-up campaigns</span>}
+                        </div>
+                        <div className="h-4 w-px bg-gradient-to-b from-transparent to-[#E6D8B8]/30" />
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -951,12 +1007,34 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
               </div>
             )}
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-4 space-y-2">
             {agingStats.map(s => (
-               <div key={s.name} className="flex items-center justify-between p-2 bg-white rounded border border-[#E6D8B8]/30">
-                 <span className="text-[10px] font-bold text-[#9A8262]">{s.name}</span>
-                 <span className="text-xs font-black" style={{ color: s.color }}>{s.value}</span>
-               </div>
+              <div key={s.name} className="flex items-center justify-between p-3 bg-white rounded-xl border border-[#E6D8B8]/40 hover:border-[#C9A84C]/30 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                  <span className="text-xs font-bold text-[#2A1C00]">{s.name}</span>
+                  <span className="text-xs font-black" style={{ color: s.color }}>({s.value} leads)</span>
+                </div>
+                {s.name === '30+ Days' && s.value > 0 ? (
+                  <button
+                    onClick={() => onNavigate('leads')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-lg text-[10px] font-black hover:bg-green-600 transition-all shadow-sm"
+                  >
+                    <MessageSquare size={11} />
+                    Send Bulk WhatsApp
+                  </button>
+                ) : s.name === '15-30 Days' && s.value > 0 ? (
+                  <button
+                    onClick={() => onNavigate('leads')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-lg text-[10px] font-black hover:bg-orange-600 transition-all shadow-sm"
+                  >
+                    <Phone size={11} />
+                    Priority Call
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-emerald-600 font-bold">✓ On track</span>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -983,48 +1061,61 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="md:col-span-2 h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sourceQualityStats}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6D8B8" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9A8262', fontWeight: 'bold' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9A8262' }} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#FFFDF6', border: '1px solid #E6D8B8', borderRadius: '8px' }}
-                    cursor={{ fill: 'rgba(201,168,76,0.05)' }}
-                  />
-                  <Bar dataKey="leads" fill="#9A8262" radius={[4, 4, 0, 0]} barSize={30} />
-                  <Bar dataKey="visits" fill="#C9A84C" radius={[4, 4, 0, 0]} barSize={30} />
-                </BarChart>
-              </ResponsiveContainer>
+          {sourceQualityStats.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center gap-5">
+              <div className="text-5xl">📊</div>
+              <div>
+                <p className="font-bold text-[#2A1C00] text-base">No source data available</p>
+                <p className="text-xs text-[#9A8262] mt-1 max-w-xs mx-auto">Update lead sources to see ROI analysis and find your best-performing acquisition channels.</p>
+              </div>
+              <button
+                onClick={() => onNavigate('leads')}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#C9A84C] text-[#1C1207] rounded-xl text-xs font-black hover:bg-[#D4BC7D] transition-all shadow-md"
+              >
+                <PlusCircle size={13} />
+                Bulk-edit Leads →
+              </button>
             </div>
-            
-            <div className="space-y-4">
-               <h4 className="text-[10px] font-black text-[#9A8262] uppercase tracking-widest border-b border-[#E6D8B8] pb-2">Top Performing Sources</h4>
-               {sourceQualityStats.map(source => (
-                 <div key={source.name} className="p-3 bg-white border border-[#E6D8B8]/40 rounded-xl">
-                   <div className="flex justify-between items-center mb-2">
-                     <span className="font-bold text-sm text-[#2A1C00]">{source.name}</span>
-                     <span className="text-xs font-bold text-[#C9A84C]">{source.rate}% Visit Rate</span>
-                   </div>
-                   <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                     <div 
-                       className="h-full bg-gradient-to-r from-[#C9A84C] to-[#E8C97A]" 
-                       style={{ width: `${source.rate}%` }}
-                     />
-                   </div>
-                   <div className="mt-2 flex justify-between text-[10px] text-[#9A8262]">
-                     <span>{source.leads} Leads</span>
-                     <span className="font-bold text-[#2A1C00]">{source.visits} Visits</span>
-                   </div>
-                 </div>
-               ))}
-               {sourceQualityStats.length === 0 && (
-                 <div className="p-10 text-center text-[#9A8262] italic text-xs">No source data available.</div>
-               )}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="md:col-span-2 h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sourceQualityStats}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6D8B8" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9A8262', fontWeight: 'bold' }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9A8262' }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#FFFDF6', border: '1px solid #E6D8B8', borderRadius: '8px' }}
+                      cursor={{ fill: 'rgba(201,168,76,0.05)' }}
+                    />
+                    <Bar dataKey="leads" fill="#9A8262" radius={[4, 4, 0, 0]} barSize={30} />
+                    <Bar dataKey="visits" fill="#C9A84C" radius={[4, 4, 0, 0]} barSize={30} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-[#9A8262] uppercase tracking-widest border-b border-[#E6D8B8] pb-2">Top Performing Sources</h4>
+                {sourceQualityStats.map(source => (
+                  <div key={source.name} className="p-3 bg-white border border-[#E6D8B8]/40 rounded-xl">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-bold text-sm text-[#2A1C00]">{source.name}</span>
+                      <span className="text-xs font-bold text-[#C9A84C]">{source.rate}% Visit Rate</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-[#C9A84C] to-[#E8C97A]" 
+                        style={{ width: `${source.rate}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex justify-between text-[10px] text-[#9A8262]">
+                      <span>{source.leads} Leads</span>
+                      <span className="font-bold text-[#2A1C00]">{source.visits} Visits</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl p-6 shadow-sm overflow-hidden lg:col-span-2">
@@ -1037,26 +1128,59 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
               {staleLeads.length} ACTION REQUIRED
             </span>
           </div>
-          <p className="text-[11px] text-[#9A8262] mb-4">Leads with no activity or updates for more than 7 days.</p>
-          <div className="flex-1 overflow-y-auto space-y-3 max-h-[300px] custom-scrollbar pr-2">
-            {staleLeads.map(l => (
-              <div 
-                key={l.id} 
-                onClick={() => onNavigate('lead-detail', l.id)}
-                className="p-3 bg-white border border-[#E6D8B8]/50 rounded-xl hover:border-red-200 transition-all cursor-pointer group"
-              >
-                <div className="flex justify-between items-start mb-1">
-                  <span className="font-bold text-xs text-[#2A1C00] group-hover:text-[#C9A84C]">{l.name}</span>
-                  <span className="text-[9px] text-red-500 font-bold">
-                    {Math.floor((now.getTime() - new Date(l.updated_at || l.created_at).getTime()) / (1000 * 60 * 60 * 24))} Days Idle
-                  </span>
+          <p className="text-[11px] text-[#9A8262] mb-4">Top 10 leads with no activity for <span className="font-bold text-red-500">3+ days</span>. Take action immediately.</p>
+          <div className="flex-1 overflow-y-auto space-y-3 max-h-[400px] custom-scrollbar pr-2">
+            {staleLeads.map((l, idx) => {
+              const daysIdle = Math.floor((now.getTime() - new Date(l.updated_at || l.created_at).getTime()) / (1000 * 60 * 60 * 24));
+              const urgencyColor = daysIdle > 15 ? 'red' : daysIdle > 7 ? 'orange' : 'amber';
+              const urgencyClasses = {
+                red: 'bg-red-50 border-red-200 hover:border-red-400',
+                orange: 'bg-orange-50 border-orange-200 hover:border-orange-400',
+                amber: 'bg-amber-50 border-amber-200 hover:border-amber-400',
+              };
+              return (
+                <div
+                  key={l.id}
+                  className={cn("p-3 border rounded-xl transition-all", urgencyClasses[urgencyColor])}
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <button
+                      onClick={() => onNavigate('lead-detail', l.id)}
+                      className="font-bold text-xs text-[#2A1C00] hover:text-[#C9A84C] text-left"
+                    >
+                      #{idx + 1} {l.name}
+                    </button>
+                    <span className={cn(
+                      "text-[9px] font-black px-2 py-0.5 rounded-full",
+                      urgencyColor === 'red' ? 'bg-red-500 text-white' :
+                      urgencyColor === 'orange' ? 'bg-orange-500 text-white' :
+                      'bg-amber-500 text-white'
+                    )}>
+                      {daysIdle}d Idle
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2 text-[10px] text-[#9A8262]">
+                      <span className="uppercase font-bold">{l.status}</span>
+                      <span>•</span>
+                      <span><UserIcon size={9} className="inline" /> {users.find(u => u.id === l.assignedTo)?.name || 'Unassigned'}</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const phone = l.mobile || '';
+                        if (phone) window.open(`https://wa.me/${phone.replace(/\D/g, '')}`, '_blank');
+                        else toast.error('No mobile number for this lead');
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-green-500 text-white rounded-lg text-[9px] font-black hover:bg-green-600 transition-all"
+                    >
+                      <MessageSquare size={10} />
+                      WhatsApp
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-[#9A8262]">
-                  <span>Status: {l.status.toUpperCase()}</span>
-                  <span className="flex items-center gap-1"><UserIcon size={10} /> {users.find(u => u.id === l.assignedTo)?.name || 'Unassigned'}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {staleLeads.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center p-10">
                 <CheckCircle2 size={32} className="text-green-500 mb-2 opacity-30" />
@@ -1221,7 +1345,7 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
                       {activity.userName} <span className="font-normal text-[#9A8262]">performed</span> {getActivityLabel(activity.type)}
                     </p>
                     <span className="text-[10px] font-bold text-[#9A8262] whitespace-nowrap">
-                      {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatDateTime(activity.timestamp)}
                     </span>
                   </div>
                   <div className="mt-1 flex items-center gap-2 text-xs">

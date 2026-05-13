@@ -32,6 +32,7 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
   const [selectedProject, setSelectedProject] = useState<string>('all');
   const [selectedQuality, setSelectedQuality] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showComparePeriod, setShowComparePeriod] = useState(false);
 
   // Helper to get the most accurate date for a visit
   const getRelevantDate = (v: Visit) => {
@@ -104,52 +105,84 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
     return counts;
   }, [filteredVisits, leads]);
 
-  // 3. Comparison Stats (Period-based)
+  // 3. Comparison Stats (Period-based) — 6.2 project-aware Quick Pulse
   const analyticsData = useMemo(() => {
-    // Trend Data (Last 14 days)
-    const last14Days = eachDayOfInterval({
-      start: subDays(new Date(), 13),
-      end: new Date()
-    });
+    const projectVisits = (v: Visit) => selectedProject === 'all' || v.projectId === selectedProject;
 
-    const trend = last14Days.map(day => {
+    // Trend Data (Last 14 days)
+    const last14Days = eachDayOfInterval({ start: subDays(new Date(), 13), end: new Date() });
+    const prev14Days = eachDayOfInterval({ start: subDays(new Date(), 27), end: subDays(new Date(), 14) });
+
+    const trend = last14Days.map((day, i) => {
       const dayStr = format(day, 'yyyy-MM-dd');
-      const dayVisits = visits.filter(v => v.visit_status === 'completed' && v.visit_date?.startsWith(dayStr));
+      const prevDay = prev14Days[i];
+      const prevDayStr = format(prevDay, 'yyyy-MM-dd');
+      const dayVisits = visits.filter(v => v.visit_status === 'completed' && v.visit_date?.startsWith(dayStr) && projectVisits(v));
+      const prevVisits = visits.filter(v => v.visit_status === 'completed' && v.visit_date?.startsWith(prevDayStr) && projectVisits(v));
       return {
         name: format(day, 'dd MMM'),
         visits: dayVisits.length,
-        hot: dayVisits.filter(v => leads.find(l => l.id === v.leadId)?.quality === 'hot').length
+        hot: dayVisits.filter(v => leads.find(l => l.id === v.leadId)?.quality === 'hot').length,
+        prevVisits: prevVisits.length
       };
     });
 
     // Project Data
     const projectDist = projects.map(p => {
       const pVisits = visits.filter(v => v.projectId === p.id && v.visit_status === 'completed');
-      return {
-        name: p.name,
-        value: pVisits.length
-      };
+      return { name: p.name, value: pVisits.length };
     }).filter(p => p.value > 0).sort((a, b) => b.value - a.value);
 
     // Visit to Booking Ratio
-    const totalCompletedVisits = visits.filter(v => v.visit_status === 'completed').length;
-    const closedLeadsFromVisits = leads.filter(l => l.status === 'closed' && visits.some(v => v.leadId === l.id && v.visit_status === 'completed')).length;
+    const projCompleted = visits.filter(v => v.visit_status === 'completed' && projectVisits(v));
+    const totalCompletedVisits = projCompleted.length;
+    const closedLeadsFromVisits = leads.filter(l => l.status === 'closed' && projCompleted.some(v => v.leadId === l.id)).length;
     const conversionRatio = totalCompletedVisits > 0 ? Math.round((closedLeadsFromVisits / totalCompletedVisits) * 100) : 0;
 
+    // 6.2: Project-filtered Quick Pulse
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
     return {
       trend,
       projectDist,
       conversionRatio,
       closedLeadsFromVisits,
       totalCompletedVisits,
-      today: visits.filter(v => v.visit_status === 'completed' && v.visit_date?.startsWith(format(new Date(), 'yyyy-MM-dd'))).length,
-      yesterday: visits.filter(v => v.visit_status === 'completed' && v.visit_date?.startsWith(format(subDays(new Date(), 1), 'yyyy-MM-dd'))).length,
-      thisWeek: visits.filter(v => v.visit_status === 'completed' && isWithinInterval(parseISO(v.visit_date || ''), { start: startOfWeek(new Date()), end: endOfWeek(new Date()) })).length,
-      thisMonth: visits.filter(v => v.visit_status === 'completed' && isWithinInterval(parseISO(v.visit_date || ''), { start: startOfMonth(new Date()), end: endOfMonth(new Date()) })).length
+      today: visits.filter(v => v.visit_status === 'completed' && v.visit_date?.startsWith(todayStr) && projectVisits(v)).length,
+      yesterday: visits.filter(v => v.visit_status === 'completed' && v.visit_date?.startsWith(yesterdayStr) && projectVisits(v)).length,
+      thisWeek: visits.filter(v => v.visit_status === 'completed' && projectVisits(v) && isWithinInterval(parseISO(v.visit_date || '2000-01-01'), { start: startOfWeek(new Date()), end: endOfWeek(new Date()) })).length,
+      thisMonth: visits.filter(v => v.visit_status === 'completed' && projectVisits(v) && isWithinInterval(parseISO(v.visit_date || '2000-01-01'), { start: startOfMonth(new Date()), end: endOfMonth(new Date()) })).length
     };
-  }, [visits, leads, projects]);
+  }, [visits, leads, projects, selectedProject]);
 
   const COLORS = ['#C9A84C', '#B59640', '#9A8262', '#5C4820', '#2A1C00'];
+
+  // 6.4 CSV Export
+  const handleExport = () => {
+    if (filteredVisits.length === 0) return;
+    const headers = ['Date', 'Client Name', 'Mobile', 'Project', 'Lead Quality', 'Stage', 'Visit Time'];
+    const rows = filteredVisits.map(v => {
+      const lead = leads.find(l => l.id === v.leadId);
+      const project = projects.find(p => p.id === v.projectId);
+      return [
+        getRelevantDate(v).toLocaleDateString('en-IN'),
+        v.client_name || '',
+        v.mobile || '',
+        project?.name || '',
+        lead?.quality || 'pending',
+        lead?.status?.replace('_', ' ') || 'new',
+        v.visit_time || ''
+      ];
+    });
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `footfall-log-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -179,8 +212,12 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
               className="pl-10 pr-4 py-2 bg-white border border-[#E6D8B8] rounded-xl text-sm focus:outline-none focus:border-[#C9A84C] w-64"
             />
           </div>
-          <button className="p-2.5 bg-white border border-[#E6D8B8] text-[#9A8262] rounded-xl hover:bg-[#FDFBF7] transition-all">
-            <Download size={20} />
+          <button
+            onClick={handleExport}
+            title={`Export ${filteredVisits.length} rows as CSV`}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#E6D8B8] text-[#9A8262] rounded-xl hover:bg-[#FDFBF7] hover:text-[#C9A84C] transition-all text-xs font-bold"
+          >
+            <Download size={16} /> Export CSV
           </button>
         </div>
       </div>
@@ -197,15 +234,30 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
                 <h3 className="text-white font-serif text-xl font-bold">Footfall Velocity</h3>
                 <p className="text-[#C9A84C] text-[10px] font-black uppercase tracking-widest mt-1">Daily completed visits trend</p>
               </div>
-              <div className="flex gap-4">
+              <div className="flex gap-4 items-center">
+                {/* 6.1 Compare toggle */}
+                <button
+                  onClick={() => setShowComparePeriod(p => !p)}
+                  className={cn(
+                    "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border transition-all",
+                    showComparePeriod ? "bg-[#C9A84C] border-[#C9A84C] text-[#1C1207]" : "border-white/20 text-white/50 hover:border-[#C9A84C] hover:text-[#C9A84C]"
+                  )}
+                >
+                  vs Prev Period
+                </button>
+                <div className="w-px h-10 bg-white/10" />
                 <div className="text-right">
                   <p className="text-white font-serif text-2xl font-black">{analyticsData.totalCompletedVisits}</p>
                   <p className="text-white/40 text-[9px] font-bold uppercase">Total Volume</p>
                 </div>
                 <div className="w-px h-10 bg-white/10" />
+                {/* 6.3 Benchmark context */}
                 <div className="text-right">
-                  <p className="text-[#C9A84C] font-serif text-2xl font-black">{analyticsData.conversionRatio}%</p>
+                  <p className={cn("font-serif text-2xl font-black", analyticsData.conversionRatio >= 15 ? 'text-emerald-400' : 'text-[#C9A84C]')}>{analyticsData.conversionRatio}%</p>
                   <p className="text-white/40 text-[9px] font-bold uppercase">Conversion Rate</p>
+                  <p className={cn("text-[8px] font-bold mt-0.5", analyticsData.conversionRatio >= 15 ? 'text-emerald-400' : 'text-red-400')}>
+                    {analyticsData.conversionRatio >= 15 ? '✓ Above avg' : `⚠ Avg: 15%`}
+                  </p>
                 </div>
               </div>
             </div>
@@ -225,8 +277,11 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
                     contentStyle={{ backgroundColor: '#1C1207', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '12px' }}
                     itemStyle={{ fontSize: '12px', color: '#C9A84C' }}
                   />
-                  <Area type="monotone" dataKey="visits" stroke="#C9A84C" strokeWidth={3} fillOpacity={1} fill="url(#colorVisits)" />
-                  <Area type="monotone" dataKey="hot" stroke="#E74C3C" strokeWidth={2} fill="transparent" />
+                  <Area type="monotone" dataKey="visits" name="This Period" stroke="#C9A84C" strokeWidth={3} fillOpacity={1} fill="url(#colorVisits)" />
+                  <Area type="monotone" dataKey="hot" name="Hot Leads" stroke="#E74C3C" strokeWidth={2} fill="transparent" />
+                  {showComparePeriod && (
+                    <Area type="monotone" dataKey="prevVisits" name="Prev Period" stroke="rgba(255,255,255,0.3)" strokeWidth={2} strokeDasharray="4 4" fill="transparent" />
+                  )}
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -380,12 +435,25 @@ export default function VisitAnalysis({ visits, leads, projects, onBack, onNavig
                       <StageBadge status={lead?.status || 'new'} />
                     </td>
                     <td className="px-6 py-5 text-right">
-                      <button 
-                        onClick={() => onNavigate('detail', v.id)}
-                        className="p-2 text-[#9A8262] hover:bg-[#C9A84C] hover:text-white rounded-xl transition-all"
-                      >
-                        <ChevronRight size={20} />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {/* 6.5 Jump to lead detail */}
+                        {lead && (
+                          <button
+                            onClick={() => onNavigate('lead-detail', lead.id)}
+                            title="Open Lead Detail"
+                            className="px-2.5 py-1 text-[9px] font-black text-[#C9A84C] border border-[#C9A84C]/30 hover:bg-[#C9A84C] hover:text-white rounded-lg transition-all uppercase tracking-wider"
+                          >
+                            Lead
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onNavigate('detail', v.id)}
+                          className="p-2 text-[#9A8262] hover:bg-[#C9A84C] hover:text-white rounded-xl transition-all"
+                          title="Visit Detail"
+                        >
+                          <ChevronRight size={20} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

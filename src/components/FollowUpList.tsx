@@ -134,7 +134,8 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
     cancelled: baseFilteredData.filter(f => f.statusGroup === 'cancelled').length,
     hotOverdue: baseFilteredData.filter(f => f.statusGroup === 'overdue' && f.priorityStr === 'HOT').length,
     warmOverdue: baseFilteredData.filter(f => f.statusGroup === 'overdue' && f.priorityStr === 'WARM').length,
-  }), [baseFilteredData]);
+    completedToday: baseFilteredData.filter(f => f.statusGroup === 'completed' && f.completed_at?.startsWith(today)).length,
+  }), [baseFilteredData, today]);
 
   // 3. Final list data (apply the active tab)
   const filteredData = useMemo(() => {
@@ -143,6 +144,23 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
       return true;
     });
   }, [baseFilteredData, activeTab]);
+
+  // 5.2 Smart Grouping by date
+  const groupedData = useMemo(() => {
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const lastWeekStr = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+    const groups: { label: string; color: string; items: typeof filteredData }[] = [
+      { label: `Today (${filteredData.filter(f => f.statusGroup === 'today').length})`, color: 'text-blue-600 bg-blue-50 border-blue-200', items: filteredData.filter(f => f.statusGroup === 'today') },
+      { label: `Yesterday Overdue (${filteredData.filter(f => f.statusGroup === 'overdue' && f.date?.startsWith(yesterdayStr)).length})`, color: 'text-orange-600 bg-orange-50 border-orange-200', items: filteredData.filter(f => f.statusGroup === 'overdue' && f.date?.startsWith(yesterdayStr)) },
+      { label: `Last Week Overdue (${filteredData.filter(f => f.statusGroup === 'overdue' && f.date >= lastWeekStr && !f.date?.startsWith(yesterdayStr)).length})`, color: 'text-red-600 bg-red-50 border-red-200', items: filteredData.filter(f => f.statusGroup === 'overdue' && f.date >= lastWeekStr && !f.date?.startsWith(yesterdayStr)) },
+      { label: `Older / Archive (${filteredData.filter(f => f.statusGroup === 'overdue' && f.date < lastWeekStr).length})`, color: 'text-gray-600 bg-gray-50 border-gray-200', items: filteredData.filter(f => f.statusGroup === 'overdue' && f.date < lastWeekStr) },
+      { label: `Upcoming (${filteredData.filter(f => f.statusGroup === 'upcoming').length})`, color: 'text-green-600 bg-green-50 border-green-200', items: filteredData.filter(f => f.statusGroup === 'upcoming') },
+      { label: `Completed (${filteredData.filter(f => f.statusGroup === 'completed').length})`, color: 'text-purple-600 bg-purple-50 border-purple-200', items: filteredData.filter(f => f.statusGroup === 'completed') },
+      { label: `Cancelled (${filteredData.filter(f => f.statusGroup === 'cancelled').length})`, color: 'text-gray-400 bg-gray-50 border-gray-200', items: filteredData.filter(f => f.statusGroup === 'cancelled') },
+    ].filter(g => g.items.length > 0);
+    return activeTab === 'all' ? groups : [{ label: activeTab, color: 'text-[#C9A84C]', items: filteredData }];
+  }, [filteredData, activeTab]);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredData.length && filteredData.length > 0) {
@@ -172,7 +190,8 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
   const pieData = [
     { name: 'Overdue', value: stats.overdue, color: '#ef4444' },
     { name: 'Today', value: stats.today, color: '#3b82f6' },
-    { name: 'Upcoming', value: stats.upcoming, color: '#22c55e' }
+    { name: 'Upcoming', value: stats.upcoming, color: '#22c55e' },
+    { name: 'Done Today', value: stats.completedToday, color: '#a855f7' }
   ].filter(d => d.value > 0);
   
   const totalPending = stats.overdue + stats.today + stats.upcoming;
@@ -319,6 +338,32 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
           ))}
         </div>
 
+        {/* Bulk Action Toolbar */}
+        {selectedIds.length > 0 && (
+          <div className="bg-[#1C1207] text-white rounded-xl px-5 py-3 flex flex-wrap items-center gap-3 shadow-xl animate-in fade-in duration-200">
+            <span className="text-xs font-black text-[#C9A84C] uppercase tracking-widest">{selectedIds.length} Selected</span>
+            <div className="h-4 w-px bg-white/20" />
+            <button onClick={handleBulkComplete} className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-bold transition-all">
+              <CheckCircle2 size={13} /> Mark Complete
+            </button>
+            {isAdmin && (
+              <button onClick={() => {
+                const newDate = prompt('Reschedule to date (YYYY-MM-DD):', new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+                if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+                  selectedIds.forEach(id => onUpdateStatus(id, 'completed', `Bulk rescheduled to ${newDate}`));
+                  setSelectedIds([]);
+                }
+              }} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all">
+                <RefreshCw size={13} /> Reschedule
+              </button>
+            )}
+            <button onClick={() => { if (window.confirm(`Delete ${selectedIds.length} follow-ups?`)) { selectedIds.forEach(id => onUpdateStatus(id, 'cancelled', 'Bulk deleted')); setSelectedIds([]); } }} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold transition-all">
+              <XCircle size={13} /> Delete
+            </button>
+            <button onClick={() => setSelectedIds([])} className="ml-auto text-xs text-white/50 hover:text-white transition-colors">✕ Clear</button>
+          </div>
+        )}
+
         {/* Table/List View */}
         <div className="bg-white border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
           {/* Desktop Table View */}
@@ -345,7 +390,18 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E6D8B8]/30">
-                {filteredData.length > 0 ? filteredData.map(f => (
+                {groupedData.length > 0 ? groupedData.map(group => (
+                  <React.Fragment key={group.label}>
+                    {activeTab === 'all' && (
+                      <tr>
+                        <td colSpan={9} className="px-4 py-2">
+                          <span className={cn("inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border", group.color)}>
+                            {group.label}
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                    {group.items.map(f => (
                   <tr key={f.id} className={cn("hover:bg-[#FFFDF6] transition-colors group cursor-default", selectedIds.includes(f.id) && "bg-[#FFFDF6]")}>
                     <td className="px-4 py-3 relative">
                       <div className={cn("absolute left-0 top-3 bottom-3 border-l-[3px]", getPriorityColors(f.priorityStr))} />
@@ -363,7 +419,7 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                         {f.priorityStr === 'WARM' && <AlertCircle size={14} className="text-orange-500 mb-1" />}
                         {f.priorityStr === 'NORMAL' && <CheckCircle2 size={14} className="text-green-500 mb-1" />}
                         <span className={cn("text-[9px] font-black tracking-widest", f.priorityStr === 'HOT' ? 'text-red-600' : f.priorityStr === 'WARM' ? 'text-orange-600' : 'text-green-600')}>{f.priorityStr}</span>
-                        {f.statusGroup === 'overdue' && <span className="text-[8px] font-bold text-red-500 mt-0.5">{f.daysOverdue} DAYS OVERDUE</span>}
+                        {f.statusGroup === 'overdue' && <span className="text-[8px] font-bold text-red-500 mt-0.5">{f.daysOverdue}d OVERDUE</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -383,12 +439,20 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 text-sm font-semibold text-[#2A1C00] mb-1">
-                        {f.method === 'call' ? <Phone size={14} className="text-[#C9A84C]" /> : <MessageSquare size={14} className="text-[#C9A84C]" />}
-                        {f.method === 'call' ? 'Call' : 'WhatsApp'}
-                      </div>
-                      <div className={cn("text-xs font-bold", f.statusGroup === 'overdue' ? 'text-red-500' : f.statusGroup === 'today' ? 'text-blue-500' : 'text-[#9A8262]')}>
-                      {f.statusGroup === 'today' ? 'Today' : f.statusGroup === 'overdue' ? 'Overdue' : formatDate(f.date)}
+                      {/* 5.5 One-Click Call & WhatsApp */}
+                      {f.method === 'call' ? (
+                        <a href={`tel:${f.phone}`} onClick={e => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-[10px] font-black transition-all shadow-sm">
+                          <Phone size={11} /> ☎ Call Now
+                        </a>
+                      ) : (
+                        <a href={`https://wa.me/91${(f.phone || '').replace(/\D/g,'')}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] hover:bg-[#1da851] text-white rounded-lg text-[10px] font-black transition-all shadow-sm">
+                          <MessageSquare size={11} /> WhatsApp
+                        </a>
+                      )}
+                      <div className={cn("text-[9px] font-bold mt-1", f.statusGroup === 'overdue' ? 'text-red-500' : f.statusGroup === 'today' ? 'text-blue-500' : 'text-[#9A8262]')}>
+                        {f.statusGroup === 'today' ? 'Today' : f.statusGroup === 'overdue' ? 'Overdue' : formatDate(f.date)}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -431,9 +495,11 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                       </div>
                     </td>
                   </tr>
+                    ))}
+                  </React.Fragment>
                 )) : (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center">
+                    <td colSpan={9} className="px-4 py-12 text-center">
                       <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#FDFAF2] border border-[#E6D8B8] mb-4">
                         <Calendar className="text-[#C9A84C]" size={24} />
                       </div>
@@ -558,7 +624,8 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
             {[
               { label: 'Overdue', value: stats.overdue, color: 'bg-red-500' },
               { label: 'Today', value: stats.today, color: 'bg-blue-500' },
-              { label: 'Upcoming', value: stats.upcoming, color: 'bg-green-500' }
+              { label: 'Upcoming', value: stats.upcoming, color: 'bg-green-500' },
+              { label: 'Done Today', value: stats.completedToday, color: 'bg-purple-500' }
             ].map(item => (
               <div key={item.label} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
@@ -566,11 +633,16 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                   <span className="font-semibold text-[#5C4820]">{item.label}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-bold text-[#2A1C00]">({item.value})</span>
-                  <span className="text-[#9A8262] w-8 text-right">{totalPending ? Math.round((item.value / totalPending) * 100) : 0}%</span>
+                  <span className={cn("font-bold", item.label === 'Done Today' && item.value > 0 ? 'text-purple-600' : 'text-[#2A1C00]')}>({item.value})</span>
+                  <span className="text-[#9A8262] w-8 text-right">{totalPending ? Math.round((item.value / (totalPending + stats.completedToday)) * 100) : 0}%</span>
                 </div>
               </div>
             ))}
+            {stats.completedToday > 0 && (
+              <div className="mt-2 p-2 bg-purple-50 border border-purple-100 rounded-lg text-center">
+                <span className="text-xs font-black text-purple-700">🎉 {stats.completedToday} completed today!</span>
+              </div>
+            )}
           </div>
         </div>
 

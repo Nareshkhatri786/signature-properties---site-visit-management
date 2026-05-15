@@ -35,44 +35,6 @@
     href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap"
     rel="stylesheet"
   />
-
-  <!-- Inline critical CSS to prevent FOUC -->
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body, #root { height: 100%; width: 100%; }
-    body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      background: #1C1207;
-      color: #2A1C00;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      overflow-x: hidden;
-    }
-    /* Loading spinner shown before React hydrates */
-    #root:empty::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      background: #1C1207;
-    }
-    #root:empty::before {
-      content: '';
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 40px;
-      height: 40px;
-      border: 3px solid rgba(201,168,76,0.2);
-      border-top-color: #C9A84C;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      z-index: 10;
-    }
-    @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
-  </style>
 </head>
 
 <body>

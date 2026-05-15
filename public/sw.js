@@ -1,7 +1,7 @@
 // Signature CRM — Service Worker v2
 // Strategy: Cache-First for static assets, Network-First for API
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `crm-static-${CACHE_VERSION}`;
 const API_CACHE = `crm-api-${CACHE_VERSION}`;
 

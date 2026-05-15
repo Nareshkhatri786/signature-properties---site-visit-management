@@ -19,9 +19,9 @@ export default defineConfig(({ mode }) => {
       alias: { '@': path.resolve(__dirname, '.') },
     },
     build: {
-      sourcemap: false,          // No source maps in prod (smaller bundle)
-      cssCodeSplit: true,        // Split CSS per chunk
-      assetsInlineLimit: 4096,   // Inline assets < 4kb as base64
+      sourcemap: false,          
+      cssCodeSplit: false,       // ❌ DISABLED: CSS code splitting breaks Tailwind v4 cascade
+      assetsInlineLimit: 4096,   
       minify: 'terser',
       terserOptions: {
         compress: {

@@ -4,7 +4,6 @@ import mysql from 'mysql2/promise';
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import { askClaudeAWS } from './claude-service.js';
 
-dotenv.config();
 
 let globalPool: mysql.Pool | null = null;
 

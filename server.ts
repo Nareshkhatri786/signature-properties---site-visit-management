@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
@@ -8,11 +9,9 @@ import { pool, query, queryOne, execute, parseJsonFields, stringifyJsonFields, t
 import { setupMISReports, generateDailyMISReport, generateWeekendMISReport, generateMonthlyDetailedMISReport, setDbPool, getReportStats, sendCustomEmail } from "./reportService.js";
 import { normalizePhoneNumber } from "./src/lib/phoneUtils.js";
 import webPush from "web-push";
-import dotenv from "dotenv";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import { askClaudeAWS } from "./claude-service.js";
-dotenv.config();
 
 const PUBLIC_VAPID_KEY = process.env.PUBLIC_VAPID_KEY || "BLraqx6JI2_b6uK3Q83waVcP2n8JXaAhzdPWrVJnqHhfLhusM8AextWDWwPx0_y51Ua9XxY-g-D4FvgJomgMpBE";
 const PRIVATE_VAPID_KEY = process.env.PRIVATE_VAPID_KEY || "6d9cRb3i51P9Qw0niJSkTQ5_mGuK-Dqz2Wcj-itMUPQ";

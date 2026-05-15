@@ -239,20 +239,28 @@ export default function Reports({ leads, visits, users, projects, onNavigate, cu
     { name: 'No Show', value: visits.filter(v => v.visit_status === 'no_show').length, color: '#95A5A6' }
   ];
 
-  // 8. Call Outcome Distribution
+  // 8. Call Outcome Distribution (using filtered leads)
   const callStats = [
-    { name: 'Interested', value: leads.reduce((acc, l) => acc + (l.answeredCount || 0), 0), color: '#27AE60' },
-    { name: 'Busy/No Answer', value: leads.reduce((acc, l) => acc + ((l.callCount || 0) - (l.answeredCount || 0)), 0), color: '#F1C40F' }
+    { name: 'Interested', value: filteredLeadsGlobal.reduce((acc, l) => acc + (l.answeredCount || 0), 0), color: '#27AE60' },
+    { name: 'Busy/No Answer', value: filteredLeadsGlobal.reduce((acc, l) => acc + ((l.callCount || 0) - (l.answeredCount || 0)), 0), color: '#F1C40F' }
   ];
 
-  // 9. Daily Trends (Last 7 Days)
+  // 9. Lead Quality Distribution (AI Scored)
+  const qualityStats = [
+    { name: 'Hot', value: filteredLeadsGlobal.filter(l => l.quality === 'hot').length, color: '#E74C3C' },
+    { name: 'Warm', value: filteredLeadsGlobal.filter(l => l.quality === 'warm').length, color: '#F1C40F' },
+    { name: 'Cold', value: filteredLeadsGlobal.filter(l => l.quality === 'cold').length, color: '#3498DB' },
+    { name: 'Disqualified', value: filteredLeadsGlobal.filter(l => l.quality === 'disq').length, color: '#95A5A6' }
+  ];
+
+  // 10. Daily Trends (Last 7 Days)
   const dailyData = Array.from({ length: 7 }).map((_, i) => {
     const d = subDays(now, i);
-    const dayLeads = leads.filter(l => isToday(new Date(l.created_at)) || format(new Date(l.created_at), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd'));
+    const dateStr = format(d, 'yyyy-MM-dd');
     return {
       date: format(d, 'MMM d'),
-      calls: leads.reduce((acc, l) => acc + (l.activities?.filter((a: any) => a.type === 'call_logged' && format(new Date(a.timestamp), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')).length || 0), 0),
-      answered: leads.reduce((acc, l) => acc + (l.activities?.filter((a: any) => a.type === 'call_logged' && a.details?.includes('Interested') && format(new Date(a.timestamp), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')).length || 0), 0)
+      calls: filteredLeadsGlobal.reduce((acc, l) => acc + (l.activities?.filter((a: any) => a.type === 'call_logged' && format(new Date(a.timestamp), 'yyyy-MM-dd') === dateStr).length || 0), 0),
+      answered: filteredLeadsGlobal.reduce((acc, l) => acc + (l.activities?.filter((a: any) => a.type === 'call_logged' && a.details?.includes('Interested') && format(new Date(a.timestamp), 'yyyy-MM-dd') === dateStr).length || 0), 0)
     };
   }).reverse();
 

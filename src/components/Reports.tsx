@@ -489,9 +489,9 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
             )}
           </div>
         </div>
-      </div>
 
       {/* Automated MIS Reports Block - Only for Admin and Manager */}
+
       {(currentUserRole?.toLowerCase() === 'admin' || currentUserRole?.toLowerCase() === 'adm' || currentUserRole?.toLowerCase() === 'manager') && (
         <div className="bg-gradient-to-br from-[#1C1207] to-[#2A1C00] rounded-[2rem] p-8 border border-[#C9A84C]/30 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-96 h-96 bg-[#C9A84C]/10 rounded-full -mr-48 -mt-48 blur-3xl" />

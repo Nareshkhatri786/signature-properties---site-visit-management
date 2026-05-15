@@ -1,8 +1,8 @@
 import nodemailer from 'nodemailer';
 import cron from 'node-cron';
 import mysql from 'mysql2/promise';
-import dotenv from 'dotenv';
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
+import { askClaudeAWS } from './claude-service.js';
 
 dotenv.config();
 
@@ -71,6 +71,27 @@ export async function sendCustomEmail(to: string, subject: string, html: string)
   }
 }
 
+// --- AI Insights Helper ---
+async function getAIReportInsight(reportType: string, data: any) {
+  const prompt = `
+    Analyze this ${reportType} data for Signature Properties CRM and provide a concise executive summary.
+    Focus on:
+    1. Overall performance trends.
+    2. Specific projects or users needing attention.
+    3. Actionable advice for the management.
+    
+    Data:
+    ${JSON.stringify(data)}
+    
+    Keep the tone professional and strategic. Use bullet points for action items.
+  `;
+  try {
+    return await askClaudeAWS(prompt, "You are a senior real estate business analyst.");
+  } catch (e) {
+    return "AI Insight currently unavailable.";
+  }
+}
+
 // --- Report Generators ---
 
 export async function generateDailyMISReport() {
@@ -117,10 +138,20 @@ export async function generateDailyMISReport() {
   const [weeklyNew] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) >= ?", [startOfWeek]);
   const [monthlyNew] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) >= ?", [startOfMonth]);
 
+  const aiInsight = await getAIReportInsight('Daily MIS', { projectStats, userStats });
+
   const html = `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 1000px; padding: 20px;">
-      <h2 style="font-size: 18px; margin-bottom: 20px; text-transform: uppercase;">Daily MIS Report - ${today}</h2>
+      <h2 style="font-size: 18px; margin-bottom: 20px; text-transform: uppercase; color: #C9A84C;">Daily MIS Report - ${today}</h2>
       
+      <!-- AI AUDIT SECTION -->
+      <div style="background: #FFF9E6; border: 1px solid #C9A84C; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
+        <h3 style="margin-top: 0; color: #1C1207; font-size: 16px; border-bottom: 1px solid #C9A84C; padding-bottom: 10px;">✨ Signature AI Audit</h3>
+        <div style="font-size: 14px; line-height: 1.6; color: #444;">
+          ${aiInsight.replace(/\n/g, '<br/>')}
+        </div>
+      </div>
+
       <!-- Project Wise Table -->
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; border: 1px solid #ddd;">
         <thead>

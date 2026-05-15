@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AIReportLab from './AIReportLab';
 import { toast } from 'react-hot-toast';
 import { 
   BarChart, 
@@ -115,6 +116,7 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
   });
   const [drillDownType, setDrillDownType] = useState<'leads' | 'calls' | 'visits' | 'whatsapp' | null>(null);
   const [misLastSent, setMisLastSent] = useState<Record<string, Date | null>>({ daily: null, weekend: null, detailed_monthly: null });
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'ai-lab'>('dashboard');
 
   const getMisLastSentLabel = (type: string) => {
     const d = misLastSent[type];
@@ -410,25 +412,42 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
 
   return (
     <div className="space-y-8 pb-12">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="font-serif text-3xl font-bold text-[#2A1C00] flex items-center gap-3">
-              <div className="p-2 bg-[#C9A84C]/10 rounded-xl">
-                <TrendingUp className="text-[#C9A84C]" size={24} />
-              </div>
-              Strategic Analytics
-            </h2>
-            <p className="text-[#9A8262] text-sm mt-1 ml-14">Data-driven insights & performance audits.</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <button className="bg-white border border-[#E6D8B8] px-4 py-2 rounded-xl text-sm font-bold text-[#C9A84C] flex items-center gap-2 hover:bg-[#FDFAF2] transition-colors shadow-sm">
-              <Download size={16} /> Export
-            </button>
-          </div>
         </div>
+      </div>
 
-        {/* Top Filters Bar */}
+      {/* TABS NAVIGATION */}
+      <div className="flex items-center gap-4 border-b border-[#E6D8B8]/30 pb-1">
+        <button 
+          onClick={() => setActiveTab('dashboard')}
+          className={cn(
+            "pb-3 px-2 text-sm font-bold tracking-tight transition-all relative",
+            activeTab === 'dashboard' ? "text-[#C9A84C]" : "text-[#9A8262] hover:text-[#2A1C00]"
+          )}
+        >
+          Traditional Dashboard
+          {activeTab === 'dashboard' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#C9A84C]" />}
+        </button>
+        {(currentUserRole?.toLowerCase() === 'admin' || currentUserRole?.toLowerCase() === 'adm') && (
+          <button 
+            onClick={() => setActiveTab('ai-lab')}
+            className={cn(
+              "pb-3 px-2 text-sm font-bold tracking-tight transition-all relative flex items-center gap-2",
+              activeTab === 'ai-lab' ? "text-[#C9A84C]" : "text-[#9A8262] hover:text-[#2A1C00]"
+            )}
+          >
+            <Sparkles size={14} className={activeTab === 'ai-lab' ? "animate-pulse" : ""} />
+            AI Report Lab
+            {activeTab === 'ai-lab' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#C9A84C]" />}
+          </button>
+        )}
+      </div>
+
+
+      {activeTab === 'ai-lab' ? (
+        <AIReportLab leads={leads} visits={visits} users={users} />
+      ) : (
+        <>
+          {/* Top Filters Bar */}
         <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl p-4 shadow-sm flex flex-wrap items-center gap-4">
           <div className="flex-1 min-w-[200px]">
              <DateRangeSelector selectedRange={dateRange} onChange={setDateRange} />
@@ -1370,7 +1389,8 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
             )}
           </div>
         </div>
-      </div>
+      </>
+      )}
     </div>
   );
-}
+}

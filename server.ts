@@ -11,6 +11,7 @@ import webPush from "web-push";
 import dotenv from "dotenv";
 import { Server } from "socket.io";
 import { createServer } from "http";
+import { askClaudeAWS } from "./claude-service.js";
 dotenv.config();
 
 const PUBLIC_VAPID_KEY = process.env.PUBLIC_VAPID_KEY || "BLraqx6JI2_b6uK3Q83waVcP2n8JXaAhzdPWrVJnqHhfLhusM8AextWDWwPx0_y51Ua9XxY-g-D4FvgJomgMpBE";
@@ -226,6 +227,18 @@ async function startServer() {
       return res.status(500).json({ error: e.message });
     }
   });
+
+  // -- AI CHATBOT (AWS CLAUDE) ---------------------------
+  app.post("/api/ai/ask", authMiddleware, async (req, res) => {
+    const { prompt, context } = req.body;
+    try {
+      const response = await askClaudeAWS(prompt, context || "");
+      res.json({ response });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 
   // -- PUSH NOTIFICATIONS ---------------------------------
   app.get("/api/push/public-key", (req, res) => {

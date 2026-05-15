@@ -412,10 +412,8 @@ export default function Reports({ callLogs, visits, leads, activities, users, pr
 
   return (
     <div className="space-y-8 pb-12">
-        </div>
-      </div>
-
       {/* TABS NAVIGATION */}
+
       <div className="flex items-center gap-4 border-b border-[#E6D8B8]/30 pb-1">
         <button 
           onClick={() => setActiveTab('dashboard')}

@@ -54,7 +54,7 @@ import {
   differenceInDays
 } from 'date-fns';
 import { cn } from '../lib/utils';
-import { DateRangeSelector } from './DateRangeSelector';
+import DateRangeSelector, { DateRange } from './DateRangeSelector';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface ReportsProps {
@@ -67,9 +67,10 @@ interface ReportsProps {
 }
 
 export default function Reports({ leads, visits, users, projects, onNavigate, currentUserRole }: ReportsProps) {
-  const [dateRange, setDateRange] = useState({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
+  const [dateRange, setDateRange] = useState<DateRange>({
+    type: 'thisMonth',
+    start: startOfMonth(new Date()),
+    end: endOfMonth(new Date())
   });
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedUser, setSelectedUser] = useState('');
@@ -88,7 +89,7 @@ export default function Reports({ leads, visits, users, projects, onNavigate, cu
   // Filter leads by date range, project, and user
   const filteredLeadsGlobal = leads.filter(l => {
     const leadDate = new Date(l.created_at);
-    const inRange = leadDate >= dateRange.from && leadDate <= dateRange.to;
+    const inRange = leadDate >= dateRange.start && leadDate <= dateRange.end;
     const matchesProject = !selectedProject || l.projectId === selectedProject;
     const matchesUser = !selectedUser || l.assignedTo?.toString() === selectedUser;
     return inRange && matchesProject && matchesUser;
@@ -96,7 +97,7 @@ export default function Reports({ leads, visits, users, projects, onNavigate, cu
 
   const filteredVisitsGlobal = visits.filter(v => {
     const visitDate = new Date(v.visit_date);
-    const inRange = visitDate >= dateRange.from && visitDate <= dateRange.to;
+    const inRange = visitDate >= dateRange.start && visitDate <= dateRange.end;
     const matchesProject = !selectedProject || v.projectId === selectedProject;
     const matchesUser = !selectedUser || v.assignedTo?.toString() === selectedUser;
     return inRange && matchesProject && matchesUser;
@@ -195,7 +196,7 @@ export default function Reports({ leads, visits, users, projects, onNavigate, cu
   const filteredActivities = allActivities
     .filter(a => {
       const aDate = new Date(a.timestamp);
-      return aDate >= dateRange.from && aDate <= dateRange.to;
+      return aDate >= dateRange.start && aDate <= dateRange.end;
     })
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 20);

@@ -16,7 +16,9 @@ import {
   LineChart,
   Line,
   AreaChart,
-  Area,
+  Area
+} from 'recharts';
+import { 
   BarChart3,
   TrendingUp,
   Download,

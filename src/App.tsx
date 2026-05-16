@@ -1794,6 +1794,7 @@ export default function App() {
                 completionVisit!,
                 data.outcome,
                 data.feedback,
+                data.interest,
                 user
               );
 

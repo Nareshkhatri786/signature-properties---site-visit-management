@@ -137,7 +137,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
   const [completionData, setCompletionData] = useState({
     feedback: '',
-    interest: 'warm' as LeadQuality,
+    interest: (lead?.quality || 'warm') as LeadQuality,
     outcome: 'follow_up_required' as VisitOutcome,
     nextStep: 'none' as 'none' | 'followup' | 'revisit',
     nextDate: '',
@@ -1127,6 +1127,8 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
                         <option value="hot">🔥 Hot Interest</option>
                         <option value="warm">🌡️ Warm Interest</option>
                         <option value="cold">❄️ Cold Interest</option>
+                        <option value="pending">⏳ Pending</option>
+                        <option value="disq">🚫 Disqualified</option>
                       </select>
                     </div>
 

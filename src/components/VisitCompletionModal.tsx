@@ -124,6 +124,8 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                       <option value="hot">🔥 Hot</option>
                       <option value="warm">🌡️ Warm</option>
                       <option value="cold">❄️ Cold</option>
+                      <option value="pending">⏳ Pending</option>
+                      <option value="disq">❌ Disqualified</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">

@@ -15,6 +15,7 @@ export const syncEngine = {
     visit: Visit, 
     outcome: string, 
     feedback: string,
+    interest: LeadQuality,
     user: User
   ): { updatedLead: Lead; updatedVisit: Visit; activity: Activity } => {
     const completedAt = new Date().toISOString();
@@ -32,6 +33,7 @@ export const syncEngine = {
     const updatedLead: Lead = {
       ...lead,
       status: 'visit_done' as LeadStatus,
+      quality: interest,
       updated_at: completedAt,
       stats: {
         ...lead.stats,

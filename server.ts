@@ -270,10 +270,10 @@ async function startServer() {
     setImmediate(async () => {
       try {
         const body = req.body;
-        console.log("[WhatsApp Webhook] Incoming payload:", JSON.stringify(body, null, 2));
+        console.log("[WhatsApp Webhook] Incoming payload received in background");
 
-        // TODO in Phase 3: Route this message to Gemini AI, process the 24-hour window, 
-        // save to whatsapp_messages table, and notify the CRM UI via socket.io
+        const { processIncomingWhatsAppMessage } = await import('./src/lib/whatsapp-ai-bot.js');
+        await processIncomingWhatsAppMessage(body);
 
       } catch (error) {
         console.error("[WhatsApp Webhook] Error processing background task:", error);

@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS leads (
   stats             JSON,
   created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  last_client_reply_at DATETIME NULL,
   INDEX idx_projectId (projectId),
   INDEX idx_assignedTo (assignedTo),
   INDEX idx_status (status),

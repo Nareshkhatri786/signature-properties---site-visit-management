@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { query, queryOne } from "../../server.js";
+import { query, queryOne } from "../../db.js";
 import { WhatsAppService } from "./whatsapp-service.js";
 
 const API_KEY = process.env.GEMINI_API_KEY || "";

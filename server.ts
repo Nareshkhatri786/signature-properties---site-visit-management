@@ -242,6 +242,45 @@ async function startServer() {
   });
 
 
+  // -- WHATSAPP WEBHOOK (WAOFFICIAL) -----------------------
+  // GET: Webhook verification by the provider
+  app.get("/api/webhook/whatsapp", (req, res) => {
+    const verify_token = process.env.WEBHOOK_VERIFY_TOKEN;
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+
+    if (mode && token) {
+      if (mode === "subscribe" && token === verify_token) {
+        console.log("WEBHOOK_VERIFIED");
+        return res.status(200).send(challenge);
+      } else {
+        return res.sendStatus(403);
+      }
+    }
+    return res.status(200).send("Webhook is alive");
+  });
+
+  // POST: Receiving incoming messages
+  app.post("/api/webhook/whatsapp", async (req, res) => {
+    // 1. Immediately acknowledge the webhook to prevent provider timeouts
+    res.status(200).send("EVENT_RECEIVED");
+
+    // 2. Process in the background so the main thread isn't blocked
+    setImmediate(async () => {
+      try {
+        const body = req.body;
+        console.log("[WhatsApp Webhook] Incoming payload:", JSON.stringify(body, null, 2));
+
+        // TODO in Phase 3: Route this message to Gemini AI, process the 24-hour window, 
+        // save to whatsapp_messages table, and notify the CRM UI via socket.io
+
+      } catch (error) {
+        console.error("[WhatsApp Webhook] Error processing background task:", error);
+      }
+    });
+  });
+
   // -- PUSH NOTIFICATIONS ---------------------------------
   app.get("/api/push/public-key", (req, res) => {
     res.json({ publicKey: PUBLIC_VAPID_KEY });

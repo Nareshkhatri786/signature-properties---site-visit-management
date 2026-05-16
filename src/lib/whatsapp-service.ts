@@ -4,7 +4,7 @@ dotenv.config();
 const WA_API_KEY = process.env.WA_API_KEY || '';
 // Defaulting to Phone ID 1 as the primary sender for now
 const WA_PHONE_ID = process.env.WA_PHONE_ID_1 || ''; 
-const WA_BASE_URL = 'https://app.waofficial.com/api/v1'; // Base URL to be verified against provider docs
+const WA_BASE_URL = 'https://app.waofficial.com/api/v2/whatsapp-business';
 
 export interface SendMessageResponse {
   success: boolean;
@@ -57,7 +57,7 @@ export class WhatsAppService {
       }
     };
 
-    return this.makeRequest('/messages/sendText', payload);
+    return this.makeRequest('/messages', payload);
   }
 
   /**
@@ -94,7 +94,7 @@ export class WhatsAppService {
       }
     };
 
-    return this.makeRequest('/messages/sendTemplate', payload);
+    return this.makeRequest('/messages', payload);
   }
 
   /**
@@ -116,6 +116,6 @@ export class WhatsAppService {
       }
     };
 
-    return this.makeRequest(`/messages/sendMedia`, payload);
+    return this.makeRequest('/messages', payload);
   }
 }

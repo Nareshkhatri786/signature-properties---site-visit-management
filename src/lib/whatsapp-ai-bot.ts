@@ -133,7 +133,8 @@ The JSON must have the following structure:
 }
 
 Rules:
-- Be polite, concise, and persuasive. 
+- Be polite, concise, and persuasive. Use SIMPLE, SHORT, and CONVERSATIONAL language.
+- Avoid long formal paragraphs. Be direct like a human salesperson on WhatsApp.
 - NEVER violate the 'Strict AI Rules'.
 - If the client asks to talk to a human or schedules a visit, set "action": "ESCALATE_TO_HUMAN" and provide a summary.
 - If the client asks for media (brochure, video, map), set the corresponding "action" to trigger the system to send it.
@@ -153,11 +154,18 @@ Rules:
       
       await WhatsAppService.sendSessionMessage(message.from, aiResult.replyText);
 
-      // Save AI outgoing message
+      // Save AI outgoing message to WhatsApp history
       const outMsgId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
       await query(
         "INSERT INTO whatsapp_messages (id, leadId, senderName, senderPhoneNumber, content, type) VALUES (?, ?, ?, ?, ?, ?)",
         [outMsgId, lead.id, "AI Assistant", message.from, aiResult.replyText, 'outgoing']
+      );
+
+      // Save to Timeline as Automated Remark
+      const rmkId = `rmk_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      await query(
+        "INSERT INTO remarks (id, targetId, text, `by`, type, category) VALUES (?, ?, ?, ?, ?, ?)",
+        [rmkId, lead.id, aiResult.replyText, "SYSTEM / AUTOMATED", "automated", "ai"]
       );
     }
 
@@ -189,8 +197,8 @@ Rules:
     else if (aiResult.action === "ESCALATE_TO_HUMAN") {
       const summary = aiResult.actionData?.summary || "Client needs human assistance.";
       // Save summary to lead stats or remarks
-      const remarkId = `rmk_${Date.now()}`;
-      await query("INSERT INTO remarks (id, leadId, content) VALUES (?, ?, ?)", [remarkId, lead.id, `[AI Chat Summary] ${summary}`]);
+      const rmkId = `rmk_${Date.now()}`;
+      await query("INSERT INTO remarks (id, targetId, text, `by`, type) VALUES (?, ?, ?, ?, ?)", [rmkId, lead.id, `[AI Chat Summary] ${summary}`, "SYSTEM", "remark"]);
       
       // Update Lead Status to hot
       await query("UPDATE leads SET quality = 'hot' WHERE id = ?", [lead.id]);

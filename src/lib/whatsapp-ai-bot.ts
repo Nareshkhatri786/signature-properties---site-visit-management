@@ -49,13 +49,19 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
   console.log(`[WA Bot] Incoming message from ${message.from}: ${message.text}`);
 
   // 1. Find the Lead by phone number
-  // Mobile numbers might have country codes. Try matching end of string.
   const phoneSuffix = message.from.length > 10 ? message.from.slice(-10) : message.from;
-  const lead = await queryOne<any>("SELECT * FROM leads WHERE mobile LIKE ?", [`%${phoneSuffix}`]);
+  let lead = await queryOne<any>("SELECT * FROM leads WHERE mobile LIKE ?", [`%${phoneSuffix}`]);
   
+  // Auto-create lead if they don't exist in the CRM!
   if (!lead) {
-    console.log(`[WA Bot] No lead found for phone ${message.from}`);
-    return;
+    console.log(`[WA Bot] Unknown number ${message.from}. Auto-creating new Lead!`);
+    const newLeadId = `lead_wa_${Date.now()}`;
+    await query(
+      "INSERT INTO leads (id, name, mobile, source, quality, status) VALUES (?, ?, ?, ?, ?, ?)",
+      [newLeadId, "WhatsApp Lead", message.from, "WhatsApp", "pending", "new"]
+    );
+    // Fetch the newly created lead to continue the flow
+    lead = await queryOne<any>("SELECT * FROM leads WHERE id = ?", [newLeadId]);
   }
 
   // 2. Update the 24-hour window timer for the lead

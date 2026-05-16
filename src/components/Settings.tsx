@@ -86,7 +86,8 @@ export default function SettingsPage({
       walkthrough_video: '',
       testimonial_video: '',
       brochure_link: '',
-      google_maps_link: ''
+      google_maps_link: '',
+      ai_rules: ''
     };
     onAddProject(newProject);
     setNewProjectName('');
@@ -537,6 +538,19 @@ export default function SettingsPage({
                               location: { ...(editingProject.location || { lat: 0, lng: 0, radius: 100 }), address: e.target.value }
                             })}
                             className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">AI Chatbot Strict Rules</label>
+                          <textarea 
+                            rows={3}
+                            placeholder="e.g. Do not negotiate on price. Only offer 3BHK flats. Tell them site visits are only on weekends."
+                            value={editingProject.ai_rules || ''}
+                            onChange={(e) => setEditingProject({
+                              ...editingProject, 
+                              ai_rules: e.target.value
+                            })}
+                            className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm resize-none"
                           />
                         </div>
 

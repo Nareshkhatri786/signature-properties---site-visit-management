@@ -79,6 +79,7 @@ export interface Project {
   testimonial_video?: string;
   brochure_link?: string;
   google_maps_link?: string;
+  ai_rules?: string;
 }
 
 export interface Settings {

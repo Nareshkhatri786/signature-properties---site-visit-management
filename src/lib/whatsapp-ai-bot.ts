@@ -77,6 +77,32 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
 
   const chatTranscript = history.map(h => `${h.type === 'incoming' ? 'Client' : 'AI'}: ${h.content}`).join("\n");
 
+  // 4b. Fetch Project Knowledge Base
+  let projectContext = "";
+  let mediaLinks: any = null;
+  if (lead.projectId) {
+    const proj = await queryOne<any>("SELECT * FROM projects WHERE id = ?", [lead.projectId]);
+    if (proj) {
+      mediaLinks = {
+        brochure: proj.brochure_link,
+        walkthrough: proj.walkthrough_video,
+        sample_house: proj.sample_house_video,
+        location: proj.google_maps_link
+      };
+      projectContext = `
+Project Name: ${proj.name}
+Description: ${proj.description || 'Premium Real Estate Project'}
+Strict AI Rules to follow: ${proj.ai_rules || 'No specific rules, be polite and helpful.'}
+
+Available Media to send (ONLY send if explicitly asked by client):
+- Brochure: ${proj.brochure_link ? 'Available' : 'Not Available'}
+- Walkthrough Video: ${proj.walkthrough_video ? 'Available' : 'Not Available'}
+- Sample House Video: ${proj.sample_house_video ? 'Available' : 'Not Available'}
+- Location Map: ${proj.google_maps_link ? 'Available' : 'Not Available'}
+`;
+    }
+  }
+
   // 5. Build the Gemini System Prompt
   const systemPrompt = `
 You are the autonomous AI Sales Assistant for Signature Properties. 
@@ -86,6 +112,8 @@ You MUST reply in the same language the client uses (English, Hindi, or Gujarati
 Client Name: ${lead.name}
 Property Interest: ${lead.property_interest || 'Any'}
 
+${projectContext}
+
 Recent Chat History:
 ${chatTranscript}
 
@@ -93,20 +121,21 @@ You MUST output your response in STRICT JSON format with no markdown wrappers or
 The JSON must have the following structure:
 {
   "replyText": "The exact text message to send to the client via WhatsApp",
-  "action": "NONE" | "SCHEDULE_VISIT" | "SCHEDULE_FOLLOWUP" | "ESCALATE_TO_HUMAN" | "SEND_BROCHURE",
+  "action": "NONE" | "SCHEDULE_VISIT" | "SCHEDULE_FOLLOWUP" | "ESCALATE_TO_HUMAN" | "SEND_BROCHURE" | "SEND_WALKTHROUGH" | "SEND_LOCATION",
   "actionData": {
     // Only if action is SCHEDULE_VISIT or SCHEDULE_FOLLOWUP
     "date": "YYYY-MM-DD",
     "time": "HH:MM",
     // Only if action is ESCALATE_TO_HUMAN
-    "summary": "Short 1-sentence summary of the 10-minute chat for the human agent to read."
+    "summary": "Short 1-sentence summary of the chat for the human agent to read."
   }
 }
 
 Rules:
 - Be polite, concise, and persuasive. 
+- NEVER violate the 'Strict AI Rules'.
 - If the client asks to talk to a human or schedules a visit, set "action": "ESCALATE_TO_HUMAN" and provide a summary.
-- If the client asks for a brochure, set "action": "SEND_BROCHURE".
+- If the client asks for media (brochure, video, map), set the corresponding "action" to trigger the system to send it.
   `;
 
   try {
@@ -154,8 +183,14 @@ Rules:
         [followupId, lead.id, aiResult.actionData?.date || null, "AI Auto-scheduled follow-up", "pending"]
       );
     }
-    else if (aiResult.action === "SEND_BROCHURE") {
-      await WhatsAppService.sendMediaMessage(message.from, "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", "document", "Here is the project brochure you requested.");
+    else if (aiResult.action === "SEND_BROCHURE" && mediaLinks?.brochure) {
+      await WhatsAppService.sendMediaMessage(message.from, mediaLinks.brochure, "document", "Here is the project brochure you requested.");
+    }
+    else if (aiResult.action === "SEND_WALKTHROUGH" && mediaLinks?.walkthrough) {
+      await WhatsAppService.sendMediaMessage(message.from, mediaLinks.walkthrough, "video", "Here is the project walkthrough video.");
+    }
+    else if (aiResult.action === "SEND_LOCATION" && mediaLinks?.location) {
+      await WhatsAppService.sendSessionMessage(message.from, `Here is the location link: ${mediaLinks.location}`);
     }
     else if (aiResult.action === "ESCALATE_TO_HUMAN") {
       const summary = aiResult.actionData?.summary || "Client needs human assistance.";

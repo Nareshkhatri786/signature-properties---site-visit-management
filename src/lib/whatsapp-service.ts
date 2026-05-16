@@ -52,9 +52,7 @@ export class WhatsAppService {
       phoneNoId: WA_PHONE_ID,
       to: to,
       type: "text",
-      text: {
-        body: text
-      }
+      text: text
     };
 
     return this.makeRequest('/messages', payload);

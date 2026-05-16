@@ -26,7 +26,7 @@ export const askGemini = async (prompt: string, context: string = "") => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-live-preview",
+      model: "gemini-3-flash-preview",
       contents: [
         { role: "user", parts: [{ text: `${systemPrompt}\n\nUser Request: ${prompt}\n\nStrictly follow all formatting requirements in the request.` }] }
       ]

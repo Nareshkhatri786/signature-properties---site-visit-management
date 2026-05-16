@@ -1,13 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
+import { askGemini } from "../../gemini-service.js";
 import { query, queryOne } from "../../db.js";
 import { WhatsAppService } from "./whatsapp-service.js";
-
-const API_KEY = process.env.GEMINI_API_KEY || "";
-let ai: any = null;
-
-if (API_KEY) {
-  ai = new GoogleGenAI({ apiKey: API_KEY });
-}
 
 interface IncomingMessage {
   from: string;
@@ -147,14 +140,7 @@ Rules:
   `;
 
   try {
-    if (!ai) throw new Error("Gemini AI is not initialized");
-
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: [{ role: "user", parts: [{ text: systemPrompt }] }]
-    });
-
-    const rawText = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || "{}";
+    const rawText = await askGemini(systemPrompt, projectContext);
     const cleanJsonText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     const aiResult = JSON.parse(cleanJsonText);
 

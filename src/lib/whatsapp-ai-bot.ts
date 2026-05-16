@@ -41,6 +41,9 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
   const message = parseWebhookPayload(body);
   if (!message || !message.text) return; // Not a text message or invalid
 
+  // The phone number ID to reply FROM (the project's WA number)
+  const replyFromPhoneId = body.phoneNoId || body.recipientPhoneNumberId || undefined;
+
   console.log(`[WA Bot] Incoming message from ${message.from}: ${message.text}`);
 
   // 1. Find the Lead by phone number
@@ -156,7 +159,7 @@ Rules:
       // Since this is a direct reply to an incoming message, we are ALLOWED to reply immediately, 
       // even at night, per the requirements ("Client-Initiated Chats: ALLOWED").
       
-      await WhatsAppService.sendSessionMessage(message.from, aiResult.replyText);
+      await WhatsAppService.sendSessionMessage(message.from, aiResult.replyText, replyFromPhoneId);
 
       // Save AI outgoing message to WhatsApp history
       const outMsgId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;

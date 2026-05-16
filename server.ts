@@ -11,6 +11,7 @@ import { normalizePhoneNumber } from "./src/lib/phoneUtils.js";
 import webPush from "web-push";
 import { Server } from "socket.io";
 import { createServer } from "http";
+import { processIncomingWhatsAppMessage } from "./src/lib/whatsapp-ai-bot.js";
 
 const PUBLIC_VAPID_KEY = process.env.PUBLIC_VAPID_KEY || "BLraqx6JI2_b6uK3Q83waVcP2n8JXaAhzdPWrVJnqHhfLhusM8AextWDWwPx0_y51Ua9XxY-g-D4FvgJomgMpBE";
 const PRIVATE_VAPID_KEY = process.env.PRIVATE_VAPID_KEY || "6d9cRb3i51P9Qw0niJSkTQ5_mGuK-Dqz2Wcj-itMUPQ";
@@ -1040,15 +1041,13 @@ async function startServer() {
         await pool.execute("UPDATE leads SET updated_at = NOW() WHERE id = ?", [leadId]);
 
         // Trigger AI in background
-        setImmediate(async () => {
-          try {
-            const { processIncomingWhatsAppMessage } = await import('./src/lib/whatsapp-ai-bot.js');
-            await processIncomingWhatsAppMessage({ 
-              from: normalizedMobile, 
-              message: messageText, 
-              projectId: projectId 
-            });
-          } catch (e) { console.error("AI Error:", e); }
+        setImmediate(() => {
+          processIncomingWhatsAppMessage({ 
+            from: normalizedMobile, 
+            message: messageText, 
+            projectId: projectId,
+            recipientPhoneNumberId: recipientPhoneNumberId
+          }).catch(e => console.error("AI Error:", e));
         });
 
         return res.json({ success: true, leadId, action: "followup_created" });
@@ -1073,15 +1072,13 @@ async function startServer() {
         await pool.execute("UPDATE whatsapp_messages SET leadId = ? WHERE id = ?", [leadId, msgId]);
         
         // Trigger AI in background
-        setImmediate(async () => {
-          try {
-            const { processIncomingWhatsAppMessage } = await import('./src/lib/whatsapp-ai-bot.js');
-            await processIncomingWhatsAppMessage({ 
-              from: normalizedMobile, 
-              message: messageText, 
-              projectId: projectId 
-            });
-          } catch (e) { console.error("AI Error:", e); }
+        setImmediate(() => {
+          processIncomingWhatsAppMessage({ 
+            from: normalizedMobile, 
+            message: messageText, 
+            projectId: projectId,
+            recipientPhoneNumberId: recipientPhoneNumberId
+          }).catch(e => console.error("AI Error:", e));
         });
 
         return res.json({ success: true, leadId, action: "lead_created" });

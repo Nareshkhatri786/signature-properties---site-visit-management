@@ -47,9 +47,9 @@ export class WhatsAppService {
    * @param to Phone number with country code (e.g., 919876543210)
    * @param text The message content
    */
-  public static async sendSessionMessage(to: string, text: string): Promise<SendMessageResponse> {
+  public static async sendSessionMessage(to: string, text: string, fromPhoneId?: string): Promise<SendMessageResponse> {
     const payload = {
-      phoneNoId: WA_PHONE_ID,
+      phoneNoId: fromPhoneId || WA_PHONE_ID,
       to: to,
       type: "text",
       text: text

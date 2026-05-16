@@ -64,11 +64,13 @@ interface ReportsProps {
   visits: any[];
   users: any[];
   projects: any[];
+  callLogs?: any[];
+  activities?: any[];
   onNavigate: (page: string, id?: string) => void;
   currentUserRole?: string;
 }
 
-export default function Reports({ leads, visits, users, projects, onNavigate, currentUserRole }: ReportsProps) {
+export default function Reports({ leads, visits, users, projects, callLogs = [], activities = [], onNavigate, currentUserRole }: ReportsProps) {
   const [dateRange, setDateRange] = useState<DateRange>({
     type: 'thisMonth',
     start: startOfMonth(new Date()),
@@ -106,11 +108,25 @@ export default function Reports({ leads, visits, users, projects, onNavigate, cu
   });
 
   // Calculate Metrics
+  const filteredCallLogsGlobal = callLogs.filter(c => {
+    const cDate = new Date(c.timestamp);
+    const inRange = cDate >= dateRange.start && cDate <= dateRange.end;
+    const matchesProject = !selectedProject || c.projectId === selectedProject;
+    return inRange && matchesProject;
+  });
+
+  const filteredActivitiesGlobal = activities.filter(a => {
+    const aDate = new Date(a.timestamp);
+    const inRange = aDate >= dateRange.start && aDate <= dateRange.end;
+    const matchesProject = !selectedProject || a.projectId === selectedProject;
+    return inRange && matchesProject;
+  });
+
   const stats = {
     leads: filteredLeadsGlobal.length,
-    calls: filteredLeadsGlobal.reduce((acc, l) => acc + (l.callCount || 0), 0),
-    answered: filteredLeadsGlobal.reduce((acc, l) => acc + (l.answeredCount || 0), 0),
-    whatsapp: filteredLeadsGlobal.reduce((acc, l) => acc + (l.whatsappCount || 0), 0),
+    calls: filteredCallLogsGlobal.length,
+    answered: filteredCallLogsGlobal.filter(c => c.outcome === 'answered').length,
+    whatsapp: filteredActivitiesGlobal.filter(a => a.type === 'whatsapp_sent').length,
     visits: filteredVisitsGlobal.length,
     visitsDone: filteredVisitsGlobal.filter(v => v.visit_status === 'completed').length,
   };
@@ -188,17 +204,17 @@ export default function Reports({ leads, visits, users, projects, onNavigate, cu
   }).sort((a, b) => b.rate - a.rate);
 
   // 4. Activity Audit Log (Last 20)
-  const allActivities = leads.flatMap(l => (l.activities || []).map((a: any) => ({
+  const allActivitiesMapped = activities.map((a: any) => ({
     ...a,
-    leadId: l.id,
-    targetName: l.name,
-    userName: users.find(u => u.id === a.userId)?.name || 'System'
-  })));
+    userName: users.find(u => u.id === a.userId)?.name || a.userName || 'System'
+  }));
 
-  const filteredActivities = allActivities
+  const filteredActivities = allActivitiesMapped
     .filter(a => {
       const aDate = new Date(a.timestamp);
-      return aDate >= dateRange.start && aDate <= dateRange.end;
+      const inRange = aDate >= dateRange.start && aDate <= dateRange.end;
+      const matchesProject = !selectedProject || a.projectId === selectedProject;
+      return inRange && matchesProject;
     })
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 20);
@@ -241,8 +257,8 @@ export default function Reports({ leads, visits, users, projects, onNavigate, cu
 
   // 8. Call Outcome Distribution (using filtered leads)
   const callStats = [
-    { name: 'Interested', value: filteredLeadsGlobal.reduce((acc, l) => acc + (l.answeredCount || 0), 0), color: '#27AE60' },
-    { name: 'Busy/No Answer', value: filteredLeadsGlobal.reduce((acc, l) => acc + ((l.callCount || 0) - (l.answeredCount || 0)), 0), color: '#F1C40F' }
+    { name: 'Interested', value: filteredCallLogsGlobal.filter(c => c.outcome === 'answered').length, color: '#27AE60' },
+    { name: 'Busy/No Answer', value: filteredCallLogsGlobal.filter(c => c.outcome !== 'answered').length, color: '#F1C40F' }
   ];
 
   // 9. Lead Quality Distribution (AI Scored)
@@ -266,16 +282,52 @@ export default function Reports({ leads, visits, users, projects, onNavigate, cu
 
   const renderDrillDown = () => {
     if (!drillDownType) return null;
+    
+    let drillData: any[] = [];
+    if (drillDownType === 'leads') drillData = filteredLeadsGlobal;
+    if (drillDownType === 'calls') drillData = filteredCallLogsGlobal;
+    if (drillDownType === 'answered') drillData = filteredCallLogsGlobal.filter(c => c.outcome === 'answered');
+    if (drillDownType === 'whatsapp') drillData = filteredActivitiesGlobal.filter(a => a.type === 'whatsapp_sent');
+    if (drillDownType === 'visits') drillData = filteredVisitsGlobal;
+    if (drillDownType === 'visitsDone') drillData = filteredVisitsGlobal.filter(v => v.visit_status === 'completed');
+
     return (
       <div className="bg-white border border-[#E6D8B8] rounded-2xl p-6 shadow-sm mt-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-[#2A1C00] capitalize">Detailed View: {drillDownType}</h3>
+        <div className="flex items-center justify-between mb-4 border-b border-[#E6D8B8]/50 pb-4">
+          <h3 className="font-bold text-[#2A1C00] capitalize text-lg flex items-center gap-2">
+            Detailed View: {drillDownType} 
+            <span className="bg-[#C9A84C]/10 text-[#C9A84C] text-xs py-1 px-2 rounded-full">{drillData.length} records</span>
+          </h3>
           <button onClick={() => setDrillDownType(null)} className="p-2 hover:bg-gray-100 rounded-full transition-all">
             <X size={18} />
           </button>
         </div>
-        <div className="text-sm text-[#9A8262] italic">
-          Showing data analysis for {drillDownType} within the selected date range.
+        <div className="max-h-[400px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
+          {drillData.length === 0 ? (
+            <p className="text-sm text-[#9A8262] italic py-4 text-center">No records found for this period.</p>
+          ) : (
+            drillData.map((item, idx) => (
+              <div 
+                key={item.id || idx}
+                onClick={() => {
+                  const targetId = item.leadId || item.targetId || item.id;
+                  if (targetId) onNavigate('lead-detail', targetId);
+                }}
+                className="flex items-center justify-between p-4 bg-[#FFFDF6] border border-[#E6D8B8]/50 rounded-xl hover:bg-[#F2ECD8]/30 hover:border-[#C9A84C]/30 cursor-pointer transition-all"
+              >
+                <div>
+                  <p className="font-bold text-[#2A1C00]">{item.name || item.client_name || item.targetName || 'Record'}</p>
+                  <p className="text-xs text-[#9A8262] mt-1">{formatDateTime(item.created_at || item.timestamp || item.visit_date)}</p>
+                </div>
+                <div>
+                  {item.outcome && <span className="text-xs font-bold uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 px-2 py-1 rounded-lg mr-2">{item.outcome.replace('_', ' ')}</span>}
+                  {item.visit_status && <span className="text-xs font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-2 py-1 rounded-lg mr-2">{item.visit_status.replace('_', ' ')}</span>}
+                  {item.quality && <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded-lg mr-2">{item.quality}</span>}
+                  <ChevronRight size={16} className="text-[#C9A84C] inline" />
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     );

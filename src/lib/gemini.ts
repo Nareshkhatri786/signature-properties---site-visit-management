@@ -1,16 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 import { Lead, Visit, FollowUp } from "../types";
 
-const API_KEY = (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : (import.meta as any).env?.VITE_GEMINI_API_KEY) || "";
+const API_KEY = ""; // Do not use API keys in the browser
 
 let ai: any = null;
-try {
-  if (API_KEY) {
-    ai = new GoogleGenAI(API_KEY);
-  }
-} catch (e) {
-  console.warn("Failed to initialize GoogleGenAI:", e);
-}
+// Client-side AI initialization is disabled for security.
+// Use backend API endpoints instead.
+
 
 export interface SalesInsight {
   focusLeads: { id: string; reason: string }[];

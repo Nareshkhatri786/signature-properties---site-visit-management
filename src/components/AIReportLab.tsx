@@ -48,9 +48,16 @@ export default function AIReportLab({ leads, visits, users }: AIReportLabProps) 
         },
         body: JSON.stringify({ 
           prompt: `Based on the CRM data, please generate a visual report for: "${query}". 
-                   Return your response in two parts: 
-                   1. A brief strategic analysis text.
-                   2. A JSON block marked with [CHART_DATA] containing an array of objects for visualization (e.g., { name: 'Label', value: 10 }).`,
+                   
+                   IMPORTANT: You must return your response in two distinct parts:
+                   1. A brief strategic analysis text (plain text).
+                   2. A JSON block strictly following this format: [CHART_DATA] [ { "name": "Label", "value": 123 }, ... ] [END_CHART_DATA]
+                   
+                   Example:
+                   Analysis goes here...
+                   [CHART_DATA]
+                   [{"name": "January", "value": 10}, {"name": "February", "value": 20}]
+                   [END_CHART_DATA]`,
           context 
         }),
       });
@@ -58,17 +65,23 @@ export default function AIReportLab({ leads, visits, users }: AIReportLabProps) 
       const data = await response.json();
       const rawResponse = data.response;
 
-      // Extract JSON data if present
-      const chartMatch = rawResponse.match(/\[CHART_DATA\]([\s\S]*?)(\[|$)/);
+      // Extract JSON data using a more robust regex that handles potential markdown and [END_CHART_DATA]
+      const chartMatch = rawResponse.match(/\[CHART_DATA\]([\s\S]*?)(\[END_CHART_DATA\]|\[|$)/);
       let chartJson = null;
       if (chartMatch) {
         try {
-          chartJson = JSON.parse(chartMatch[1].trim());
-        } catch (e) { console.error("Chart JSON parse error"); }
+          let cleanedJson = chartMatch[1].trim();
+          // Remove markdown code blocks if present
+          cleanedJson = cleanedJson.replace(/```json|```/g, '').trim();
+          chartJson = JSON.parse(cleanedJson);
+        } catch (e) { 
+          console.error("Chart JSON parse error:", e);
+          console.log("Attempted to parse:", chartMatch[1]);
+        }
       }
 
       setReportData({
-        analysis: rawResponse.replace(/\[CHART_DATA\][\s\S]*$/, '').trim(),
+        analysis: rawResponse.split('[CHART_DATA]')[0].trim(),
         chart: chartJson
       });
 

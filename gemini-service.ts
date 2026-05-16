@@ -26,11 +26,15 @@ export const askGemini = async (prompt: string, context: string = "") => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `${systemPrompt}\n\nUser Prompt: ${prompt}`
+      model: "gemini-1.5-flash",
+      contents: [
+        { role: "user", parts: [{ text: `${systemPrompt}\n\nUser Request: ${prompt}\n\nStrictly follow all formatting requirements in the request.` }] }
+      ]
     });
     
-    return response.text || "I am sorry, I couldn't generate a response.";
+    // The @google/genai package might return text differently
+    const text = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || "";
+    return text || "I am sorry, I couldn't generate a response.";
   } catch (error: any) {
     console.error("Gemini AI Error:", error);
     throw new Error(`Gemini Error: ${error.message}`);

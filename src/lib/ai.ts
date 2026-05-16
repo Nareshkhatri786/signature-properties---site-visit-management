@@ -3,10 +3,7 @@ import { Visit, Remark, Lead, LeadQuality } from "../types";
 
 let aiInstance: GoogleGenAI | null = null;
 const getAI = () => {
-  const key = import.meta.env.VITE_GEMINI_API_KEY || "";
-  if (!key) return null;
-  if (!aiInstance) aiInstance = new GoogleGenAI(key);
-  return aiInstance;
+  return null; // Client-side AI disabled
 };
 
 export const aiService = {

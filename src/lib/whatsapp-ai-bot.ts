@@ -86,7 +86,9 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
   // 4b. Fetch Project Knowledge Base
   let projectContext = "";
   let mediaLinks: any = null;
+  
   if (lead.projectId) {
+    // Lead is assigned to a specific project
     const proj = await queryOne<any>("SELECT * FROM projects WHERE id = ?", [lead.projectId]);
     if (proj) {
       mediaLinks = {
@@ -96,9 +98,9 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
         location: proj.google_maps_link
       };
       projectContext = `
-Project Name: ${proj.name}
+Client is specifically interested in: ${proj.name}
 Description: ${proj.description || 'Premium Real Estate Project'}
-Strict AI Rules to follow: ${proj.ai_rules || 'No specific rules, be polite and helpful.'}
+Strict AI Rules for this project: ${proj.ai_rules || 'No specific rules.'}
 
 Available Media to send (ONLY send if explicitly asked by client):
 - Brochure: ${proj.brochure_link ? 'Available' : 'Not Available'}
@@ -107,6 +109,18 @@ Available Media to send (ONLY send if explicitly asked by client):
 - Location Map: ${proj.google_maps_link ? 'Available' : 'Not Available'}
 `;
     }
+  } else {
+    // Lead is NEW / Unassigned. Provide the AI with ALL projects so it can guide the client.
+    const allProjects = await query<any[]>("SELECT * FROM projects");
+    const projList = allProjects.map(p => `
+- **${p.name}**: ${p.description || ''}. 
+  Strict Rules: ${p.ai_rules || 'No specific rules.'}`).join("\n");
+
+    projectContext = `
+The client is new and has not selected a project yet. 
+Here is a list of all our available projects. Ask them what they are looking for and guide them based on these rules:
+${projList}
+`;
   }
 
   // 5. Build the Gemini System Prompt

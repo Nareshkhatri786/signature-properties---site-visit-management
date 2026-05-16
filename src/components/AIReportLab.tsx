@@ -44,7 +44,7 @@ export default function AIReportLab({ leads, visits, users }: AIReportLabProps) 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('crm_token')}`,
         },
         body: JSON.stringify({ 
           prompt: `Based on the CRM data, please generate a visual report for: "${query}". 
@@ -100,7 +100,7 @@ export default function AIReportLab({ leads, visits, users }: AIReportLabProps) 
               </div>
               <div>
                 <h3 className="font-['Cormorant_Garamond'] text-2xl font-bold text-white tracking-tight">AI Report Designer</h3>
-                <p className="text-[#C9A84C] text-[10px] font-black uppercase tracking-[0.2em] opacity-70">powered by AWS Claude 3.5 Sonnet</p>
+                <p className="text-[#C9A84C] text-[10px] font-black uppercase tracking-[0.2em] opacity-70">powered by Google Gemini</p>
               </div>
             </div>
 

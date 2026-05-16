@@ -14,7 +14,7 @@ const modelId = process.env.CLAUDE_MODEL_ID || "anthropic.claude-3-5-sonnet-2024
 
 export const askClaudeAWS = async (prompt: string, context: string = "") => {
   const botName = process.env.AI_BOT_NAME || "Signature-AWS-Claude";
-  
+
   const systemPrompt = `
     You are "${botName}", a sophisticated AI model running on Amazon Web Services (AWS) via Bedrock.
     You are an integral part of the Signature Properties CRM.
@@ -60,3 +60,4 @@ export const askClaudeAWS = async (prompt: string, context: string = "") => {
     throw new Error(`AWS Bedrock Error: ${error.message}`);
   }
 };
+

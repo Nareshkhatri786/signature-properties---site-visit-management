@@ -11,7 +11,6 @@ import { normalizePhoneNumber } from "./src/lib/phoneUtils.js";
 import webPush from "web-push";
 import { Server } from "socket.io";
 import { createServer } from "http";
-import { askClaudeAWS } from "./claude-service.js";
 
 const PUBLIC_VAPID_KEY = process.env.PUBLIC_VAPID_KEY || "BLraqx6JI2_b6uK3Q83waVcP2n8JXaAhzdPWrVJnqHhfLhusM8AextWDWwPx0_y51Ua9XxY-g-D4FvgJomgMpBE";
 const PRIVATE_VAPID_KEY = process.env.PRIVATE_VAPID_KEY || "6d9cRb3i51P9Qw0niJSkTQ5_mGuK-Dqz2Wcj-itMUPQ";
@@ -136,13 +135,16 @@ async function ensurePendingFollowup(leadId: string, userId: number | null, proj
 function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) {
+    console.log(`[Auth] Missing or invalid header for ${req.url}`);
     return res.status(401).json({ error: "Unauthorized" });
   }
   try {
-    const decoded = jwt.verify(header.slice(7), JWT_SECRET);
+    const token = header.slice(7);
+    const decoded = jwt.verify(token, JWT_SECRET);
     (req as any).user = decoded;
     next();
-  } catch {
+  } catch (err: any) {
+    console.log(`[Auth] Token verification failed for ${req.url}:`, err.message);
     return res.status(401).json({ error: "Invalid token" });
   }
 }
@@ -227,11 +229,12 @@ async function startServer() {
     }
   });
 
-  // -- AI CHATBOT (AWS CLAUDE) ---------------------------
+  // -- AI CHATBOT (GOOGLE GEMINI) ---------------------------
   app.post("/api/ai/ask", authMiddleware, async (req, res) => {
     const { prompt, context } = req.body;
     try {
-      const response = await askClaudeAWS(prompt, context || "");
+      const { askGemini } = await import('./gemini-service.js');
+      const response = await askGemini(prompt, context || "");
       res.json({ response });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

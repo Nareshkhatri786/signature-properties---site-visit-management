@@ -52,27 +52,15 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
   const phoneSuffix = message.from.length > 10 ? message.from.slice(-10) : message.from;
   let lead = await queryOne<any>("SELECT * FROM leads WHERE mobile LIKE ?", [`%${phoneSuffix}`]);
   
-  // Auto-create lead if they don't exist in the CRM!
   if (!lead) {
-    console.log(`[WA Bot] Unknown number ${message.from}. Auto-creating new Lead!`);
-    const newLeadId = `lead_wa_${Date.now()}`;
-    await query(
-      "INSERT INTO leads (id, name, mobile, source, quality, status) VALUES (?, ?, ?, ?, ?, ?)",
-      [newLeadId, "WhatsApp Lead", message.from, "WhatsApp", "pending", "new"]
-    );
-    // Fetch the newly created lead to continue the flow
-    lead = await queryOne<any>("SELECT * FROM leads WHERE id = ?", [newLeadId]);
+    console.log(`[WA Bot] Error: Lead should have been created by server.ts already.`);
+    return;
   }
 
   // 2. Update the 24-hour window timer for the lead
   await query("UPDATE leads SET last_client_reply_at = NOW() WHERE id = ?", [lead.id]);
 
-  // 3. Save the incoming message to whatsapp_messages table
-  const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-  await query(
-    "INSERT INTO whatsapp_messages (id, leadId, senderName, senderPhoneNumber, content, type) VALUES (?, ?, ?, ?, ?, ?)",
-    [msgId, lead.id, lead.name, message.from, message.text, 'incoming']
-  );
+
 
   // 4. Fetch recent chat history for context (last 10 messages)
   const history = await query<any[]>(

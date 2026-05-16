@@ -261,25 +261,7 @@ async function startServer() {
     return res.status(200).send("Webhook is alive");
   });
 
-  // POST: Receiving incoming messages
-  app.post("/api/webhook/whatsapp", async (req, res) => {
-    // 1. Immediately acknowledge the webhook to prevent provider timeouts
-    res.status(200).send("EVENT_RECEIVED");
 
-    // 2. Process in the background so the main thread isn't blocked
-    setImmediate(async () => {
-      try {
-        const body = req.body;
-        console.log("[WhatsApp Webhook] Incoming payload received in background");
-
-        const { processIncomingWhatsAppMessage } = await import('./src/lib/whatsapp-ai-bot.js');
-        await processIncomingWhatsAppMessage(body);
-
-      } catch (error) {
-        console.error("[WhatsApp Webhook] Error processing background task:", error);
-      }
-    });
-  });
 
   // -- PUSH NOTIFICATIONS ---------------------------------
   app.get("/api/push/public-key", (req, res) => {
@@ -718,12 +700,12 @@ async function startServer() {
       } else if (col === "projects") {
         const d = stringifyJsonFields(data, JSON_FIELDS_PROJECTS);
         await pool.execute(
-          `INSERT INTO projects (id,name,description,location,sample_house_video,walkthrough_video,testimonial_video,brochure_link,google_maps_link) 
-           VALUES (?,?,?,?,?,?,?,?,?) 
+          `INSERT INTO projects (id,name,description,location,sample_house_video,walkthrough_video,testimonial_video,brochure_link,google_maps_link,ai_rules) 
+           VALUES (?,?,?,?,?,?,?,?,?,?) 
            ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),location=VALUES(location),
            sample_house_video=VALUES(sample_house_video),walkthrough_video=VALUES(walkthrough_video),
            testimonial_video=VALUES(testimonial_video),brochure_link=VALUES(brochure_link),
-           google_maps_link=VALUES(google_maps_link)`,
+           google_maps_link=VALUES(google_maps_link),ai_rules=VALUES(ai_rules)`,
           [
             d.id, 
             d.name, 
@@ -733,7 +715,8 @@ async function startServer() {
             d.walkthrough_video||null,
             d.testimonial_video||null,
             d.brochure_link||null,
-            d.google_maps_link||null
+            d.google_maps_link||null,
+            d.ai_rules||null
           ]
         );
       } else if (col === "settings") {
@@ -816,7 +799,9 @@ async function startServer() {
       };
       const table = tableMap[col];
       if (!table) return res.status(400).json({ error: "Unknown collection" });
-      await execute(`DELETE FROM ${table} WHERE id = ?`, [id]);
+      if (id === undefined) return res.status(400).json({ error: "ID cannot be undefined" });
+      
+      await execute(`DELETE FROM ${table} WHERE id = ?`, [id || null]);
       (app as any).notifyChanges(col, { id, deleted: true });
       res.json({ success: true });
     } catch (e: any) {
@@ -1053,6 +1038,15 @@ async function startServer() {
           );
         }
         await pool.execute("UPDATE leads SET updated_at = NOW() WHERE id = ?", [leadId]);
+
+        // Trigger AI in background
+        setImmediate(async () => {
+          try {
+            const { processIncomingWhatsAppMessage } = await import('./src/lib/whatsapp-ai-bot.js');
+            await processIncomingWhatsAppMessage({ from: normalizedMobile, message: messageText });
+          } catch (e) { console.error("AI Error:", e); }
+        });
+
         return res.json({ success: true, leadId, action: "followup_created" });
       } else {
         const leadId = "lead_" + Date.now();
@@ -1073,6 +1067,15 @@ async function startServer() {
           [fupId, leadId, projectId, dateOnly, formatMySQLDate(now), `New WhatsApp enquiry`, "WhatsApp", "pending", formatMySQLDate(now), `Client: ${messageText}`]
         );
         await pool.execute("UPDATE whatsapp_messages SET leadId = ? WHERE id = ?", [leadId, msgId]);
+        
+        // Trigger AI in background
+        setImmediate(async () => {
+          try {
+            const { processIncomingWhatsAppMessage } = await import('./src/lib/whatsapp-ai-bot.js');
+            await processIncomingWhatsAppMessage({ from: normalizedMobile, message: messageText });
+          } catch (e) { console.error("AI Error:", e); }
+        });
+
         return res.json({ success: true, leadId, action: "lead_created" });
       }
     } catch (e: any) {

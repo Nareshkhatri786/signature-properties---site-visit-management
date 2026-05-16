@@ -1043,7 +1043,11 @@ async function startServer() {
         setImmediate(async () => {
           try {
             const { processIncomingWhatsAppMessage } = await import('./src/lib/whatsapp-ai-bot.js');
-            await processIncomingWhatsAppMessage({ from: normalizedMobile, message: messageText });
+            await processIncomingWhatsAppMessage({ 
+              from: normalizedMobile, 
+              message: messageText, 
+              projectId: projectId 
+            });
           } catch (e) { console.error("AI Error:", e); }
         });
 
@@ -1072,7 +1076,11 @@ async function startServer() {
         setImmediate(async () => {
           try {
             const { processIncomingWhatsAppMessage } = await import('./src/lib/whatsapp-ai-bot.js');
-            await processIncomingWhatsAppMessage({ from: normalizedMobile, message: messageText });
+            await processIncomingWhatsAppMessage({ 
+              from: normalizedMobile, 
+              message: messageText, 
+              projectId: projectId 
+            });
           } catch (e) { console.error("AI Error:", e); }
         });
 

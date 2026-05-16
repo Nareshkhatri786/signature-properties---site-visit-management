@@ -6,6 +6,7 @@ interface IncomingMessage {
   from: string;
   text: string;
   timestamp: string;
+  projectId?: string;
 }
 
 /**
@@ -26,7 +27,8 @@ function parseWebhookPayload(body: any): IncomingMessage | null {
       return {
         from: body.from,
         text: body.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        projectId: body.projectId
       };
     }
   } catch (e) {
@@ -64,18 +66,20 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
 
   const chatTranscript = history.map(h => `${h.type === 'incoming' ? 'Client' : 'AI'}: ${h.content}`).join("\n");
 
-  // 4b. Fetch Project Knowledge Base
+  // 3. Get Project Details for AI context
   let projectContext = "";
-  let mediaLinks: any = null;
+  let mediaLinks: any = {};
   
-  if (lead.projectId) {
-    // Lead is assigned to a specific project
-    const proj = await queryOne<any>("SELECT * FROM projects WHERE id = ?", [lead.projectId]);
+  // CRITICAL: Use the project the client messaged FOR (from the webhook) 
+  // instead of the project the lead is assigned to in the CRM.
+  const targetProjectId = message.projectId || lead.projectId;
+
+  if (targetProjectId) {
+    const proj = await queryOne<any>("SELECT * FROM projects WHERE id = ?", [targetProjectId]);
     if (proj) {
       mediaLinks = {
         brochure: proj.brochure_link,
         walkthrough: proj.walkthrough_video,
-        sample_house: proj.sample_house_video,
         location: proj.google_maps_link
       };
       projectContext = `

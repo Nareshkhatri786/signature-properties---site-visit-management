@@ -8,7 +8,7 @@ try {
   ai = new GoogleGenAI({
     vertexai: true,
     project: 'project-fd997589-8381-4e09-a8c',
-    location: 'asia-south1',
+    location: 'us-central1',
   } as any);
   console.log("[AI] Successfully initialized Vertex AI via @google/genai SDK");
 } catch (e) {

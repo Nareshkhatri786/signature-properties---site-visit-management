@@ -1,27 +1,22 @@
-import { VertexAI } from "@google-cloud/vertexai";
+import { GoogleGenAI } from "@google/genai";
 
-// Initialize using Application Default Credentials (ADC)
-// On Google Cloud VM, this automatically uses the attached Service Account
-let vertexAI: VertexAI | null = null;
-let model: any = null;
+// Initialize using Application Default Credentials (ADC) via Vertex AI backend
+// On Google Cloud VM, the attached Service Account is automatically used
+let ai: GoogleGenAI | null = null;
 
 try {
-  vertexAI = new VertexAI({
+  ai = new GoogleGenAI({
+    vertexai: true,
     project: 'project-fd997589-8381-4e09-a8c',
     location: 'asia-south1',
-  });
-
-  model = vertexAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-  });
-
-  console.log("[AI] Successfully initialized Vertex AI (google-cloud/vertexai)");
+  } as any);
+  console.log("[AI] Successfully initialized Vertex AI via @google/genai SDK");
 } catch (e) {
   console.warn("Failed to initialize Vertex AI:", e);
 }
 
 export const askGemini = async (prompt: string, context: string = "") => {
-  if (!model) {
+  if (!ai) {
     throw new Error("Vertex AI is not initialized. Please check VM credentials.");
   }
 
@@ -36,13 +31,12 @@ export const askGemini = async (prompt: string, context: string = "") => {
   const fullPrompt = `${systemPrompt}\n\nUser Request: ${prompt}\n\nStrictly follow all formatting requirements in the request.`;
 
   try {
-    const request = {
-      contents: [{ role: "user" as const, parts: [{ text: fullPrompt }] }],
-    };
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+    });
 
-    const result = await model.generateContent(request);
-    const response = await result.response;
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const text = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || "";
     return text || "I am sorry, I couldn't generate a response.";
   } catch (error: any) {
     console.error("Gemini AI Error:", error);

@@ -238,6 +238,7 @@ async function startServer() {
       const response = await askGemini(prompt, context || "");
       res.json({ response });
     } catch (e: any) {
+      console.error("[AI Ask] Error:", e.message);
       res.status(500).json({ error: e.message });
     }
   });
@@ -503,7 +504,9 @@ async function startServer() {
 
       console.log(`[Data Debug] User: ${userFromDb.username}, Role: ${userFromDb.role}, Leads: ${leads.length}, Users: ${users.length}, Projects: ${projects.length}`);
 
-      const settingsRow = await queryOne("SELECT * FROM settings WHERE id = 'main'");
+      const [settingsRow] = await Promise.all([
+        queryOne("SELECT * FROM settings WHERE id = 'main'")
+      ]);
       const settings = settingsRow ? parseJsonFields(settingsRow, JSON_FIELDS_SETTINGS) : {};
 
       res.json({
@@ -634,11 +637,13 @@ async function startServer() {
           await connection.beginTransaction();
           console.log(`[Follow-up] Processing save for ID: ${data.id}, Status: ${data.status}`);
           
-          // 1. Validate Foreign Keys before insert/update
-          const safeLeadId = await getSafeId('leads', data.leadId);
-          const safeVisitId = await getSafeId('visits', data.visitId);
-          const safeProjectId = await getSafeId('projects', data.projectId);
-          const safeUserId = await getSafeId('users', data.userId);
+          // 1. Validate Foreign Keys before insert/update (parallel for speed)
+          const [safeLeadId, safeVisitId, safeProjectId, safeUserId] = await Promise.all([
+            getSafeId('leads', data.leadId),
+            getSafeId('visits', data.visitId),
+            getSafeId('projects', data.projectId),
+            getSafeId('users', data.userId),
+          ]);
 
           await connection.execute(
             `INSERT INTO followups (id,leadId,visitId,projectId,userId,userName,date,scheduled_at,purpose,method,status,created_at,completed_at,outcome_note)
@@ -1112,8 +1117,11 @@ async function startServer() {
       const now = new Date();
       const todayStr = now.toISOString().split("T")[0];
       const currentTime = now.getHours() * 60 + now.getMinutes();
-      const users = await query<any>("SELECT * FROM users");
-      const attendance = await query<any>("SELECT * FROM attendance WHERE date = ?", [todayStr]);
+      // Fetch users and today's attendance in parallel (faster)
+      const [users, attendance] = await Promise.all([
+        query<any>("SELECT id, name, workingHours FROM users"),
+        query<any>("SELECT * FROM attendance WHERE date = ?", [todayStr]),
+      ]);
       for (const user of users) {
         const schedule = user.workingHours ? (typeof user.workingHours === "string" ? JSON.parse(user.workingHours) : user.workingHours) : { start: "10:00", end: "19:00" };
         const [sH, sM] = schedule.start.split(":").map(Number);
@@ -1149,7 +1157,8 @@ async function startServer() {
       const now = new Date();
       const upcoming = new Date(now.getTime() + 60 * 60 * 1000);
       const thirtyAgo = new Date(now.getTime() - 30 * 60 * 1000);
-      const fups = await query<any>("SELECT * FROM followups WHERE status = 'pending'");
+      // Only fetch followups that are due within the next 2 hours (avoids loading all pending)
+      const fups = await query<any>("SELECT * FROM followups WHERE status = 'pending' AND scheduled_at IS NOT NULL AND scheduled_at <= ? AND scheduled_at >= ?", [upcoming.toISOString().slice(0,19).replace('T',' '), new Date(now.getTime() - 30*60*1000).toISOString().slice(0,19).replace('T',' ')]);
       for (const fup of fups) {
         if (!fup.scheduled_at) continue;
         const fupDate = new Date(fup.scheduled_at);
@@ -1164,7 +1173,9 @@ async function startServer() {
           }
         }
       }
-      const visits = await query<any>("SELECT * FROM visits WHERE visit_status = 'scheduled'");
+      // Only fetch visits due within the next 2 hours (avoids loading all scheduled visits)
+      const twoHrStr = new Date(now.getTime() + 120 * 60 * 1000).toISOString().split('T')[0];
+      const visits = await query<any>("SELECT * FROM visits WHERE visit_status = 'scheduled' AND visit_date >= ? AND visit_date <= ?", [todayStr, twoHrStr]);
       for (const v of visits) {
         if (!v.visit_date) continue;
         const vDate = new Date(`${v.visit_date}T${v.visit_time||"10:00"}`);

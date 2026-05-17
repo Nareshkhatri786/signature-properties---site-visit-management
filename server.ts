@@ -103,31 +103,33 @@ async function syncLeadOwnership(leadId: string, newUserId: number | null) {
   }
 }
 
+// Optimized: fetch only the columns we actually need to avoid full-row transfer
 async function ensurePendingFollowup(leadId: string, userId: number | null, projectId: string | null) {
   if (!userId) return;
   
   try {
-    // Check if lead is 'lost' - don't create followups for lost leads
-    const lead = await queryOne<any>("SELECT status FROM leads WHERE id = ?", [leadId]);
-    if (lead?.status === 'lost') return;
+    // Parallel: check lead status AND existing followup AT THE SAME TIME
+    const [leadRow, existingFup] = await Promise.all([
+      queryOne<any>("SELECT status FROM leads WHERE id = ?", [leadId]),
+      queryOne<any>("SELECT id FROM followups WHERE leadId = ? AND status = 'pending' LIMIT 1", [leadId]),
+    ]);
+    if (leadRow?.status === 'lost') return;
+    if (existingFup) return; // already has pending followup
 
-    const existingFup = await queryOne<any>("SELECT id FROM followups WHERE leadId = ? AND status = 'pending'", [leadId]);
-    if (!existingFup) {
-      const user = await queryOne<any>("SELECT name FROM users WHERE id = ?", [userId]);
-      const userName = user?.name || "Assigned User";
-      
-      const fupId = `fup_auto_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
-      const now = new Date();
-      const scheduledAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString(); // 30 mins later
-      const dateOnly = scheduledAt.split('T')[0];
-      
-      await execute(
-        `INSERT INTO followups (id, leadId, projectId, userId, userName, date, scheduled_at, purpose, method, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'call', 'pending', NOW())`,
-        [fupId, leadId, projectId, userId, userName, dateOnly, formatMySQLDate(scheduledAt), "Auto-generated Follow-up"]
-      );
-      console.log(`[Auto-FUP] Created for lead ${leadId} assigned to ${userName}`);
-    }
+    const user = await queryOne<any>("SELECT name FROM users WHERE id = ?", [userId]);
+    const userName = user?.name || "Assigned User";
+    
+    const fupId = `fup_auto_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+    const now = new Date();
+    const scheduledAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+    const dateOnly = scheduledAt.split('T')[0];
+    
+    await execute(
+      `INSERT INTO followups (id, leadId, projectId, userId, userName, date, scheduled_at, purpose, method, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'call', 'pending', NOW())`,
+      [fupId, leadId, projectId, userId, userName, dateOnly, formatMySQLDate(scheduledAt), "Auto-generated Follow-up"]
+    );
+    console.log(`[Auto-FUP] Created for lead ${leadId} assigned to ${userName}`);
   } catch (err) {
     console.error(`[Auto-FUP Error] Failed for lead ${leadId}:`, err);
   }
@@ -194,13 +196,21 @@ async function startServer() {
     });
   });
 
-  // Global emitter helper
+  // Global emitter helper — DEBOUNCED to prevent Socket.io broadcast storms
+  // If the same collection is updated multiple times within 300ms, only 1 broadcast fires
+  const pendingEmits = new Map<string, ReturnType<typeof setTimeout>>();
   const notifyChanges = (type: string, data: any, targetUserId?: string) => {
-    if (targetUserId) {
-      io.to(targetUserId).emit("data_update", { type, data });
-    } else {
-      io.emit("data_update", { type, data });
-    }
+    const key = targetUserId ? `${type}:${targetUserId}` : type;
+    const existing = pendingEmits.get(key);
+    if (existing) clearTimeout(existing);
+    pendingEmits.set(key, setTimeout(() => {
+      pendingEmits.delete(key);
+      if (targetUserId) {
+        io.to(targetUserId).emit("data_update", { type, data });
+      } else {
+        io.emit("data_update", { type, data });
+      }
+    }, 300)); // 300ms debounce
   };
 
   // Inject io into app for routes
@@ -487,26 +497,24 @@ async function startServer() {
 
       console.log(`[Data Debug] User: ${userFromDb.username}, Role: ${userFromDb.role}, isAdmin: ${isAdmin}`);
 
-      const [users, projects, leads, visits, followups, activities, call_logs, templates, webhook_configs, notifications, attendance, workflows] = await Promise.all([
-        query("SELECT * FROM users"),
-        query("SELECT * FROM projects"),
+      const [users, projects, leads, visits, followups, activities, call_logs, templates, webhook_configs, notifications, attendance, workflows, settingsRow] = await Promise.all([
+        // Only fetch columns needed by the frontend — avoids SELECT * overhead
+        query("SELECT id, username, name, role, projectId, assignedProjectIds, workingHours, assignedLocation FROM users"),
+        query("SELECT id, name, description, location, brochure_link, walkthrough_video, sample_house_video, testimonial_video, google_maps_link, ai_rules FROM projects"),
         query(leadQuery, leadParams),
-        query(`SELECT v.* FROM visits v LEFT JOIN leads l ON v.leadId = l.id ${taskQueryFilter.replace(/f\./g, 'v.')} ORDER BY v.visit_date DESC LIMIT 5000`, taskParams),
-        query(`SELECT f.* FROM followups f LEFT JOIN leads l ON f.leadId = l.id ${taskQueryFilter} ORDER BY f.date DESC LIMIT 5000`, taskParams),
-        query(`SELECT a.* FROM activities a LEFT JOIN leads l ON a.targetId = l.id ${taskQueryFilter.replace(/f\./g, 'a.')} ORDER BY a.timestamp DESC LIMIT 5000`, taskParams),
-        query(`SELECT c.* FROM call_logs c LEFT JOIN leads l ON c.leadId = l.id ${taskQueryFilter.replace(/f\./g, 'c.')} ORDER BY c.timestamp DESC LIMIT 5000`, taskParams),
-        query("SELECT * FROM templates"),
-        query("SELECT * FROM webhook_configs"),
-        query("SELECT * FROM notifications WHERE (userId = ? OR isAdmin = 1) ORDER BY createdAt DESC LIMIT 500", [userFromDb.id]),
-        query(isAdmin ? "SELECT * FROM attendance ORDER BY date DESC LIMIT 500" : "SELECT * FROM attendance WHERE userId = ? ORDER BY date DESC LIMIT 500", isAdmin ? [] : [userFromDb.id]),
-        query("SELECT * FROM workflows"),
+        query(`SELECT v.id, v.leadId, v.client_name, v.mobile, v.email, v.visit_date, v.visit_time, v.purpose, v.status, v.visit_status, v.assigned_to, v.source, v.budget, v.property_interest, v.priority, v.projectId, v.reminders_sent, v.client_feedback, v.interest_level, v.outcome, v.reschedule_log, v.completed_at, v.created_at FROM visits v LEFT JOIN leads l ON v.leadId = l.id ${taskQueryFilter.replace(/f\./g, 'v.')} ORDER BY v.visit_date DESC LIMIT 2000`, taskParams),
+        query(`SELECT f.id, f.leadId, f.visitId, f.projectId, f.userId, f.userName, f.date, f.scheduled_at, f.purpose, f.method, f.status, f.created_at, f.completed_at, f.outcome_note FROM followups f LEFT JOIN leads l ON f.leadId = l.id ${taskQueryFilter} ORDER BY f.date DESC LIMIT 2000`, taskParams),
+        query(`SELECT a.id, a.type, a.userId, a.userName, a.projectId, a.targetId, a.targetName, a.timestamp, a.details FROM activities a LEFT JOIN leads l ON a.targetId = l.id ${taskQueryFilter.replace(/f\./g, 'a.')} ORDER BY a.timestamp DESC LIMIT 1000`, taskParams),
+        query(`SELECT c.id, c.visitId, c.leadId, c.projectId, c.outcome, c.note, c.timestamp, c.by FROM call_logs c LEFT JOIN leads l ON c.leadId = l.id ${taskQueryFilter.replace(/f\./g, 'c.')} ORDER BY c.timestamp DESC LIMIT 1000`, taskParams),
+        query("SELECT id, name, type, message, fileName, fileType, active FROM templates"),
+        query("SELECT id, name, token, projectId, assignedTo, assignedUserIds, lastAssignedIndex, mapping, active FROM webhook_configs"),
+        query("SELECT id, userId, type, title, message, `read`, createdAt, isAdmin, metadata, date FROM notifications WHERE (userId = ? OR isAdmin = 1) ORDER BY createdAt DESC LIMIT 200", [userFromDb.id]),
+        query(isAdmin ? "SELECT id, userId, date, checkIn, checkOut, status FROM attendance ORDER BY date DESC LIMIT 300" : "SELECT id, userId, date, checkIn, checkOut, status FROM attendance WHERE userId = ? ORDER BY date DESC LIMIT 300", isAdmin ? [] : [userFromDb.id]),
+        query("SELECT id, name, description, isActive, `trigger`, conditions, actions, createdAt, updatedAt FROM workflows"),
+        queryOne("SELECT * FROM settings WHERE id = 'main'"),
       ]);
 
       console.log(`[Data Debug] User: ${userFromDb.username}, Role: ${userFromDb.role}, Leads: ${leads.length}, Users: ${users.length}, Projects: ${projects.length}`);
-
-      const [settingsRow] = await Promise.all([
-        queryOne("SELECT * FROM settings WHERE id = 'main'")
-      ]);
       const settings = settingsRow ? parseJsonFields(settingsRow, JSON_FIELDS_SETTINGS) : {};
 
       res.json({

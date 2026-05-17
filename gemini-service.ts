@@ -1,19 +1,23 @@
 import { GoogleGenAI } from "@google/genai";
 
-const API_KEY = process.env.GEMINI_API_KEY || "";
 let ai: any = null;
 
 try {
-  if (API_KEY) {
-    ai = new GoogleGenAI({ apiKey: API_KEY });
-  }
+  // Initialize for Vertex AI using Application Default Credentials
+  ai = new GoogleGenAI({
+    vertexai: {
+      project: 'project-fd997589-8381-4e09-a8c',
+      location: 'asia-south1'
+    }
+  });
+  console.log("[AI] Successfully initialized Vertex AI");
 } catch (e) {
-  console.warn("Failed to initialize GoogleGenAI:", e);
+  console.warn("Failed to initialize GoogleGenAI for Vertex AI:", e);
 }
 
 export const askGemini = async (prompt: string, context: string = "") => {
   if (!ai) {
-    throw new Error("Gemini API is not initialized. Please check your GEMINI_API_KEY.");
+    throw new Error("Vertex AI is not initialized. Please check VM credentials.");
   }
 
   const systemPrompt = `
@@ -26,7 +30,7 @@ export const askGemini = async (prompt: string, context: string = "") => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: [
         { role: "user", parts: [{ text: `${systemPrompt}\n\nUser Request: ${prompt}\n\nStrictly follow all formatting requirements in the request.` }] }
       ]

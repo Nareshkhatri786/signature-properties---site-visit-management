@@ -16,8 +16,26 @@ export const pool = mysql.createPool({
   charset: 'utf8mb4',
 });
 
+// Monkey-patch pool.execute to catch and auto-fix undefined bindings globally
+const originalExecute = pool.execute.bind(pool);
+(pool as any).execute = async function(sql: string, params: any[]) {
+  if (params && params.includes(undefined)) {
+    console.error("CRITICAL SQL BUG: Found 'undefined' in parameters array!");
+    console.error("SQL:", sql);
+    console.trace("Stack trace:");
+    params = params.map(p => p === undefined ? null : p); // Auto-fix
+  }
+  return originalExecute(sql, params);
+};
+
 // Helper: run a query and return rows
 export async function query<T = any>(sql: string, params?: any[]): Promise<T[]> {
+  if (params && params.includes(undefined)) {
+    console.error("CRITICAL SQL BUG: Found 'undefined' in parameters array!");
+    console.error("SQL:", sql);
+    console.trace("Stack trace:");
+    params = params.map(p => p === undefined ? null : p); // Auto-fix
+  }
   const [rows] = await pool.execute(sql, params);
   return rows as T[];
 }
@@ -30,6 +48,12 @@ export async function queryOne<T = any>(sql: string, params?: any[]): Promise<T 
 
 // Helper: INSERT/UPDATE/DELETE — return OkPacket
 export async function execute(sql: string, params?: any[]): Promise<mysql.ResultSetHeader> {
+  if (params && params.includes(undefined)) {
+    console.error("CRITICAL SQL BUG: Found 'undefined' in parameters array!");
+    console.error("SQL:", sql);
+    console.trace("Stack trace:");
+    params = params.map(p => p === undefined ? null : p); // Auto-fix
+  }
   const [result] = await pool.execute(sql, params);
   return result as mysql.ResultSetHeader;
 }

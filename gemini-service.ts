@@ -32,7 +32,7 @@ export const askGemini = async (prompt: string, context: string = "") => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-001",
+      model: "gemini-2.5-flash", // Using 2.5-flash as mandated by Google Cloud policy for new projects
       contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
     });
 

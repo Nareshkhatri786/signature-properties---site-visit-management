@@ -32,7 +32,7 @@ export const askGemini = async (prompt: string, context: string = "") => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash-001",   // Explicit version — more reliable on Vertex AI
+      model: "gemini-1.5-flash-002",
       contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
     });
 

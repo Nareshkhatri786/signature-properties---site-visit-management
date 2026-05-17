@@ -1174,6 +1174,7 @@ async function startServer() {
         }
       }
       // Only fetch visits due within the next 2 hours (avoids loading all scheduled visits)
+      const todayStr = now.toISOString().split('T')[0];
       const twoHrStr = new Date(now.getTime() + 120 * 60 * 1000).toISOString().split('T')[0];
       const visits = await query<any>("SELECT * FROM visits WHERE visit_status = 'scheduled' AND visit_date >= ? AND visit_date <= ?", [todayStr, twoHrStr]);
       for (const v of visits) {

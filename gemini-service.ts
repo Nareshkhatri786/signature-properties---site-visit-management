@@ -5,7 +5,7 @@ let ai: any = null;
 try {
   // Initialize for Vertex AI using Application Default Credentials
   ai = new GoogleGenAI({
-    vertexai: {
+    vertexAi: {
       project: 'project-fd997589-8381-4e09-a8c',
       location: 'asia-south1'
     }

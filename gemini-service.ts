@@ -1,22 +1,27 @@
-import { GoogleGenAI } from "@google/genai";
+import { VertexAI } from "@google-cloud/vertexai";
 
-let ai: any = null;
+// Initialize using Application Default Credentials (ADC)
+// On Google Cloud VM, this automatically uses the attached Service Account
+let vertexAI: VertexAI | null = null;
+let model: any = null;
 
 try {
-  // Initialize for Vertex AI using Application Default Credentials
-  ai = new GoogleGenAI({
-    vertexAi: {
-      project: 'project-fd997589-8381-4e09-a8c',
-      location: 'asia-south1'
-    }
+  vertexAI = new VertexAI({
+    project: 'project-fd997589-8381-4e09-a8c',
+    location: 'asia-south1',
   });
-  console.log("[AI] Successfully initialized Vertex AI");
+
+  model = vertexAI.getGenerativeModel({
+    model: 'gemini-1.5-flash',
+  });
+
+  console.log("[AI] Successfully initialized Vertex AI (google-cloud/vertexai)");
 } catch (e) {
-  console.warn("Failed to initialize GoogleGenAI for Vertex AI:", e);
+  console.warn("Failed to initialize Vertex AI:", e);
 }
 
 export const askGemini = async (prompt: string, context: string = "") => {
-  if (!ai) {
+  if (!model) {
     throw new Error("Vertex AI is not initialized. Please check VM credentials.");
   }
 
@@ -28,16 +33,16 @@ export const askGemini = async (prompt: string, context: string = "") => {
     ${context}
   `;
 
+  const fullPrompt = `${systemPrompt}\n\nUser Request: ${prompt}\n\nStrictly follow all formatting requirements in the request.`;
+
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: [
-        { role: "user", parts: [{ text: `${systemPrompt}\n\nUser Request: ${prompt}\n\nStrictly follow all formatting requirements in the request.` }] }
-      ]
-    });
-    
-    // The @google/genai package might return text differently
-    const text = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || "";
+    const request = {
+      contents: [{ role: "user" as const, parts: [{ text: fullPrompt }] }],
+    };
+
+    const result = await model.generateContent(request);
+    const response = await result.response;
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
     return text || "I am sorry, I couldn't generate a response.";
   } catch (error: any) {
     console.error("Gemini AI Error:", error);

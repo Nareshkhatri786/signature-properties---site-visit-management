@@ -490,6 +490,27 @@ export default function App() {
     }
   };
 
+  const buildFollowupScheduledAt = (dateValue: string, existingScheduledAt?: string) => {
+    const base = existingScheduledAt ? new Date(existingScheduledAt) : null;
+    const hours = base && !Number.isNaN(base.getTime()) ? base.getHours() : 10;
+    const minutes = base && !Number.isNaN(base.getTime()) ? base.getMinutes() : 0;
+    const scheduled = new Date(`${dateValue}T00:00:00`);
+    scheduled.setHours(hours, minutes, 0, 0);
+    return scheduled.toISOString();
+  };
+
+  const handleRescheduleFollowUp = (id: string, date: string, note?: string) => {
+    const fup = followups.find(f => f.id === id);
+    if (!fup) return;
+    handleUpdateFollowUp(id, {
+      date,
+      scheduled_at: buildFollowupScheduledAt(date, fup.scheduled_at),
+      status: 'pending',
+      completed_at: undefined,
+      outcome_note: note || fup.outcome_note
+    });
+  };
+
   const handleLogout = () => {
     console.log("[Auth] Logout initiated");
     try {
@@ -1488,6 +1509,7 @@ export default function App() {
                   completed_at: status === 'completed' ? new Date().toISOString() : undefined
                 });
               }}
+              onReschedule={handleRescheduleFollowUp}
               onNavigate={navigate}
               onCall={handleCall}
             />

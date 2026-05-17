@@ -4,7 +4,7 @@ import {
   ChevronRight, User, Star, MoreVertical, Plus, Settings, Filter, PieChart as PieChartIcon, 
   Download, RefreshCw, Bell, BellRing, ChevronDown, CheckSquare, Users, Edit3, Zap
 } from 'lucide-react';
-import { FollowUp, Lead, Visit, Page, VisitFilters, User as UserType } from '../types';
+import { FollowUp, Lead, Visit, Page, VisitFilters, User as UserType, Project } from '../types';
 import { cn, getLocalDateString, formatDate, formatDateTime } from '../lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -13,17 +13,18 @@ interface FollowUpListProps {
   followUps: FollowUp[];
   leads: Lead[];
   visits: Visit[];
-  projects: AppProject[];
+  projects: Project[];
   user: UserType;
   users?: UserType[];
   onUpdateStatus: (id: string, status: 'completed' | 'cancelled', note?: string) => void;
+  onReschedule?: (id: string, date: string, note?: string) => void;
   onNavigate: (page: Page, id?: string, filters?: VisitFilters) => void;
   onCall: (v: Visit | Lead) => void;
 }
 
 type TabType = 'all' | 'overdue' | 'today' | 'upcoming' | 'completed' | 'cancelled';
 
-export default function FollowUpList({ followUps, leads, visits, projects, user, users = [], onUpdateStatus, onNavigate, onCall }: FollowUpListProps) {
+export default function FollowUpList({ followUps, leads, visits, projects, user, users = [], onUpdateStatus, onReschedule, onNavigate, onCall }: FollowUpListProps) {
   const [filter, setFilter] = useState<TabType>('pending' as any); // using 'pending' initially, we'll map tabs properly
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [search, setSearch] = useState('');
@@ -350,7 +351,7 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
               <button onClick={() => {
                 const newDate = prompt('Reschedule to date (YYYY-MM-DD):', new Date(Date.now() + 86400000).toISOString().split('T')[0]);
                 if (newDate && /^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-                  selectedIds.forEach(id => onUpdateStatus(id, 'completed', `Bulk rescheduled to ${newDate}`));
+                  selectedIds.forEach(id => onReschedule ? onReschedule(id, newDate, `Bulk rescheduled to ${newDate}`) : onUpdateStatus(id, 'completed', `Bulk rescheduled to ${newDate}`));
                   setSelectedIds([]);
                 }
               }} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all">
@@ -672,7 +673,7 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                   if (overdueIds.length === 0) { alert('No overdue follow-ups selected.'); return; }
                   const newDate = prompt(`Reschedule ${overdueIds.length} overdue follow-ups to date (YYYY-MM-DD):`, new Date(Date.now() + 86400000).toISOString().split('T')[0]);
                   if (!newDate || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { alert('Invalid date format. Use YYYY-MM-DD'); return; }
-                  overdueIds.forEach(id => onUpdateStatus(id, 'completed', `Bulk rescheduled to ${newDate}`));
+                  overdueIds.forEach(id => onReschedule ? onReschedule(id, newDate, `Bulk rescheduled to ${newDate}`) : onUpdateStatus(id, 'completed', `Bulk rescheduled to ${newDate}`));
                   alert(`${overdueIds.length} follow-ups rescheduled.`);
                 }}
                 className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#FDFAF2] text-sm font-bold text-amber-700 transition-colors group border border-amber-100 hover:border-amber-300 bg-amber-50"

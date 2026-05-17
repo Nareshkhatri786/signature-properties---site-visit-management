@@ -29,6 +29,7 @@ const JSON_FIELDS_PROJECTS = ["location"];
 const JWT_SECRET = process.env.JWT_SECRET || "diyacrm_secret_change_in_prod";
 
 const cleanSqlId = (id: any) => (id === null || id === undefined || String(id) === "null" || String(id) === "undefined" || String(id).trim() === "") ? null : id;
+const ALLOWED_FOLLOWUP_METHODS = new Set(["call", "whatsapp", "email", "in_person"]);
 
 const getSafeId = async (table: string, id: any) => {
   const cleanId = cleanSqlId(id);
@@ -65,6 +66,11 @@ function formatMySQLDateOnly(isoString: string | null) {
     }
     return null;
   }
+}
+
+function normalizeFollowUpMethod(method: any) {
+  const normalized = String(method || "call").toLowerCase().trim();
+  return ALLOWED_FOLLOWUP_METHODS.has(normalized) ? normalized : "call";
 }
 
 // -- OWNERSHIP SYNC HELPERS -----------------------------
@@ -583,6 +589,8 @@ async function startServer() {
         try {
           await connection.beginTransaction();
           const d = stringifyJsonFields(data, JSON_FIELDS_VISITS);
+          const [existingVisitRows] = await connection.execute("SELECT visit_status FROM visits WHERE id = ?", [d.id]);
+          const prevVisitStatus = (existingVisitRows as any[]).length > 0 ? (existingVisitRows as any[])[0].visit_status : null;
           
           // 1. Save/Update Visit
           await connection.execute(
@@ -593,7 +601,7 @@ async function startServer() {
           );
 
           // 2. If Visit is Completed, Sync with Lead
-          if (d.visit_status === "completed" && d.leadId) {
+          if (d.visit_status === "completed" && prevVisitStatus !== "completed" && d.leadId) {
             // Get current lead stats
             const [leads] = await connection.execute("SELECT stats, quality, status FROM leads WHERE id = ?", [d.leadId]);
             if ((leads as any[]).length > 0) {
@@ -644,6 +652,9 @@ async function startServer() {
         try {
           await connection.beginTransaction();
           console.log(`[Follow-up] Processing save for ID: ${data.id}, Status: ${data.status}`);
+          const [existingFollowupRows] = await connection.execute("SELECT status, leadId FROM followups WHERE id = ?", [data.id]);
+          const prevFollowupStatus = (existingFollowupRows as any[]).length > 0 ? (existingFollowupRows as any[])[0].status : null;
+          const prevFollowupLeadId = (existingFollowupRows as any[]).length > 0 ? (existingFollowupRows as any[])[0].leadId : null;
           
           // 1. Validate Foreign Keys before insert/update (parallel for speed)
           const [safeLeadId, safeVisitId, safeProjectId, safeUserId] = await Promise.all([
@@ -656,14 +667,14 @@ async function startServer() {
           await connection.execute(
             `INSERT INTO followups (id,leadId,visitId,projectId,userId,userName,date,scheduled_at,purpose,method,status,created_at,completed_at,outcome_note)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-             ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),visitId=VALUES(visitId),date=VALUES(date),purpose=VALUES(purpose),method=VALUES(method),status=VALUES(status),completed_at=VALUES(completed_at),outcome_note=VALUES(outcome_note)`,
-            [data.id,safeLeadId,safeVisitId,safeProjectId,safeUserId,data.userName||null,formatMySQLDateOnly(data.date),formatMySQLDate(data.scheduled_at),data.purpose||null,data.method||"call",data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
+             ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),visitId=VALUES(visitId),projectId=VALUES(projectId),userId=VALUES(userId),userName=VALUES(userName),date=VALUES(date),scheduled_at=VALUES(scheduled_at),purpose=VALUES(purpose),method=VALUES(method),status=VALUES(status),completed_at=VALUES(completed_at),outcome_note=VALUES(outcome_note)`,
+            [data.id,safeLeadId,safeVisitId,safeProjectId,safeUserId,data.userName||null,formatMySQLDateOnly(data.date),formatMySQLDate(data.scheduled_at),data.purpose||null,normalizeFollowUpMethod(data.method),data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
           );
 
           // 2. If status is 'completed', handle Lead stats and Activity Log
-          if (data.status === "completed") {
+          if (data.status === "completed" && prevFollowupStatus !== "completed") {
             // Ensure we have leadId (sometimes frontend sends partial updates)
-            let effectiveLeadId = data.leadId;
+            let effectiveLeadId = data.leadId || prevFollowupLeadId;
             if (!effectiveLeadId) {
               const [rows] = await connection.execute("SELECT leadId FROM followups WHERE id = ?", [data.id]);
               if ((rows as any[]).length > 0) effectiveLeadId = (rows as any[])[0].leadId;

@@ -29,6 +29,14 @@ export default function FollowUpForm({
   onComplete, 
   onClose 
 }: FollowUpFormProps) {
+  const buildScheduledAt = (dateValue: string, previousScheduledAt?: string) => {
+    const timeSource = previousScheduledAt ? new Date(previousScheduledAt) : null;
+    const hours = timeSource && !Number.isNaN(timeSource.getTime()) ? timeSource.getHours() : 10;
+    const minutes = timeSource && !Number.isNaN(timeSource.getTime()) ? timeSource.getMinutes() : 0;
+    const scheduled = new Date(`${dateValue}T00:00:00`);
+    scheduled.setHours(hours, minutes, 0, 0);
+    return scheduled.toISOString();
+  };
   
   const [formData, setFormData] = useState({
     date: followUp?.date 
@@ -62,6 +70,7 @@ export default function FollowUpForm({
       const updatedFollowUp: FollowUp = {
         ...followUp,
         date: formData.date,
+        scheduled_at: buildScheduledAt(formData.date, followUp.scheduled_at),
         purpose: formData.purpose,
         method: formData.method,
       };
@@ -82,7 +91,7 @@ export default function FollowUpForm({
       method: formData.method,
       status: 'pending',
       created_at: new Date().toISOString(),
-      scheduled_at: new Date().toISOString(),
+      scheduled_at: buildScheduledAt(formData.date),
     };
 
     onSave(newFollowUp);

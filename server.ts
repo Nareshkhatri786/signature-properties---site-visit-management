@@ -30,6 +30,11 @@ const JWT_SECRET = process.env.JWT_SECRET || "diyacrm_secret_change_in_prod";
 
 const cleanSqlId = (id: any) => (id === null || id === undefined || String(id) === "null" || String(id) === "undefined" || String(id).trim() === "") ? null : id;
 const ALLOWED_FOLLOWUP_METHODS = new Set(["call", "whatsapp", "email", "in_person"]);
+const ALLOWED_FOLLOWUP_STATUSES = new Set(["pending", "completed", "cancelled"]);
+const ALLOWED_VISIT_STATUSES = new Set(["scheduled", "rescheduled", "completed", "cancelled"]);
+const ALLOWED_LEAD_STATUSES = new Set(["new", "contacted", "visit_scheduled", "visit_done", "closed", "lost"]);
+const ALLOWED_LEAD_QUALITIES = new Set(["hot", "warm", "cold", "pending", "disq"]);
+const ALLOWED_CALL_OUTCOMES = new Set(["answered", "not_answered", "busy", "switched_off"]);
 
 const getSafeId = async (table: string, id: any) => {
   const cleanId = cleanSqlId(id);
@@ -71,6 +76,11 @@ function formatMySQLDateOnly(isoString: string | null) {
 function normalizeFollowUpMethod(method: any) {
   const normalized = String(method || "call").toLowerCase().trim();
   return ALLOWED_FOLLOWUP_METHODS.has(normalized) ? normalized : "call";
+}
+
+function normalizeSetValue(value: any, allowed: Set<string>, fallback: string) {
+  const normalized = String(value || "").toLowerCase().trim();
+  return allowed.has(normalized) ? normalized : fallback;
 }
 
 // -- OWNERSHIP SYNC HELPERS -----------------------------
@@ -549,16 +559,18 @@ async function startServer() {
         const d = stringifyJsonFields(data, JSON_FIELDS_LEADS);
         
         // 1. Check current assignment to detect change
-        const currentLead = await queryOne<any>("SELECT assignedTo, projectId FROM leads WHERE id = ?", [d.id]);
+        const currentLead = await queryOne<any>("SELECT assignedTo, projectId, status, quality FROM leads WHERE id = ?", [d.id]);
         const isAssignmentChanged = currentLead && currentLead.assignedTo != d.assignedTo;
         const isNewLead = !currentLead;
+        const leadStatus = normalizeSetValue(d.status, ALLOWED_LEAD_STATUSES, currentLead?.status || "new");
+        const leadQuality = normalizeSetValue(d.quality, ALLOWED_LEAD_QUALITIES, currentLead?.quality || "pending");
 
         // 2. Save/Update lead
         await pool.execute(
           `INSERT INTO leads (id,name,mobile,email,source,quality,status,budget,property_interest,priority,projectId,assignedTo,stats,created_at,updated_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE name=VALUES(name),mobile=VALUES(mobile),email=VALUES(email),source=VALUES(source),quality=VALUES(quality),status=VALUES(status),budget=VALUES(budget),property_interest=VALUES(property_interest),priority=VALUES(priority),assignedTo=VALUES(assignedTo),stats=VALUES(stats),updated_at=NOW()`,
-          [d.id,d.name,d.mobile||null,d.email||null,d.source||null,d.quality||"pending",d.status||"new",d.budget||null,d.property_interest||null,d.priority||0,cleanSqlId(d.projectId),cleanSqlId(d.assignedTo),d.stats||null,formatMySQLDate(d.created_at),new Date().toISOString().slice(0, 19).replace('T', ' ')]
+          [d.id,d.name,d.mobile||null,d.email||null,d.source||null,leadQuality,leadStatus,d.budget||null,d.property_interest||null,d.priority||0,cleanSqlId(d.projectId),cleanSqlId(d.assignedTo),d.stats||null,formatMySQLDate(d.created_at),new Date().toISOString().slice(0, 19).replace('T', ' ')]
         );
 
         // 3. Sync ownership if changed or new
@@ -567,13 +579,13 @@ async function startServer() {
         }
 
         // 4. AUTO FOLLOW-UP LOGIC: Ensure a pending follow-up exists if assigned
-        if (d.status === "lost") {
+        if (leadStatus === "lost") {
           // If lost, remove all pending followups
           await execute("DELETE FROM followups WHERE leadId = ? AND status = 'pending'", [d.id]);
           console.log(`[Lost Lead] Cleaned up followups for ${d.id}`);
         } else if (d.assignedTo) {
           await ensurePendingFollowup(d.id, d.assignedTo, d.projectId || (currentLead?.projectId));
-        } else if (isNewLead && d.status === "new") {
+        } else if (isNewLead && leadStatus === "new") {
           // Fallback for unassigned new leads: create a system follow-up
           const fupId = `fup_auto_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
           const tenMinsLater = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -591,17 +603,19 @@ async function startServer() {
           const d = stringifyJsonFields(data, JSON_FIELDS_VISITS);
           const [existingVisitRows] = await connection.execute("SELECT visit_status FROM visits WHERE id = ?", [d.id]);
           const prevVisitStatus = (existingVisitRows as any[]).length > 0 ? (existingVisitRows as any[])[0].visit_status : null;
+          const visitStatus = normalizeSetValue(d.visit_status, ALLOWED_VISIT_STATUSES, "scheduled");
+          const visitLeadQuality = normalizeSetValue(d.status, ALLOWED_LEAD_QUALITIES, "pending");
           
           // 1. Save/Update Visit
           await connection.execute(
             `INSERT INTO visits (id,leadId,client_name,mobile,email,visit_date,visit_time,purpose,status,visit_status,assigned_to,source,budget,property_interest,priority,projectId,reminders_sent,client_feedback,interest_level,outcome,reschedule_log,completed_at,created_at)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
              ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),client_name=VALUES(client_name),mobile=VALUES(mobile),email=VALUES(email),visit_date=VALUES(visit_date),visit_time=VALUES(visit_time),purpose=VALUES(purpose),status=VALUES(status),visit_status=VALUES(visit_status),assigned_to=VALUES(assigned_to),source=VALUES(source),budget=VALUES(budget),property_interest=VALUES(property_interest),priority=VALUES(priority),reminders_sent=VALUES(reminders_sent),client_feedback=VALUES(client_feedback),interest_level=VALUES(interest_level),outcome=VALUES(outcome),reschedule_log=VALUES(reschedule_log),completed_at=VALUES(completed_at)`,
-            [d.id,cleanSqlId(d.leadId),d.client_name,d.mobile||null,d.email||null,formatMySQLDateOnly(d.visit_date),d.visit_time||null,d.purpose||null,d.status||"pending",d.visit_status||"scheduled",d.assigned_to||null,d.source||null,d.budget||null,d.property_interest||null,d.priority||0,cleanSqlId(d.projectId),d.reminders_sent||null,d.client_feedback||null,d.interest_level||null,d.outcome||null,d.reschedule_log||null,formatMySQLDate(d.completed_at),formatMySQLDate(d.created_at || new Date().toISOString())]
+            [d.id,cleanSqlId(d.leadId),d.client_name,d.mobile||null,d.email||null,formatMySQLDateOnly(d.visit_date),d.visit_time||null,d.purpose||null,visitLeadQuality,visitStatus,d.assigned_to||null,d.source||null,d.budget||null,d.property_interest||null,d.priority||0,cleanSqlId(d.projectId),d.reminders_sent||null,d.client_feedback||null,d.interest_level||null,d.outcome||null,d.reschedule_log||null,formatMySQLDate(d.completed_at),formatMySQLDate(d.created_at || new Date().toISOString())]
           );
 
           // 2. If Visit is Completed, Sync with Lead
-          if (d.visit_status === "completed" && prevVisitStatus !== "completed" && d.leadId) {
+          if (visitStatus === "completed" && prevVisitStatus !== "completed" && d.leadId) {
             // Get current lead stats
             const [leads] = await connection.execute("SELECT stats, quality, status FROM leads WHERE id = ?", [d.leadId]);
             if ((leads as any[]).length > 0) {
@@ -626,15 +640,21 @@ async function startServer() {
               const activityId = `act_vis_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
               await connection.execute(
                 `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
-                [activityId, 'visit_completed', null, d.assigned_to||'System', d.projectId||null, d.leadId, d.client_name, `Site Visit Completed. Total visits: ${stats.visits_done}. Lead upgraded to ${newQuality}.`]
+                [activityId, 'visit_completed', null, d.assigned_to||'System', d.projectId||null, d.leadId, d.client_name, `Visit status transition: ${prevVisitStatus || 'new'} -> completed. Total visits: ${stats.visits_done}. Lead upgraded to ${newQuality}.`]
               );
             }
+          } else if (visitStatus === "completed" && prevVisitStatus === "completed" && d.leadId) {
+            const activityId = `act_guard_vis_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+            await connection.execute(
+              `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
+              [activityId, 'lifecycle_guard', null, d.assigned_to||'System', d.projectId||null, d.leadId, d.client_name, `Visit status transition ignored: completed -> completed. Counters were not changed.`]
+            );
           } else if (d.leadId) {
             // Log visit scheduled/updated
             const activityId = `act_vis_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
             await connection.execute(
               `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
-              [activityId, 'visit_scheduled', null, d.assigned_to||'System', d.projectId||null, d.leadId, d.client_name, `Site Visit ${d.visit_status}: ${d.visit_date} ${d.visit_time || ''}`]
+              [activityId, visitStatus === 'rescheduled' ? 'visit_rescheduled' : 'visit_scheduled', null, d.assigned_to||'System', d.projectId||null, d.leadId, d.client_name, `Visit status transition: ${prevVisitStatus || 'new'} -> ${visitStatus}. Date: ${d.visit_date} ${d.visit_time || ''}`]
             );
           }
 
@@ -652,9 +672,12 @@ async function startServer() {
         try {
           await connection.beginTransaction();
           console.log(`[Follow-up] Processing save for ID: ${data.id}, Status: ${data.status}`);
-          const [existingFollowupRows] = await connection.execute("SELECT status, leadId FROM followups WHERE id = ?", [data.id]);
+          const [existingFollowupRows] = await connection.execute("SELECT status, leadId, date, scheduled_at FROM followups WHERE id = ?", [data.id]);
           const prevFollowupStatus = (existingFollowupRows as any[]).length > 0 ? (existingFollowupRows as any[])[0].status : null;
           const prevFollowupLeadId = (existingFollowupRows as any[]).length > 0 ? (existingFollowupRows as any[])[0].leadId : null;
+          const prevFollowupDate = (existingFollowupRows as any[]).length > 0 ? formatMySQLDateOnly((existingFollowupRows as any[])[0].date) : null;
+          const followupStatus = normalizeSetValue(data.status, ALLOWED_FOLLOWUP_STATUSES, "pending");
+          const followupDate = formatMySQLDateOnly(data.date);
           
           // 1. Validate Foreign Keys before insert/update (parallel for speed)
           const [safeLeadId, safeVisitId, safeProjectId, safeUserId] = await Promise.all([
@@ -668,11 +691,11 @@ async function startServer() {
             `INSERT INTO followups (id,leadId,visitId,projectId,userId,userName,date,scheduled_at,purpose,method,status,created_at,completed_at,outcome_note)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
              ON DUPLICATE KEY UPDATE leadId=VALUES(leadId),visitId=VALUES(visitId),projectId=VALUES(projectId),userId=VALUES(userId),userName=VALUES(userName),date=VALUES(date),scheduled_at=VALUES(scheduled_at),purpose=VALUES(purpose),method=VALUES(method),status=VALUES(status),completed_at=VALUES(completed_at),outcome_note=VALUES(outcome_note)`,
-            [data.id,safeLeadId,safeVisitId,safeProjectId,safeUserId,data.userName||null,formatMySQLDateOnly(data.date),formatMySQLDate(data.scheduled_at),data.purpose||null,normalizeFollowUpMethod(data.method),data.status||"pending",formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
+            [data.id,safeLeadId,safeVisitId,safeProjectId,safeUserId,data.userName||null,followupDate,formatMySQLDate(data.scheduled_at),data.purpose||null,normalizeFollowUpMethod(data.method),followupStatus,formatMySQLDate(data.created_at || new Date().toISOString()),formatMySQLDate(data.completed_at),data.outcome_note||null]
           );
 
           // 2. If status is 'completed', handle Lead stats and Activity Log
-          if (data.status === "completed" && prevFollowupStatus !== "completed") {
+          if (followupStatus === "completed" && prevFollowupStatus !== "completed") {
             // Ensure we have leadId (sometimes frontend sends partial updates)
             let effectiveLeadId = data.leadId || prevFollowupLeadId;
             if (!effectiveLeadId) {
@@ -698,7 +721,29 @@ async function startServer() {
               const uId = data.userId ? parseInt(String(data.userId)) : null;
               await connection.execute(
                 `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
-                [activityId, 'followup_done', uId, data.userName||null, data.projectId||null, effectiveLeadId, data.clientName||'Lead', `Follow-up completed: ${data.outcome_note || 'Completed'}`]
+                [activityId, 'followup_done', uId, data.userName||null, data.projectId||null, effectiveLeadId, data.clientName||'Lead', `Follow-up status transition: ${prevFollowupStatus || 'new'} -> completed. Outcome: ${data.outcome_note || 'Completed'}`]
+              );
+            }
+          } else {
+            const effectiveLeadId = data.leadId || prevFollowupLeadId;
+            const uId = data.userId ? parseInt(String(data.userId)) : null;
+            if (followupStatus === "completed" && prevFollowupStatus === "completed" && effectiveLeadId) {
+              const activityId = `act_guard_fup_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+              await connection.execute(
+                `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
+                [activityId, 'lifecycle_guard', uId, data.userName||null, data.projectId||null, effectiveLeadId, data.clientName||'Lead', `Follow-up status transition ignored: completed -> completed. Counters were not changed.`]
+              );
+            } else if (prevFollowupStatus === "pending" && followupStatus === "pending" && prevFollowupDate && followupDate && prevFollowupDate !== followupDate && effectiveLeadId) {
+              const activityId = `act_fup_res_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+              await connection.execute(
+                `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
+                [activityId, 'followup_rescheduled', uId, data.userName||null, data.projectId||null, effectiveLeadId, data.clientName||'Lead', `Follow-up status transition: pending -> pending rescheduled. Date: ${prevFollowupDate} -> ${followupDate}`]
+              );
+            } else if (followupStatus === "cancelled" && prevFollowupStatus !== "cancelled" && effectiveLeadId) {
+              const activityId = `act_fup_cancel_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+              await connection.execute(
+                `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
+                [activityId, 'followup_cancelled', uId, data.userName||null, data.projectId||null, effectiveLeadId, data.clientName||'Lead', `Follow-up status transition: ${prevFollowupStatus || 'new'} -> cancelled. Reason: ${data.outcome_note || 'Not provided'}`]
               );
             }
           }
@@ -765,10 +810,11 @@ async function startServer() {
           [d.id,d.name,d.token||"",d.projectId||null,d.assignedTo||null,d.assignedUserIds||null,d.lastAssignedIndex||0,d.mapping||"{}",d.active?1:0]
         );
       } else if (col === "call_logs") {
+        const callOutcome = normalizeSetValue(data.outcome, ALLOWED_CALL_OUTCOMES, "not_answered");
         await pool.execute(
           `INSERT INTO call_logs (id,visitId,leadId,projectId,outcome,note,timestamp,\`by\`) VALUES (?,?,?,?,?,?,?,?)
            ON DUPLICATE KEY UPDATE outcome=VALUES(outcome),note=VALUES(note)`,
-          [data.id,cleanSqlId(data.visitId),cleanSqlId(data.leadId),cleanSqlId(data.projectId),data.outcome||"not_answered",data.note||null,formatMySQLDate(data.timestamp || new Date().toISOString()),data.by||null]
+          [data.id,cleanSqlId(data.visitId),cleanSqlId(data.leadId),cleanSqlId(data.projectId),callOutcome,data.note||null,formatMySQLDate(data.timestamp || new Date().toISOString()),data.by||null]
         );
       } else if (col === "activities") {
         await pool.execute(

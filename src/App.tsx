@@ -438,29 +438,13 @@ export default function App() {
     const updatedFup = newFollowups.find(f => f.id === id);
     if (updatedFup) api.save('followups', updatedFup);
 
-    // Increment followups_done stats if completed
-    if (updates.status === 'completed' && fup.status !== 'completed') {
-       const lead = leads.find(l => l.id === fup.leadId);
-       if (lead) {
-         const newStats = {
-           ...lead.stats,
-           followups_done: (lead.stats.followups_done || 0) + 1
-         };
-         const updatedLead = { ...lead, stats: newStats, updated_at: new Date().toISOString() };
-         // Manual update removed
-         api.save('leads', updatedLead);
-       }
-    }
-
-    // Activity Logging
+    // Backend owns lifecycle counters and activity audit entries; frontend keeps UX-only side effects here.
     const lead = leads.find(l => l.id === fup.leadId);
     const visit = visits.find(v => v.id === fup.visitId);
     const clientName = lead?.name || visit?.client_name || 'Client';
     const targetId = fup.leadId || (fup.visitId || '');
 
     if (updates.status === 'completed' && fup.status !== 'completed') {
-      logActivity('followup_done', targetId, clientName, `Outcome: ${updates.outcome_note || 'Completed'}`);
-      
       // Also add a remark if note exists
       if (updates.outcome_note) {
         const remark: Remark = {
@@ -482,10 +466,8 @@ export default function App() {
         clientName
       });
     } else if (updates.date && updates.date !== fup.date) {
-      logActivity('followup_rescheduled', targetId, clientName, `New Date: ${updates.date}`);
       toast.success('Follow-up rescheduled');
     } else if (updates.status === 'cancelled' && fup.status !== 'cancelled') {
-      logActivity('followup_cancelled', targetId, clientName, updates.outcome_note ? `Reason: ${updates.outcome_note}` : '');
       toast.success('Follow-up cancelled');
     }
   };

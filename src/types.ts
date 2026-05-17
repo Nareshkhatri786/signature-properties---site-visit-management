@@ -31,7 +31,8 @@ export type ActivityType =
   | 'followup_rescheduled'
   | 'followup_cancelled'
   | 'bulk_assigned'
-  | 'client_visit_reminder';
+  | 'client_visit_reminder'
+  | 'lifecycle_guard';
 
 export interface Activity {
   id: string;

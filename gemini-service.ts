@@ -12,7 +12,7 @@ try {
   });
 
   model = vertexAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash',
   });
 
   console.log("[AI] Successfully initialized Vertex AI (google-cloud/vertexai)");

@@ -9,6 +9,10 @@ const WA_TEXT_ENDPOINT = process.env.WA_TEXT_ENDPOINT || '/messages';
 const WA_IMAGE_ENDPOINT = process.env.WA_IMAGE_ENDPOINT || '/send-image-message-by-url';
 const WA_VIDEO_ENDPOINT = process.env.WA_VIDEO_ENDPOINT || '/send-video-message-by-url';
 const WA_DOCUMENT_ENDPOINT = process.env.WA_DOCUMENT_ENDPOINT || '/send-document-message';
+const WA_API_KEYS_BY_PHONE: Record<string, string> = {
+  // Devi Bungalows dedicated WhatsApp credentials
+  "916390071558584": process.env.WA_API_KEY_916390071558584 || "cf709fc71c6ca4178196df5bde5e2942c2bc93699b9ab9b68b3db0d08c8a74e6",
+};
 
 export interface SendMessageResponse {
   success: boolean;
@@ -24,12 +28,18 @@ export class WhatsAppService {
   /**
    * Helper to make API requests to the provider
    */
+  private static resolveApiKey(phoneNoId?: string): string {
+    const key = phoneNoId ? WA_API_KEYS_BY_PHONE[String(phoneNoId)] : "";
+    return key || WA_API_KEY;
+  }
+
   private static async makeRequest(endpoint: string, payload: any): Promise<SendMessageResponse> {
     try {
+      const selectedApiKey = this.resolveApiKey(payload?.phoneNoId);
       const response = await fetch(`${WA_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${WA_API_KEY}`,
+          'Authorization': `Bearer ${selectedApiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)

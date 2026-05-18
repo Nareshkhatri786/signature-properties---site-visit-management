@@ -1208,23 +1208,40 @@ async function startServer() {
       const messageText = content?.text || "";
       const normalizedMobile = normalizePhoneNumber(String(senderPhoneNumber));
 
-      const mappingTable: Record<string, { projectId: string; userName: string }> = {
-        "916390071558584":   { projectId: "p3", userName: "Hemant" },
-        "122101071140010719":{ projectId: "p4", userName: "Vani" },
-        "1152168267972565":  { projectId: "p2", userName: "Megha" },
+      const staticUserByPhone: Record<string, string> = {
+        "916390071558584": "Hemant",      // Devi Bungalows
+        "122101071140010719": "Vani",     // Royal Rudraksha (existing)
+        "1152168267972565": "Megha",      // Shreemad Family (existing)
       };
 
-      const mapping = mappingTable[recipientPhoneNumberId];
-      if (!mapping) return res.status(404).json({ error: "Project mapping not found" });
+      const inferProjectKeywordByPhone: Record<string, string> = {
+        "916390071558584": "devi",
+        "122101071140010719": "royal",
+        "1152168267972565": "shreemad",
+      };
 
-      const { projectId, userName } = mapping;
+      const projectKeyword = inferProjectKeywordByPhone[recipientPhoneNumberId];
+      let project: any = null;
+      if (projectKeyword) {
+        project = await queryOne<any>("SELECT id, name FROM projects WHERE LOWER(name) LIKE ? ORDER BY updated_at DESC LIMIT 1", [`%${projectKeyword}%`]);
+      }
+      if (!project) {
+        // Fallback to any active project to avoid webhook drop; still keeps per-number context
+        project = await queryOne<any>("SELECT id, name FROM projects ORDER BY updated_at DESC LIMIT 1");
+      }
+      if (!project?.id) return res.status(404).json({ error: "Project mapping not found" });
+
+      const projectId = String(project.id);
+      const userName = staticUserByPhone[recipientPhoneNumberId] || "";
       const now = new Date().toISOString();
       const dateOnly = now.split("T")[0];
 
       let clientName = String(senderName || "WhatsApp Contact").trim()
         .split(" ").map((s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()).join(" ");
 
-      const targetUser = await queryOne<any>("SELECT * FROM users WHERE LOWER(name) LIKE ?", [`%${userName.toLowerCase()}%`]);
+      const targetUser = userName
+        ? await queryOne<any>("SELECT * FROM users WHERE LOWER(name) LIKE ?", [`%${userName.toLowerCase()}%`])
+        : null;
       const assignedUserId = targetUser?.id || null;
 
       const existingLead = await queryOne<any>(

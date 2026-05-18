@@ -9,6 +9,17 @@ interface IncomingMessage {
   projectId?: string;
 }
 
+function buildProjectLinkReply(projectName: string, kind: "brochure" | "walkthrough" | "sample" | "location", url: string) {
+  const cleanName = projectName || "this project";
+  const labelMap = {
+    brochure: "brochure",
+    walkthrough: "walkthrough video",
+    sample: "sample house video",
+    location: "location link",
+  } as const;
+  return `Sure. Sharing ${cleanName} ${labelMap[kind]}:\n${url}`;
+}
+
 const AI_GREETING_VARIANTS = [
   "Good morning Sir/Madam",
   "Namaste Sir/Madam",
@@ -106,6 +117,8 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
       mediaLinks = {
         brochure: proj.brochure_link,
         walkthrough: proj.walkthrough_video,
+        sample: proj.sample_house_video,
+        testimonial: proj.testimonial_video,
         location: proj.google_maps_link
       };
       projectContext = `
@@ -117,6 +130,7 @@ Available Media to send (ONLY send if explicitly asked by client):
 - Brochure: ${proj.brochure_link ? 'Available' : 'Not Available'}
 - Walkthrough Video: ${proj.walkthrough_video ? 'Available' : 'Not Available'}
 - Sample House Video: ${proj.sample_house_video ? 'Available' : 'Not Available'}
+- Testimonial Video: ${proj.testimonial_video ? 'Available' : 'Not Available'}
 - Location Map: ${proj.google_maps_link ? 'Available' : 'Not Available'}
 `;
     }
@@ -152,7 +166,7 @@ You MUST output your response in STRICT JSON format with no markdown wrappers or
 The JSON must have the following structure:
 {
   "replyText": "The exact text message to send to the client via WhatsApp",
-  "action": "NONE" | "SCHEDULE_VISIT" | "SCHEDULE_FOLLOWUP" | "ESCALATE_TO_HUMAN" | "SEND_BROCHURE" | "SEND_WALKTHROUGH" | "SEND_LOCATION",
+  "action": "NONE" | "SCHEDULE_VISIT" | "SCHEDULE_FOLLOWUP" | "ESCALATE_TO_HUMAN" | "SEND_BROCHURE" | "SEND_WALKTHROUGH" | "SEND_SAMPLE_VIDEO" | "SEND_TESTIMONIAL" | "SEND_LOCATION",
   "actionData": {
     // Only if action is SCHEDULE_VISIT or SCHEDULE_FOLLOWUP
     "date": "YYYY-MM-DD",
@@ -165,12 +179,17 @@ The JSON must have the following structure:
 Rules:
 - Be polite, concise, and persuasive. Use SIMPLE, SHORT, and CONVERSATIONAL language.
 - Avoid long formal paragraphs. Be direct like a human salesperson on WhatsApp.
+- If client shows interest but has not asked media yet, you may proactively ask:
+  "Kya main aapko sample video bheju?" / "Can I share a sample video?" (based on client language).
 - Greeting style should be professional and natural. Rotate tone naturally across conversations:
   sometimes "Good morning", sometimes "Namaste", sometimes "Jay Shree Krishna, kem chho?".
   Do not repeat the exact same greeting pattern in every chat.
 - NEVER violate the 'Strict AI Rules'.
 - If the client asks to talk to a human or schedules a visit, set "action": "ESCALATE_TO_HUMAN" and provide a summary.
 - If the client asks for media (brochure, video, map), set the corresponding "action" to trigger the system to send it.
+- If client asks for "sample video", "site video", "walkthrough", "brochure", "location", or "map", prefer link-sharing actions.
+- For media actions, do NOT send binary media. Share links only via text message.
+- Keep project separation strict: only talk about the currently active project number context.
   `;
 
   try {
@@ -229,13 +248,39 @@ Rules:
       );
     }
     else if (aiResult.action === "SEND_BROCHURE" && mediaLinks?.brochure) {
-      await WhatsAppService.sendMediaMessage(message.from, mediaLinks.brochure, "document", "Here is the project brochure you requested.");
+      await WhatsAppService.sendSessionMessage(
+        message.from,
+        buildProjectLinkReply(String((await queryOne<any>("SELECT name FROM projects WHERE id = ? LIMIT 1", [targetProjectId]))?.name || "this project"), "brochure", mediaLinks.brochure),
+        replyFromPhoneId
+      );
     }
     else if (aiResult.action === "SEND_WALKTHROUGH" && mediaLinks?.walkthrough) {
-      await WhatsAppService.sendMediaMessage(message.from, mediaLinks.walkthrough, "video", "Here is the project walkthrough video.");
+      await WhatsAppService.sendSessionMessage(
+        message.from,
+        buildProjectLinkReply(String((await queryOne<any>("SELECT name FROM projects WHERE id = ? LIMIT 1", [targetProjectId]))?.name || "this project"), "walkthrough", mediaLinks.walkthrough),
+        replyFromPhoneId
+      );
+    }
+    else if (aiResult.action === "SEND_SAMPLE_VIDEO" && mediaLinks?.sample) {
+      await WhatsAppService.sendSessionMessage(
+        message.from,
+        buildProjectLinkReply(String((await queryOne<any>("SELECT name FROM projects WHERE id = ? LIMIT 1", [targetProjectId]))?.name || "this project"), "sample", mediaLinks.sample),
+        replyFromPhoneId
+      );
+    }
+    else if (aiResult.action === "SEND_TESTIMONIAL" && mediaLinks?.testimonial) {
+      await WhatsAppService.sendSessionMessage(
+        message.from,
+        `Sharing customer testimonial video for ${String((await queryOne<any>("SELECT name FROM projects WHERE id = ? LIMIT 1", [targetProjectId]))?.name || "this project")}:\n${mediaLinks.testimonial}`,
+        replyFromPhoneId
+      );
     }
     else if (aiResult.action === "SEND_LOCATION" && mediaLinks?.location) {
-      await WhatsAppService.sendSessionMessage(message.from, `Here is the location link: ${mediaLinks.location}`);
+      await WhatsAppService.sendSessionMessage(
+        message.from,
+        buildProjectLinkReply(String((await queryOne<any>("SELECT name FROM projects WHERE id = ? LIMIT 1", [targetProjectId]))?.name || "this project"), "location", mediaLinks.location),
+        replyFromPhoneId
+      );
     }
     else if (aiResult.action === "ESCALATE_TO_HUMAN") {
       const summary = aiResult.actionData?.summary || "Client needs human assistance.";

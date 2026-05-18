@@ -363,7 +363,10 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
         <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
         {/* Mobile View: Card List */}
         <div className="md:hidden divide-y divide-[#E6D8B8]/50">
-          {filteredLeads.map((l, idx) => (
+          {filteredLeads.map((l, idx) => {
+            const nextAction = getLeadFollowUp(followUps, l.id, undefined, visits);
+            const nextStatus = getFollowUpDisplayStatus(nextAction);
+            return (
             <motion.div 
               key={l.id}
               initial={{ opacity: 0, x: -10 }}
@@ -395,12 +398,17 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
                     <p className="text-green-600 text-sm font-medium mt-0.5">{l.mobile}</p>
                     <div className="mt-2">
                       <FollowUpStatusBadge 
-                        status={getFollowUpDisplayStatus(getLeadFollowUp(followUps, l.id, undefined, visits))}
-                        date={getLeadFollowUp(followUps, l.id, undefined, visits)?.date}
+                        status={nextStatus}
+                        date={nextAction?.date}
                         isLost={l.status === 'lost'}
                         onClick={() => onNavigate('lead-detail', l.id)}
                       />
                     </div>
+                    {nextAction?.status === 'pending' && (
+                      <p className={cn("mt-1 text-[10px] font-semibold", nextStatus === 'overdue' ? "text-red-600" : "text-[#7A6540]")}>
+                        Next: {nextAction.purpose || 'Follow-up'}{nextAction.date ? ` • ${nextAction.date}` : ''}
+                      </p>
+                    )}
                     <div className="flex items-center gap-2 mt-2">
                       <LeadStatusBadge status={l.status} />
                       <span className="text-[10px] font-medium text-[#9A8262] bg-[#F5EDD4] px-2 py-0.5 rounded-md">
@@ -430,7 +438,7 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
                 </div>
               </div>
             </motion.div>
-          ))}
+          )})}
         </div>
 
         {/* Desktop View: Table */}
@@ -460,8 +468,11 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E6D8B8]/50">
-              {filteredLeads.map(l => (
-                <tr key={l.id} className={cn("hover:bg-[#FEFCF5] transition-colors", selectedIds.includes(l.id) && "bg-[#C9A84C]/5")}>
+              {filteredLeads.map(l => {
+                const nextAction = getLeadFollowUp(followUps, l.id, undefined, visits);
+                const nextStatus = getFollowUpDisplayStatus(nextAction);
+                return (
+                <tr key={l.id} className={cn("hover:bg-[#FEFCF5] transition-colors", selectedIds.includes(l.id) && "bg-[#C9A84C]/5", nextStatus === 'overdue' && "bg-red-50/40")}>
                   <td className="px-6 py-4">
                     <button 
                       onClick={() => toggleSelect(l.id)}
@@ -487,11 +498,16 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
                   </td>
                   <td className="px-6 py-4">
                     <FollowUpStatusBadge 
-                      status={getFollowUpDisplayStatus(getLeadFollowUp(followUps, l.id, undefined, visits))}
-                      date={getLeadFollowUp(followUps, l.id, undefined, visits)?.date}
+                      status={nextStatus}
+                      date={nextAction?.date}
                       isLost={l.status === 'lost'}
                       onClick={() => onNavigate('lead-detail', l.id)}
                     />
+                    {nextAction?.status === 'pending' && (
+                      <p className={cn("text-[10px] mt-1 font-semibold", nextStatus === 'overdue' ? "text-red-600" : "text-[#7A6540]")}>
+                        {nextAction.purpose || 'Follow-up Call'}
+                      </p>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex flex-col items-center gap-1">
@@ -550,7 +566,7 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
               {filteredLeads.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-20 text-center text-[#9A8262] italic text-sm">

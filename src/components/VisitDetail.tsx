@@ -297,6 +297,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
     } else if (field === 'visit_status') {
       if (value === 'cancelled') activityType = 'visit_cancelled';
       else if (value === 'rescheduled') activityType = 'visit_rescheduled';
+      else if (value === 'no_show') activityType = 'visit_no_show';
       else activityType = 'visit_scheduled';
     }
     
@@ -523,7 +524,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
             <MessageSquare size={18} /> WhatsApp
           </button>
           
-          {(visit.visit_status === 'scheduled' || visit.visit_status === 'rescheduled') && (
+          {(['scheduled', 'reminder_sent', 'confirmed', 'rescheduled', 'arrived'] as const).includes(visit.visit_status as any) && (
             <>
               <button 
                 onClick={() => setIsRescheduleModalOpen(true)}
@@ -785,8 +786,12 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
                   className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
                 >
                   <option value="scheduled">📅 Scheduled</option>
+                  <option value="reminder_sent">🔔 Reminder Sent</option>
+                  <option value="confirmed">✅ Confirmed</option>
+                  <option value="arrived">📍 Arrived</option>
                   <option value="completed">✅ Completed</option>
                   <option value="rescheduled">🔄 Rescheduled</option>
+                  <option value="no_show">⚠️ No Show</option>
                   <option value="cancelled">❌ Cancelled</option>
                 </select>
               </div>

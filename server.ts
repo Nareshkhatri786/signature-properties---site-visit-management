@@ -32,7 +32,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "diyacrm_secret_change_in_prod";
 const cleanSqlId = (id: any) => (id === null || id === undefined || String(id) === "null" || String(id) === "undefined" || String(id).trim() === "") ? null : id;
 const ALLOWED_FOLLOWUP_METHODS = new Set(["call", "whatsapp", "email", "in_person"]);
 const ALLOWED_FOLLOWUP_STATUSES = new Set(["pending", "completed", "cancelled"]);
-const ALLOWED_VISIT_STATUSES = new Set(["scheduled", "rescheduled", "completed", "cancelled"]);
+const ALLOWED_VISIT_STATUSES = new Set(["scheduled", "reminder_sent", "confirmed", "rescheduled", "no_show", "arrived", "completed", "cancelled"]);
 const ALLOWED_LEAD_STATUSES = new Set(["new", "contacted", "visit_scheduled", "visit_done", "closed", "lost"]);
 const ALLOWED_LEAD_QUALITIES = new Set(["hot", "warm", "cold", "pending", "disq"]);
 const ALLOWED_CALL_OUTCOMES = new Set(["answered", "not_answered", "busy", "switched_off"]);
@@ -677,9 +677,13 @@ async function startServer() {
           } else if (d.leadId) {
             // Log visit scheduled/updated
             const activityId = `act_vis_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+            const visitActivityType =
+              visitStatus === 'rescheduled' ? 'visit_rescheduled'
+              : visitStatus === 'no_show' ? 'visit_no_show'
+              : 'visit_scheduled';
             await connection.execute(
               `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
-              [activityId, visitStatus === 'rescheduled' ? 'visit_rescheduled' : 'visit_scheduled', null, d.assigned_to||'System', d.projectId||null, d.leadId, d.client_name, `Visit status transition: ${prevVisitStatus || 'new'} -> ${visitStatus}. Date: ${d.visit_date} ${d.visit_time || ''}`]
+              [activityId, visitActivityType, null, d.assigned_to||'System', d.projectId||null, d.leadId, d.client_name, `Visit status transition: ${prevVisitStatus || 'new'} -> ${visitStatus}. Date: ${d.visit_date} ${d.visit_time || ''}`]
             );
           }
 

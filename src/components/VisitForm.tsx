@@ -418,8 +418,12 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
                   className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C] appearance-none cursor-pointer"
                 >
                   <option value="scheduled">📅 Scheduled</option>
+                  <option value="reminder_sent">🔔 Reminder Sent</option>
+                  <option value="confirmed">✅ Confirmed</option>
+                  <option value="arrived">📍 Arrived</option>
                   <option value="completed">✅ Completed</option>
                   <option value="rescheduled">🔄 Rescheduled</option>
+                  <option value="no_show">⚠️ No Show</option>
                   <option value="cancelled">❌ Cancelled</option>
                 </select>
               </div>

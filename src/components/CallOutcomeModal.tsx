@@ -3,16 +3,18 @@ import { Phone, CheckCircle2, XCircle, Clock, Ban, X } from 'lucide-react';
 import { CallOutcome } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { QUICK_ACTION_CHIPS, QuickActionChipKey } from '../lib/workflowDiscipline';
 
 interface CallOutcomeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (outcome: CallOutcome, note?: string) => void;
+  onSelect: (outcome: CallOutcome, note?: string, chip?: QuickActionChipKey) => void;
   clientName: string;
 }
 
 export default function CallOutcomeModal({ isOpen, onClose, onSelect, clientName }: CallOutcomeModalProps) {
   const [note, setNote] = React.useState('');
+  const [selectedChip, setSelectedChip] = React.useState<QuickActionChipKey | null>(null);
   const outcomes: { value: CallOutcome; label: string; icon: any; color: string; bg: string }[] = [
     { value: 'answered', label: 'Answered', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
     { value: 'not_answered', label: 'Not Answered', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
@@ -53,7 +55,7 @@ export default function CallOutcomeModal({ isOpen, onClose, onSelect, clientName
                 {outcomes.map((outcome) => (
                   <button
                     key={outcome.value}
-                    onClick={() => onSelect(outcome.value, note)}
+                    onClick={() => onSelect(outcome.value, note, selectedChip || undefined)}
                     className={cn(
                       "flex items-center gap-4 p-4 rounded-xl border border-transparent transition-all hover:translate-x-1",
                       outcome.bg,
@@ -66,6 +68,27 @@ export default function CallOutcomeModal({ isOpen, onClose, onSelect, clientName
                     <span className="font-bold text-[#2A1C00]">{outcome.label}</span>
                   </button>
                 ))}
+              </div>
+
+              <div className="mt-5">
+                <p className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider mb-2">Quick Action Chips</p>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(QUICK_ACTION_CHIPS) as QuickActionChipKey[]).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setSelectedChip(k)}
+                      className={cn(
+                        "px-2.5 py-1.5 rounded-full border text-[11px] font-semibold",
+                        selectedChip === k
+                          ? "border-[#C9A84C] bg-[#C9A84C]/10 text-[#5C4820]"
+                          : "border-[#E6D8B8] bg-white text-[#9A8262]"
+                      )}
+                    >
+                      {QUICK_ACTION_CHIPS[k].label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="mt-6 space-y-2 pb-2">

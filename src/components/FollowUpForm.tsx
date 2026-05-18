@@ -3,6 +3,7 @@ import { Calendar, Clock, StickyNote, Save, X, Phone, MessageSquare, CheckCircle
 import { FollowUp, FollowUpMethod, User, Page, VisitFilters } from '../types';
 import { generateId } from '../lib/storage';
 import { cn, getLocalDateString } from '../lib/utils';
+import { NEXT_ACTION_TYPES, QUICK_ACTION_CHIPS, QuickActionChipKey, addDaysISO } from '../lib/workflowDiscipline';
 
 interface FollowUpFormProps {
   followUp?: FollowUp;
@@ -45,9 +46,11 @@ export default function FollowUpForm({
     purpose: followUp?.purpose || '',
     method: followUp?.method || initialMethod || 'call' as FollowUpMethod,
     note: '',
+    actionType: (followUp?.purpose && NEXT_ACTION_TYPES.includes(followUp.purpose as any) ? followUp.purpose : 'Follow-up Call') as string,
   });
 
   const [isCompleting, setIsCompleting] = useState(false);
+  const [selectedChip, setSelectedChip] = useState<QuickActionChipKey | null>(null);
 
   // Auto-reset note when entering completion mode to prevent repetition
   React.useEffect(() => {
@@ -71,7 +74,7 @@ export default function FollowUpForm({
         ...followUp,
         date: formData.date,
         scheduled_at: buildScheduledAt(formData.date, followUp.scheduled_at),
-        purpose: formData.purpose,
+        purpose: formData.purpose || formData.actionType,
         method: formData.method,
       };
       onSave(updatedFollowUp);
@@ -87,7 +90,7 @@ export default function FollowUpForm({
       userId: user.id,
       userName: user.name,
       date: formData.date,
-      purpose: formData.purpose,
+      purpose: formData.purpose || formData.actionType,
       method: formData.method,
       status: 'pending',
       created_at: new Date().toISOString(),
@@ -167,14 +170,60 @@ export default function FollowUpForm({
                   <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
                     <StickyNote size={12} /> Purpose
                   </label>
-                  <textarea 
-                    value={formData.purpose}
-                    onChange={(e) => setFormData(prev => ({ ...prev, purpose: e.target.value }))}
+                    <textarea 
+                      value={formData.purpose}
+                      onChange={(e) => setFormData(prev => ({ ...prev, purpose: e.target.value }))}
                     required
                     rows={3}
                     placeholder="E.g., Discuss pricing..."
                     className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C] resize-none"
-                  />
+                    />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Next Action Type</label>
+                  <select
+                    value={formData.actionType}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFormData(prev => ({ ...prev, actionType: v, purpose: prev.purpose || v }));
+                    }}
+                    className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                  >
+                    {NEXT_ACTION_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Quick Chips</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(Object.keys(QUICK_ACTION_CHIPS) as QuickActionChipKey[]).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => {
+                          const cfg = QUICK_ACTION_CHIPS[k];
+                          const nextDate = addDaysISO(getLocalDateString(), cfg.days);
+                          setSelectedChip(k);
+                          setFormData(prev => ({
+                            ...prev,
+                            method: cfg.method,
+                            actionType: cfg.actionType,
+                            purpose: cfg.actionType,
+                            date: nextDate
+                          }));
+                        }}
+                        className={cn(
+                          "px-2.5 py-1 rounded-full border text-[11px] font-semibold",
+                          selectedChip === k ? "border-[#C9A84C] bg-[#C9A84C]/10 text-[#5C4820]" : "border-[#E6D8B8] text-[#9A8262] bg-white"
+                        )}
+                      >
+                        {QUICK_ACTION_CHIPS[k].label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </>
             ) : (

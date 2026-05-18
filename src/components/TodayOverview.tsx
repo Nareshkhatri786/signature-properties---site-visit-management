@@ -53,7 +53,7 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
       .slice(0, 8);
 
     const todayVisits = visits
-      .filter((v) => v.visit_date === today && (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled'))
+      .filter((v) => v.visit_date === today && ['scheduled', 'reminder_sent', 'confirmed', 'rescheduled', 'arrived'].includes(v.visit_status))
       .sort((a, b) => (a.visit_time || '').localeCompare(b.visit_time || ''))
       .slice(0, 8);
 
@@ -63,6 +63,9 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
 
     const hotLeads = leads
       .filter((l) => l.quality === 'hot' && l.status !== 'closed' && l.status !== 'lost')
+      .slice(0, 8);
+    const pendingNegotiations = followUps
+      .filter((f) => f.status === 'pending' && /negotiation/i.test(String(f.purpose || '')))
       .slice(0, 8);
 
     const activeLeads = leads.filter((l) => l.status !== 'closed' && l.status !== 'lost');
@@ -91,9 +94,10 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
 
     const counts = {
       overdueFollowups: followUps.filter((f) => f.status === 'pending' && normalizeDate(f.date) < today).length,
-      todayVisits: visits.filter((v) => v.visit_date === today && (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled')).length,
+      todayVisits: visits.filter((v) => v.visit_date === today && ['scheduled', 'reminder_sent', 'confirmed', 'rescheduled', 'arrived'].includes(v.visit_status)).length,
       myPendingTasks: followUps.filter((f) => f.status === 'pending' && f.userName === user.name && normalizeDate(f.date) <= today).length,
       hotLeads: leads.filter((l) => l.quality === 'hot' && l.status !== 'closed' && l.status !== 'lost').length,
+      pendingNegotiations: followUps.filter((f) => f.status === 'pending' && /negotiation/i.test(String(f.purpose || ''))).length,
       missedFollowups: activeLeads.filter((l) => !pendingLeadIds.has(String(l.id))).length,
       missedVisitOutcome: visits
         .filter((v) => v.visit_status === 'completed')
@@ -105,7 +109,7 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
         }).length
     };
 
-    return { overdueFollowups, todayVisits, myPendingTasks, hotLeads, missedFollowups, missedVisitOutcome, counts };
+    return { overdueFollowups, todayVisits, myPendingTasks, hotLeads, pendingNegotiations, missedFollowups, missedVisitOutcome, counts };
   }, [followUps, leads, visits, user.name, today]);
 
   return (
@@ -118,6 +122,7 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <ActionCountCard label="Overdue Follow-ups" value={vm.counts.overdueFollowups} tone="red" onClick={() => onNavigate('followups')} />
         <ActionCountCard label="Today's Visits" value={vm.counts.todayVisits} tone="blue" onClick={() => onNavigate('visits', undefined, { period: 'today' })} />
+        <ActionCountCard label="Negotiations" value={vm.counts.pendingNegotiations || 0} tone="amber" onClick={() => onNavigate('followups')} />
         <ActionCountCard label="My Pending Tasks" value={vm.counts.myPendingTasks} tone="amber" onClick={() => onNavigate('followups')} />
         <ActionCountCard label="Hot Leads" value={vm.counts.hotLeads} tone="orange" onClick={() => onNavigate('leads', undefined, { quality: 'hot' })} />
       </div>
@@ -238,6 +243,20 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
             id: f.id,
             primary: f.purpose || 'Pending follow-up',
             secondary: `${normalizeDate(f.date)} • ${f.method}`,
+            onClick: () => onNavigate('followups')
+          }))}
+        />
+
+        <Panel
+          title="Pending Negotiations"
+          icon={<Target size={16} className="text-amber-600" />}
+          emptyText="No pending negotiations."
+          actionText="Open Follow-ups"
+          onAction={() => onNavigate('followups')}
+          items={vm.pendingNegotiations.map((f) => ({
+            id: f.id,
+            primary: f.userName || 'Unassigned',
+            secondary: `${f.purpose || 'Negotiation'} • ${normalizeDate(f.date)}`,
             onClick: () => onNavigate('followups')
           }))}
         />

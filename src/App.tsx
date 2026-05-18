@@ -33,6 +33,7 @@ import { aiService } from './lib/ai';
 import { generateId } from './lib/storage';
 import { cn } from './lib/utils';
 import { normalizePhoneNumber } from './lib/phoneUtils';
+import { QUICK_ACTION_CHIPS, QuickActionChipKey, addDaysISO, getLeadPendingNextAction, isLeadActiveForDiscipline } from './lib/workflowDiscipline';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { apiService } from './lib/api-service';
@@ -129,7 +130,7 @@ export default function App() {
   const [initError, setInitError] = useState<string | null>(null);
   const [activeVisitFilters, setActiveVisitFilters] = useState<VisitFilters | null>(null);
   const [activeLeadFilters, setActiveLeadFilters] = useState<LeadFilters | null>(null);
-  const [followUpPromptData, setFollowUpPromptData] = useState<{ leadId?: string, visitId?: string, projectId: string, clientName: string } | null>(null);
+  const [followUpPromptData, setFollowUpPromptData] = useState<{ leadId?: string, visitId?: string, projectId: string, clientName: string, mandatory?: boolean } | null>(null);
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [preferredFollowUpMethod, setPreferredFollowUpMethod] = useState<FollowUpMethod>('call');
   const [isVisitCompletionModalOpen, setIsVisitCompletionModalOpen] = useState(false);
@@ -454,7 +455,8 @@ export default function App() {
         leadId: fup.leadId,
         visitId: fup.visitId,
         projectId: fup.projectId,
-        clientName
+        clientName,
+        mandatory: !!(lead && isLeadActiveForDiscipline(lead))
       });
     } else if (updates.date && updates.date !== fup.date) {
       toast.success('Follow-up rescheduled');
@@ -628,7 +630,7 @@ export default function App() {
     setIsCallModalOpen(true);
   };
 
-  const recordCallOutcome = (v: Visit | Lead, outcome: CallOutcome, note?: string) => {
+  const recordCallOutcome = (v: Visit | Lead, outcome: CallOutcome, note?: string, chip?: QuickActionChipKey) => {
     if (!user) return;
     
     const visitId = 'visit_date' in v ? v.id : '';
@@ -667,6 +669,9 @@ export default function App() {
       const updatedLead = {
         ...lead,
         quality: shouldMoveToCold ? 'cold' as LeadQuality : lead.quality,
+        priority: chip && QUICK_ACTION_CHIPS[chip]?.suggestedPriority
+          ? Math.max(Number(lead.priority || 0), Number(QUICK_ACTION_CHIPS[chip].suggestedPriority || 0))
+          : lead.priority,
         stats: {
           ...lead.stats,
           calls_attempted: lead.stats.calls_attempted + 1,
@@ -681,6 +686,37 @@ export default function App() {
 
       if (shouldMoveToCold) {
         toast.error('Lead moved to Cold due to 3 consecutive Switched Off calls');
+      }
+
+      if (chip && isLeadActiveForDiscipline(lead) && !getLeadPendingNextAction(followups, lead.id)) {
+        const cfg = QUICK_ACTION_CHIPS[chip];
+        const base = getLocalDateString();
+        const nextDate = addDaysISO(base, cfg.days);
+        const autoFup: FollowUp = {
+          id: generateId(),
+          leadId: lead.id,
+          projectId: lead.projectId,
+          userId: lead.assignedTo || user.id,
+          userName: users.find((u) => u.id === (lead.assignedTo || user.id))?.name || user.name,
+          date: nextDate,
+          scheduled_at: new Date(`${nextDate}T11:00:00`).toISOString(),
+          purpose: cfg.actionType,
+          method: cfg.method,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          outcome_note: `Auto-created from quick chip: ${cfg.label}`
+        };
+        api.save('followups', autoFup);
+      }
+
+      if (!chip && isLeadActiveForDiscipline(lead) && !getLeadPendingNextAction(followups, lead.id)) {
+        setFollowUpPromptData({
+          leadId: lead.id,
+          visitId: undefined,
+          projectId: lead.projectId,
+          clientName: lead.name,
+          mandatory: true
+        });
       }
     }
 
@@ -908,10 +944,10 @@ export default function App() {
     toast.success(`Successfully analyzed ${successCount} leads`, { id: 'bulk-ai' });
   };
 
-  const handleCallOutcome = (outcome: CallOutcome, note?: string) => {
+  const handleCallOutcome = (outcome: CallOutcome, note?: string, chip?: QuickActionChipKey) => {
     const target = activeCallVisit || activeCallLead;
     if (target) {
-      recordCallOutcome(target, outcome, note);
+      recordCallOutcome(target, outcome, note, chip);
     }
     setIsCallModalOpen(false);
     setActiveCallVisit(null);
@@ -1672,7 +1708,7 @@ export default function App() {
               <h3 className="font-bold text-lg text-[#2A1C00] mb-1">Schedule Next Step?</h3>
               <p className="text-xs text-[#9A8262] mb-4 leading-relaxed">
                 The follow-up for <span className="font-bold text-[#5C4820]">{followUpPromptData.clientName}</span> is complete. 
-                Would you like to schedule the next follow-up now?
+                {followUpPromptData.mandatory ? ' Next action is required to keep this lead active.' : ' Would you like to schedule the next follow-up now?'}
               </p>
 
               <div className="space-y-2 mb-5">
@@ -1706,15 +1742,17 @@ export default function App() {
                 >
                   <Plus size={18} /> Schedule Next Follow-up
                 </button>
-                <button 
-                  onClick={() => {
-                    setFollowUpPromptData(null);
-                    setPreferredFollowUpMethod('call');
-                  }}
-                  className="w-full bg-white border border-[#E6D8B8] text-[#9A8262] font-semibold py-2.5 rounded-lg hover:bg-[#FDFAF2] transition-colors"
-                >
-                  Not now, maybe later
-                </button>
+                {!followUpPromptData.mandatory && (
+                  <button 
+                    onClick={() => {
+                      setFollowUpPromptData(null);
+                      setPreferredFollowUpMethod('call');
+                    }}
+                    className="w-full bg-white border border-[#E6D8B8] text-[#9A8262] font-semibold py-2.5 rounded-lg hover:bg-[#FDFAF2] transition-colors"
+                  >
+                    Not now, maybe later
+                  </button>
+                )}
               </div>
             </div>
             <div className="bg-[#FAF9F6] px-4 py-2 border-t border-[#F2ECD8] flex justify-center">
@@ -1787,14 +1825,14 @@ export default function App() {
                 await api.save('activities', activity);
 
                 // 2. Handle Next Followup
-                if (data.nextStep === 'followup' && data.nextDate) {
+                if ((data.nextStep === 'callback' || data.nextStep === 'negotiation') && data.nextDate) {
                   const f: FollowUp = {
                     id: generateId(),
                     leadId: updatedLead.id,
                     visitId: updatedVisit.id,
                     projectId: updatedVisit.projectId,
                     date: data.nextDate,
-                    purpose: 'Follow up post-visit',
+                    purpose: data.nextStep === 'negotiation' ? 'Negotiation Call' : 'Follow-up Call',
                     status: 'pending',
                     userId: user.id,
                     userName: user.name,
@@ -1827,6 +1865,14 @@ export default function App() {
                     priority: updatedVisit.priority || updatedLead.priority || 0
                   };
                   await api.save('visits', revisit);
+                }
+
+                if (data.nextStep === 'close_lead') {
+                  await api.save('leads', {
+                    ...updatedLead,
+                    status: data.outcome === 'booked' ? 'closed' : 'lost',
+                    updated_at: new Date().toISOString()
+                  });
                 }
               })();
 

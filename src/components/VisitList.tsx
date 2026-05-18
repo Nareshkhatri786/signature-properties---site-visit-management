@@ -245,8 +245,12 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
           >
             <option value="">All Visits</option>
             <option value="scheduled">📅 Scheduled</option>
+            <option value="reminder_sent">🔔 Reminder Sent</option>
+            <option value="confirmed">✅ Confirmed</option>
+            <option value="arrived">📍 Arrived</option>
             <option value="completed">✅ Completed</option>
             <option value="rescheduled">🔄 Rescheduled</option>
+            <option value="no_show">⚠️ No Show</option>
             <option value="cancelled">❌ Cancelled</option>
           </select>
         </div>

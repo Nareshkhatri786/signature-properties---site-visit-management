@@ -1,7 +1,9 @@
 export type LeadStatus = 'new' | 'contacted' | 'visit_scheduled' | 'visit_done' | 'closed' | 'lost';
 export type LeadQuality = 'hot' | 'warm' | 'cold' | 'pending' | 'disq';
-export type VisitStatus = 'scheduled' | 'rescheduled' | 'completed' | 'cancelled';
+export type VisitStatus = 'scheduled' | 'reminder_sent' | 'confirmed' | 'rescheduled' | 'no_show' | 'arrived' | 'completed' | 'cancelled';
 export type VisitOutcome = 'booked' | 'highly_interested' | 'follow_up_required' | 'shared_quotation' | 'negotiation' | 'not_interested';
+export type VisitConcernType = 'budget_issue' | 'loan_issue' | 'family_discussion' | 'location_concern' | 'competition_property' | 'not_interested';
+export type VisitNextStep = 'callback' | 'revisit' | 'negotiation' | 'close_lead';
 
 export type TemplateType = 'reminder' | 'welcome' | 'thank_you' | 'follow_up' | 'custom';
 
@@ -246,6 +248,8 @@ export interface Visit {
   client_feedback?: string;
   interest_level?: LeadQuality;
   outcome?: VisitOutcome;
+  concern_type?: VisitConcernType;
+  next_step?: VisitNextStep;
   
   // Reschedule history
   reschedule_log?: {

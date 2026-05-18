@@ -867,11 +867,15 @@ export function StatusBadge({ status }: { status: string }) {
 export function VisitBadge({ status, leadId, leads = [] }: { status: string, leadId?: string | null, leads?: Lead[] }) {
   const styles: any = {
     scheduled: 'bg-indigo-600 text-white shadow-sm',
+    reminder_sent: 'bg-sky-50 text-sky-700 border border-sky-200',
+    confirmed: 'bg-blue-50 text-blue-700 border border-blue-200',
+    arrived: 'bg-teal-50 text-teal-700 border border-teal-200',
     completed: 'bg-emerald-600 text-white shadow-sm',
     rescheduled: 'bg-amber-50 text-amber-700 border border-amber-200',
+    no_show: 'bg-orange-50 text-orange-700 border border-orange-200',
     cancelled: 'bg-rose-50 text-rose-600 border border-rose-200',
   };
-  const icons: any = { scheduled: '📅', completed: '✅', rescheduled: '🔄', cancelled: '❌' };
+  const icons: any = { scheduled: '📅', reminder_sent: '🔔', confirmed: '✅', arrived: '📍', completed: '🏁', rescheduled: '🔄', no_show: '⚠️', cancelled: '❌' };
   
   const lead = leadId ? leads.find(l => l.id === leadId) : null;
   const stats = lead?.stats ? (typeof lead.stats === 'string' ? JSON.parse(lead.stats) : lead.stats) : null;

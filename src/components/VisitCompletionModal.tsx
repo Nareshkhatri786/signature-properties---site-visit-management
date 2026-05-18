@@ -10,7 +10,7 @@ import {
   X,
   Save
 } from 'lucide-react';
-import { Visit, Lead, VisitOutcome, LeadQuality, User } from '../types';
+import { Visit, Lead, VisitOutcome, LeadQuality, User, VisitConcernType, VisitNextStep } from '../types';
 
 interface VisitCompletionModalProps {
   isOpen: boolean;
@@ -28,7 +28,8 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
     feedback: '',
     interest: (lead?.quality || 'warm') as LeadQuality,
     outcome: 'follow_up_required' as VisitOutcome,
-    nextStep: 'none' as 'none' | 'followup' | 'revisit',
+    concernType: 'family_discussion' as VisitConcernType,
+    nextStep: 'callback' as VisitNextStep,
     nextDate: '',
     nextTime: '',
     visitDate: visit.visit_date || new Date().toISOString().split('T')[0],
@@ -37,8 +38,8 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requireNextAction, setRequireNextAction] = useState(true);
-  const nextActionMissing = data.nextStep === 'none' || !data.nextDate;
-  const mustHaveNextAction = requireNextAction || data.outcome === 'follow_up_required';
+  const nextActionMissing = !data.nextDate;
+  const mustHaveNextAction = requireNextAction || data.outcome === 'follow_up_required' || data.outcome === 'negotiation' || data.outcome === 'highly_interested';
   const isValidationBlocked = mustHaveNextAction && nextActionMissing;
 
   const handleSubmit = () => {
@@ -140,9 +141,27 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                       <option value="booked">💰 Booked</option>
                       <option value="highly_interested">🌟 High Interest</option>
                       <option value="follow_up_required">📞 Follow-up</option>
+                      <option value="negotiation">🤝 Negotiation</option>
+                      <option value="shared_quotation">📄 Quotation Shared</option>
                       <option value="not_interested">❌ Not Interested</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Concern Type</label>
+                  <select
+                    value={data.concernType}
+                    onChange={(e) => setData({ ...data, concernType: e.target.value as VisitConcernType })}
+                    className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
+                  >
+                    <option value="budget_issue">Budget Issue</option>
+                    <option value="loan_issue">Loan Issue</option>
+                    <option value="family_discussion">Family Discussion</option>
+                    <option value="location_concern">Location Concern</option>
+                    <option value="competition_property">Competition Property</option>
+                    <option value="not_interested">Not Interested</option>
+                  </select>
                 </div>
 
                 {/* Next Step */}
@@ -163,37 +182,36 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                     </label>
                     <select 
                       value={data.nextStep}
-                      onChange={(e) => setData({...data, nextStep: e.target.value as any})}
+                      onChange={(e) => setData({...data, nextStep: e.target.value as VisitNextStep})}
                       className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
                     >
-                      <option value="none">No immediate action</option>
-                      <option value="followup">📞 Schedule Follow-up Call</option>
-                      <option value="revisit">📅 Schedule Re-Visit</option>
+                      <option value="callback">📞 Callback</option>
+                      <option value="revisit">📅 Revisit</option>
+                      <option value="negotiation">🤝 Negotiation</option>
+                      <option value="close_lead">✅ Close Lead</option>
                     </select>
                   </div>
 
-                  {data.nextStep !== 'none' && (
-                    <div className="grid grid-cols-2 gap-3 bg-[#FDFAF2] p-3 rounded-lg border border-[#E6D8B8]">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-[#9A8262] uppercase">Next Date</label>
-                        <input 
-                          type="date" 
-                          value={data.nextDate}
-                          onChange={(e) => setData({...data, nextDate: e.target.value})}
-                          className="w-full bg-white border border-[#E6D8B8] rounded py-1.5 px-2 text-xs focus:outline-none focus:border-[#C9A84C]"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-[#9A8262] uppercase">Next Time</label>
-                        <input 
-                          type="time" 
-                          value={data.nextTime}
-                          onChange={(e) => setData({...data, nextTime: e.target.value})}
-                          className="w-full bg-white border border-[#E6D8B8] rounded py-1.5 px-2 text-xs focus:outline-none focus:border-[#C9A84C]"
-                        />
-                      </div>
+                  <div className="grid grid-cols-2 gap-3 bg-[#FDFAF2] p-3 rounded-lg border border-[#E6D8B8]">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-[#9A8262] uppercase">Next Date</label>
+                      <input 
+                        type="date" 
+                        value={data.nextDate}
+                        onChange={(e) => setData({...data, nextDate: e.target.value})}
+                        className="w-full bg-white border border-[#E6D8B8] rounded py-1.5 px-2 text-xs focus:outline-none focus:border-[#C9A84C]"
+                      />
                     </div>
-                  )}
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-[#9A8262] uppercase">Next Time</label>
+                      <input 
+                        type="time" 
+                        value={data.nextTime}
+                        onChange={(e) => setData({...data, nextTime: e.target.value})}
+                        className="w-full bg-white border border-[#E6D8B8] rounded py-1.5 px-2 text-xs focus:outline-none focus:border-[#C9A84C]"
+                      />
+                    </div>
+                  </div>
                   {isValidationBlocked && (
                     <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-2 py-1.5">
                       Next action required: select follow-up/revisit and set next date.

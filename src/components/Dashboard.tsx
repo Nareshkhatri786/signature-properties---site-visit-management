@@ -249,18 +249,18 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
       </div>
 
       {/* ===== TODAY'S ACTION TRAY ===== */}
-      <div className="bg-gradient-to-r from-[#1C1207] to-[#2A1D0E] border border-amber-900/30 rounded-2xl p-5 shadow-xl">
+      <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl p-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 bg-amber-500/20 rounded-xl flex items-center justify-center">
             <Zap size={18} className="text-amber-400" />
           </div>
           <div>
-            <h3 className="text-amber-400 font-bold text-sm uppercase tracking-widest">Today's Action Tray</h3>
-            <p className="text-amber-200/30 text-[10px]">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            <h3 className="text-[#2A1C00] font-bold text-sm uppercase tracking-widest">Today's Action Tray</h3>
+            <p className="text-[#9A8262] text-[10px]">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <button onClick={() => onNavigate('followups')} className="bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 rounded-xl p-4 text-left transition-all group">
+          <button onClick={() => onNavigate('followups', undefined, { tab: 'overdue' })} className="bg-red-50 border border-red-200 hover:bg-red-100 rounded-xl p-4 text-left transition-colors group">
             <div className="flex items-center justify-between mb-2">
               <AlertCircle size={18} className="text-red-400" />
               <span className="text-2xl font-bold text-red-300">{calculatedStats.followupsOverdue}</span>
@@ -268,7 +268,7 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
             <p className="text-red-300 text-xs font-bold">Overdue Follow-ups</p>
             <p className="text-red-400/60 text-[10px] mt-0.5">Action required immediately</p>
           </button>
-          <button onClick={() => onNavigate('followups')} className="bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 rounded-xl p-4 text-left transition-all">
+          <button onClick={() => onNavigate('followups', undefined, { tab: 'today' })} className="bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl p-4 text-left transition-colors">
             <div className="flex items-center justify-between mb-2">
               <CalendarIcon size={18} className="text-amber-400" />
               <span className="text-2xl font-bold text-amber-300">{calculatedStats.followupsDueToday}</span>
@@ -276,7 +276,7 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
             <p className="text-amber-300 text-xs font-bold">Follow-ups Due Today</p>
             <p className="text-amber-400/60 text-[10px] mt-0.5">Complete before EOD</p>
           </button>
-          <button onClick={() => onNavigate('visits', undefined, { period: 'today', visitStatus: 'scheduled' })} className="bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 rounded-xl p-4 text-left transition-all">
+          <button onClick={() => onNavigate('visits', undefined, { period: 'today', visitStatus: 'scheduled' })} className="bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl p-4 text-left transition-colors">
             <div className="flex items-center justify-between mb-2">
               <CalendarDays size={18} className="text-blue-400" />
               <span className="text-2xl font-bold text-blue-300">{calculatedStats.scheduledToday}</span>
@@ -284,7 +284,7 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
             <p className="text-blue-300 text-xs font-bold">Visits Scheduled Today</p>
             <p className="text-blue-400/60 text-[10px] mt-0.5">Confirm with clients</p>
           </button>
-          <button onClick={() => onNavigate('leads', undefined, { quality: 'hot' })} className="bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 rounded-xl p-4 text-left transition-all">
+          <button onClick={() => onNavigate('leads', undefined, { quality: 'hot' })} className="bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-xl p-4 text-left transition-colors">
             <div className="flex items-center justify-between mb-2">
               <FireExtinguisher size={18} className="text-orange-400" />
               <span className="text-2xl font-bold text-orange-300">{calculatedStats.hotLeads}</span>
@@ -457,7 +457,7 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {calculatedStats.notContactedDays.length > 0 && (
-              <button onClick={() => onNavigate('leads')} className="bg-white border border-rose-200 rounded-xl p-4 text-left hover:bg-rose-50 transition-all flex items-center justify-between">
+              <button onClick={() => onNavigate('leads', undefined, { search: 'No Activity 7+ Days' })} className="bg-white border border-rose-200 rounded-xl p-4 text-left hover:bg-rose-50 transition-colors flex items-center justify-between">
                 <div>
                   <p className="font-bold text-rose-800 text-sm">{calculatedStats.notContactedDays.length} Leads — No Activity in 7+ Days</p>
                   <p className="text-rose-600/70 text-[11px] mt-0.5">Reassign or schedule follow-up</p>
@@ -466,7 +466,7 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
               </button>
             )}
             {calculatedStats.visitedNoFollowup.length > 0 && (
-              <button onClick={() => onNavigate('visits', undefined, { visitStatus: 'completed' })} className="bg-white border border-rose-200 rounded-xl p-4 text-left hover:bg-rose-50 transition-all flex items-center justify-between">
+              <button onClick={() => onNavigate('followups', undefined, { tab: 'all', search: 'Auto-generated Follow-up' })} className="bg-white border border-rose-200 rounded-xl p-4 text-left hover:bg-rose-50 transition-colors flex items-center justify-between">
                 <div>
                   <p className="font-bold text-rose-800 text-sm">{calculatedStats.visitedNoFollowup.length} Visits Done — No Follow-up Scheduled</p>
                   <p className="text-rose-600/70 text-[11px] mt-0.5">Schedule post-visit follow-up</p>
@@ -489,7 +489,7 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {calculatedStats.followupsOverdue > 0 && (
             <div 
-              onClick={() => onNavigate('followups')}
+              onClick={() => onNavigate('followups', undefined, { tab: 'overdue' })}
               className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-red-100 transition-all group"
             >
               <div className="flex items-center gap-3">
@@ -506,7 +506,7 @@ export default React.memo(function Dashboard({ visits, leads, followUps, user, u
           )}
           {calculatedStats.followupsDueToday > 0 && (
             <div 
-              onClick={() => onNavigate('followups')}
+              onClick={() => onNavigate('followups', undefined, { tab: 'today' })}
               className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-blue-100 transition-all group"
             >
               <div className="flex items-center gap-3">

@@ -89,6 +89,16 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
     return (b.created_at || '').localeCompare(a.created_at || '');
   });
 
+  const activeFilters = [
+    search ? `Search: ${search}` : '',
+    status ? `Status: ${status.replace('_', ' ')}` : '',
+    quality ? `Quality: ${quality}` : '',
+    source ? `Source: ${source}` : '',
+    projectIdFilter ? `Project: ${projects.find(p => p.id === projectIdFilter)?.name || 'Selected'}` : '',
+    assignedToFilter !== '' ? `Owner: ${users.find(u => u.id === assignedToFilter)?.name || 'Selected'}` : '',
+    followUpFilter ? `Follow-up: ${followUpFilter}` : '',
+  ].filter(Boolean);
+
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredLeads.length) {
       setSelectedIds([]);
@@ -292,6 +302,16 @@ export default React.memo(function LeadList({ leads, users, projects, onNavigate
           </div>
         </div>
       </div>
+
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {activeFilters.map((item) => (
+            <span key={item} className="px-2.5 py-1 rounded-md bg-[#F5EDD4] text-[#5C4820] text-[11px] font-semibold">
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
 
       {selectedIds.length > 0 && (
         <div className="bg-[#C9A84C] text-white px-6 py-3 rounded-xl flex items-center justify-between shadow-lg animate-in slide-in-from-top-4 duration-300">

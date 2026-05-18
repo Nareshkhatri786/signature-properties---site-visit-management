@@ -128,6 +128,16 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
     return (b.visit_date || '').localeCompare(a.visit_date || '');
   });
 
+  const activeFilters = [
+    search ? `Search: ${search}` : '',
+    period ? `Period: ${period}` : '',
+    status ? `Lead: ${status}` : '',
+    visitStatus ? `Visit: ${visitStatus.replace('_', ' ')}` : '',
+    projectIdFilter ? `Project: ${projects.find(p => p.id === projectIdFilter)?.name || 'Selected'}` : '',
+    assignedToFilter ? `Owner: ${assignedToFilter}` : '',
+    followUpFilter ? `Follow-up: ${followUpFilter}` : '',
+  ].filter(Boolean);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -314,6 +324,16 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
           <X size={14} /> Reset
         </button>
       </div>
+
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {activeFilters.map((item) => (
+            <span key={item} className="px-2.5 py-1 rounded-md bg-[#F5EDD4] text-[#5C4820] text-[11px] font-semibold">
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
 
       {viewMode === 'kanban' ? (
         <VisitKanbanBoard 

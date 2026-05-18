@@ -181,6 +181,15 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
     return activeTab === 'all' ? groups : [{ label: activeTab, color: 'text-[#C9A84C]', items: filteredData }];
   }, [filteredData, activeTab]);
 
+  const activeFilters = [
+    activeTab !== 'all' ? `Tab: ${activeTab}` : '',
+    search ? `Search: ${search}` : '',
+    assigneeFilter !== 'all' ? `Assignee: ${assigneeFilter === 'me' ? 'Me' : (users.find(u => String(u.id) === String(assigneeFilter))?.name || assigneeFilter)}` : '',
+    priorityFilter !== 'all' ? `Priority: ${priorityFilter}` : '',
+    stageFilter !== 'all' ? `Stage: ${stageFilter}` : '',
+    projectFilter !== 'all' ? `Project: ${projects.find(p => p.id === projectFilter)?.name || projectFilter}` : '',
+  ].filter(Boolean);
+
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredData.length && filteredData.length > 0) {
       setSelectedIds([]);
@@ -357,6 +366,16 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
           ))}
         </div>
 
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {activeFilters.map((item) => (
+              <span key={item} className="px-2.5 py-1 rounded-md bg-[#F5EDD4] text-[#5C4820] text-[11px] font-semibold">
+                {item}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Bulk Action Toolbar */}
         {selectedIds.length > 0 && (
           <div className="bg-[#1C1207] text-white rounded-xl px-5 py-3 flex flex-wrap items-center gap-3 shadow-xl animate-in fade-in duration-200">
@@ -504,7 +523,7 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-1">
                         <button onClick={() => onCall(f.lead || f.visit!)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"><Phone size={16} /></button>
                         <button onClick={() => onNavigate('whatsapp', f.leadId || f.visitId)} className="p-1.5 text-[#25D366] hover:bg-green-50 rounded-lg transition-colors"><MessageSquare size={16} /></button>
                         {f.status === 'pending' && (

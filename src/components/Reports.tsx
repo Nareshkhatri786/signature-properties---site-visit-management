@@ -58,6 +58,8 @@ import {
 import { cn } from '../lib/utils';
 import DateRangeSelector, { DateRange } from './DateRangeSelector';
 import { motion, AnimatePresence } from 'motion/react';
+import { useComplianceReport, useSlaStatus } from '../lib/queries';
+import { apiService } from '../lib/api-service';
 
 interface ReportsProps {
   leads: any[];
@@ -68,6 +70,15 @@ interface ReportsProps {
   activities?: any[];
   onNavigate: (page: string, id?: string) => void;
   currentUserRole?: string;
+}
+
+function MiniExceptionStat({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className="bg-white border border-[#EFE2C4] rounded-lg px-2.5 py-2">
+      <p className="text-[10px] text-[#9A8262] uppercase tracking-wide">{label}</p>
+      <p className={cn("text-base font-black mt-0.5", tone)}>{value}</p>
+    </div>
+  );
 }
 
 export default function Reports({ leads, visits, users, projects, callLogs = [], activities = [], onNavigate, currentUserRole }: ReportsProps) {
@@ -81,6 +92,22 @@ export default function Reports({ leads, visits, users, projects, callLogs = [],
   const [drillDownType, setDrillDownType] = useState<'leads' | 'calls' | 'visits' | 'whatsapp' | null>(null);
   const [misLastSent, setMisLastSent] = useState<Record<string, Date | null>>({ daily: null, weekend: null, detailed_monthly: null });
   const [activeTab, setActiveTab] = useState<'dashboard' | 'ai-lab'>('dashboard');
+  const [isFixing, setIsFixing] = useState<'missed_followups' | 'missed_visit_outcomes' | null>(null);
+  const canManageCompliance = ['admin', 'adm', 'manager'].includes(String(currentUserRole || '').toLowerCase());
+  const { data: complianceReport } = useComplianceReport('today', canManageCompliance);
+  const { data: slaStatus } = useSlaStatus('today', canManageCompliance, false);
+
+  const runBulkFix = async (mode: 'missed_followups' | 'missed_visit_outcomes') => {
+    try {
+      setIsFixing(mode);
+      const res = await apiService.runComplianceBulkFix(mode, 100);
+      toast.success(`Compliance fix done: ${res.fixed || 0} updated`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Bulk fix failed');
+    } finally {
+      setIsFixing(null);
+    }
+  };
 
   const getMisLastSentLabel = (type: string) => {
     const d = misLastSent[type];
@@ -445,6 +472,65 @@ export default function Reports({ leads, visits, users, projects, callLogs = [],
               )}
             </div>
           </div>
+
+          {canManageCompliance && (
+            <div className="bg-white border border-[#E6D8B8] rounded-xl overflow-hidden">
+              <div className="px-3 py-2.5 bg-[#FDFAF2] border-b border-[#E6D8B8] flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-[#2A1C00]">Manager Exception Panel (Today)</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => runBulkFix('missed_followups')}
+                    disabled={isFixing !== null}
+                    className="text-[10px] font-bold border border-[#E6D8B8] rounded px-2 py-1 text-[#9A8262] hover:bg-white disabled:opacity-50"
+                  >
+                    {isFixing === 'missed_followups' ? 'Fixing...' : 'Fix Follow-ups'}
+                  </button>
+                  <button
+                    onClick={() => runBulkFix('missed_visit_outcomes')}
+                    disabled={isFixing !== null}
+                    className="text-[10px] font-bold border border-[#E6D8B8] rounded px-2 py-1 text-[#9A8262] hover:bg-white disabled:opacity-50"
+                  >
+                    {isFixing === 'missed_visit_outcomes' ? 'Fixing...' : 'Fix Visit Outcomes'}
+                  </button>
+                </div>
+              </div>
+              <div className="p-3 grid grid-cols-2 md:grid-cols-4 gap-2 border-b border-[#E6D8B8] bg-[#FFFEFA]">
+                <MiniExceptionStat label="Overdue Follow-ups" value={slaStatus?.summary?.overdueFollowups || 0} tone="text-red-700" />
+                <MiniExceptionStat label="First Response Breach" value={slaStatus?.summary?.firstResponseBreaches || 0} tone="text-amber-700" />
+                <MiniExceptionStat label="Missed Visit Outcomes" value={slaStatus?.summary?.missedVisitOutcomes || 0} tone="text-red-700" />
+                <MiniExceptionStat label="Stale Hot Leads" value={slaStatus?.summary?.staleHotLeads || 0} tone="text-orange-700" />
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-[#FFFEFA]">
+                    <tr>
+                      <th className="px-3 py-2 text-[10px] uppercase tracking-wide text-[#9A8262]">User</th>
+                      <th className="px-3 py-2 text-[10px] uppercase tracking-wide text-[#9A8262]">Follow-ups Due</th>
+                      <th className="px-3 py-2 text-[10px] uppercase tracking-wide text-[#9A8262]">Done</th>
+                      <th className="px-3 py-2 text-[10px] uppercase tracking-wide text-[#9A8262]">Visits Done</th>
+                      <th className="px-3 py-2 text-[10px] uppercase tracking-wide text-[#9A8262]">Compliance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(complianceReport?.rows || []).map((row: any) => (
+                      <tr key={row.userId || row.userName} className="border-t border-[#F2E8D4]">
+                        <td className="px-3 py-2.5 text-xs font-semibold text-[#2A1C00]">{row.userName || '-'}</td>
+                        <td className="px-3 py-2.5 text-xs text-[#5C4820]">{row.followupsDue ?? 0}</td>
+                        <td className="px-3 py-2.5 text-xs text-[#5C4820]">{row.followupsDone ?? 0}</td>
+                        <td className="px-3 py-2.5 text-xs text-[#5C4820]">{row.visitsDone ?? 0}</td>
+                        <td className="px-3 py-2.5 text-xs font-bold text-[#2A1C00]">{Math.round(Number(row.compliancePct || 0))}%</td>
+                      </tr>
+                    ))}
+                    {(!complianceReport?.rows || complianceReport.rows.length === 0) && (
+                      <tr>
+                        <td className="px-3 py-4 text-xs text-[#9A8262]" colSpan={5}>No compliance rows available.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Automated MIS Reports Block - Only for Admin and Manager */}
           {(currentUserRole?.toLowerCase() === 'admin' || currentUserRole?.toLowerCase() === 'adm' || currentUserRole?.toLowerCase() === 'manager') && (

@@ -54,6 +54,21 @@ export const apiService = {
 
   getWhatsAppMessages: (targetId: string): Promise<any> =>
     apiFetch(`/api/whatsapp/${targetId}`),
+  sendWhatsAppMessage: (payload: {
+    leadId?: string;
+    visitId?: string;
+    to?: string;
+    type: "text" | "image" | "video" | "document";
+    text?: string;
+    mediaUrl?: string;
+    caption?: string;
+    fileName?: string;
+    fromPhoneId?: string;
+    projectId?: string;
+  }): Promise<any> =>
+    apiFetch("/api/whatsapp/send", { method: "POST", body: JSON.stringify(payload) }),
+  sendOpenWindowGreeting: (payload: { leadId?: string; visitId?: string; to?: string; fromPhoneId?: string }): Promise<any> =>
+    apiFetch("/api/whatsapp/send-open-window-greeting", { method: "POST", body: JSON.stringify(payload) }),
 
   saveRemark: (targetId: string, data: any): Promise<any> =>
     apiFetch("/api/remarks", { method: "POST", body: JSON.stringify({ targetId, remark: data }) }),

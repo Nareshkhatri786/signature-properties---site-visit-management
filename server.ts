@@ -12,6 +12,7 @@ import webPush from "web-push";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import { processIncomingWhatsAppMessage } from "./src/lib/whatsapp-ai-bot.js";
+import { WhatsAppService } from "./src/lib/whatsapp-service.js";
 
 const PUBLIC_VAPID_KEY = process.env.PUBLIC_VAPID_KEY || "BLraqx6JI2_b6uK3Q83waVcP2n8JXaAhzdPWrVJnqHhfLhusM8AextWDWwPx0_y51Ua9XxY-g-D4FvgJomgMpBE";
 const PRIVATE_VAPID_KEY = process.env.PRIVATE_VAPID_KEY || "6d9cRb3i51P9Qw0niJSkTQ5_mGuK-Dqz2Wcj-itMUPQ";
@@ -71,6 +72,30 @@ function formatMySQLDateOnly(isoString: string | null) {
     }
     return null;
   }
+}
+
+const OPEN_WINDOW_GREETINGS = [
+  "Good morning Sir/Madam. Hope you are doing well. Aaj aapko project related koi update chahiye ho to main turant share kar sakta hoon.",
+  "Jay Shree Krishna Sir. Kem chho? Royal Rudraksha vishe short update joiye to hu havej mokli dau.",
+  "Namaste Sir/Madam. Aapki convenience ke hisaab se aaj ek short site visit slot arrange kar sakte hain.",
+  "Good morning. Premium family homes ke latest availability aur visit slots ready hain, jab aap bolo share kar deta hoon.",
+  "Jay Shree Krishna. Aaje sanje 5-7 athva kal savare 11-1 maathi koi slot comfortable hoy to janavo."
+];
+
+function isWithin24hWindow(lastClientReplyAt: any) {
+  if (!lastClientReplyAt) return false;
+  const d = new Date(lastClientReplyAt);
+  if (isNaN(d.getTime())) return false;
+  return ((Date.now() - d.getTime()) / (1000 * 60 * 60)) < 24;
+}
+
+function pickRotatingGreeting(seed: string) {
+  const daySeed = new Date().toISOString().slice(0, 10);
+  const raw = `${seed || ""}_${daySeed}`;
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+  const idx = Math.abs(hash) % OPEN_WINDOW_GREETINGS.length;
+  return OPEN_WINDOW_GREETINGS[idx];
 }
 
 function normalizeFollowUpMethod(method: any) {
@@ -902,6 +927,115 @@ async function startServer() {
     try {
       const rows = await query("SELECT * FROM whatsapp_messages WHERE leadId = ? ORDER BY timestamp DESC", [req.params.targetId]);
       res.json(rows);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/whatsapp/send", authMiddleware, async (req, res) => {
+    try {
+      const { leadId, visitId, to, type, text, mediaUrl, caption, fileName, fromPhoneId, projectId } = req.body || {};
+      const messageType = String(type || "text").toLowerCase();
+      if (!["text", "image", "video", "document"].includes(messageType)) {
+        return res.status(400).json({ error: "Invalid type. Use text/image/video/document." });
+      }
+
+      let lead: any = null;
+      let resolvedLeadId: string | null = cleanSqlId(leadId);
+      let resolvedProjectId: string | null = cleanSqlId(projectId);
+      let targetPhone = normalizePhoneNumber(String(to || ""));
+
+      if (!resolvedLeadId && visitId) {
+        const visit = await queryOne<any>("SELECT leadId, projectId, mobile FROM visits WHERE id = ? LIMIT 1", [visitId]);
+        if (visit?.leadId) resolvedLeadId = String(visit.leadId);
+        if (!resolvedProjectId && visit?.projectId) resolvedProjectId = String(visit.projectId);
+        if (!targetPhone && visit?.mobile) targetPhone = normalizePhoneNumber(String(visit.mobile));
+      }
+      if (resolvedLeadId) {
+        lead = await queryOne<any>("SELECT id, name, mobile, projectId, last_client_reply_at FROM leads WHERE id = ? LIMIT 1", [resolvedLeadId]);
+        if (lead?.mobile && !targetPhone) targetPhone = normalizePhoneNumber(String(lead.mobile));
+        if (!resolvedProjectId && lead?.projectId) resolvedProjectId = String(lead.projectId);
+      }
+      if (!targetPhone) return res.status(400).json({ error: "Recipient number missing." });
+
+      const openWindow = isWithin24hWindow(lead?.last_client_reply_at);
+      if (!openWindow) {
+        return res.status(400).json({
+          error: "24-hour window closed. Session messages/media are blocked. Wait for client reply or use approved template flow."
+        });
+      }
+
+      let waRes: any = null;
+      if (messageType === "text") {
+        const msg = String(text || "").trim();
+        if (!msg) return res.status(400).json({ error: "Text message is required." });
+        waRes = await WhatsAppService.sendSessionMessage(targetPhone, msg, fromPhoneId);
+      } else {
+        const link = String(mediaUrl || "").trim();
+        if (!link) return res.status(400).json({ error: "mediaUrl is required for image/video/document." });
+        waRes = await WhatsAppService.sendMediaMessage(
+          targetPhone,
+          link,
+          messageType as "image" | "video" | "document",
+          String(caption || "").trim() || undefined,
+          String(fileName || "").trim() || undefined,
+          fromPhoneId
+        );
+      }
+
+      if (!waRes?.success) {
+        return res.status(502).json({ error: "WhatsApp send failed", providerError: waRes?.error || null });
+      }
+
+      const outMsgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const content = messageType === "text"
+        ? String(text || "")
+        : `[${messageType.toUpperCase()}] ${String(caption || "").trim() || ""} ${String(mediaUrl || "").trim()}`.trim();
+      await pool.execute(
+        `INSERT INTO whatsapp_messages (id,leadId,senderName,senderPhoneNumber,content,timestamp,type,projectId) VALUES (?,?,?,?,?,?,?,?)`,
+        [outMsgId, resolvedLeadId || null, "CRM Sender", targetPhone, content, formatMySQLDate(new Date().toISOString()), "outgoing", resolvedProjectId || null]
+      );
+
+      res.json({ success: true, messageId: waRes.messageId || null, openWindow });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/whatsapp/send-open-window-greeting", authMiddleware, async (req, res) => {
+    try {
+      const { leadId, visitId, to, fromPhoneId } = req.body || {};
+      let lead: any = null;
+      let targetPhone = normalizePhoneNumber(String(to || ""));
+      let resolvedLeadId: string | null = cleanSqlId(leadId);
+      let resolvedProjectId: string | null = null;
+
+      if (!resolvedLeadId && visitId) {
+        const visit = await queryOne<any>("SELECT leadId, projectId, mobile FROM visits WHERE id = ? LIMIT 1", [visitId]);
+        if (visit?.leadId) resolvedLeadId = String(visit.leadId);
+        if (visit?.projectId) resolvedProjectId = String(visit.projectId);
+        if (!targetPhone && visit?.mobile) targetPhone = normalizePhoneNumber(String(visit.mobile));
+      }
+      if (resolvedLeadId) {
+        lead = await queryOne<any>("SELECT id, name, mobile, projectId, last_client_reply_at FROM leads WHERE id = ? LIMIT 1", [resolvedLeadId]);
+        if (lead?.mobile && !targetPhone) targetPhone = normalizePhoneNumber(String(lead.mobile));
+        if (!resolvedProjectId && lead?.projectId) resolvedProjectId = String(lead.projectId);
+      }
+      if (!targetPhone) return res.status(400).json({ error: "Recipient number missing." });
+      if (!isWithin24hWindow(lead?.last_client_reply_at)) {
+        return res.status(400).json({ error: "Greeting blocked: only send inside open 24-hour window." });
+      }
+
+      const greeting = pickRotatingGreeting(String(resolvedLeadId || targetPhone));
+      const waRes = await WhatsAppService.sendSessionMessage(targetPhone, greeting, fromPhoneId);
+      if (!waRes?.success) return res.status(502).json({ error: "WhatsApp send failed", providerError: waRes?.error || null });
+
+      const outMsgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      await pool.execute(
+        `INSERT INTO whatsapp_messages (id,leadId,senderName,senderPhoneNumber,content,timestamp,type,projectId) VALUES (?,?,?,?,?,?,?,?)`,
+        [outMsgId, resolvedLeadId || null, "CRM Greeting Bot", targetPhone, greeting, formatMySQLDate(new Date().toISOString()), "outgoing", resolvedProjectId || null]
+      );
+      res.json({ success: true, greeting, messageId: waRes.messageId || null });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

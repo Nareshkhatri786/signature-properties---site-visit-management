@@ -120,15 +120,15 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <ActionCountCard label="Overdue Follow-ups" value={vm.counts.overdueFollowups} tone="red" onClick={() => onNavigate('followups')} />
+        <ActionCountCard label="Overdue Follow-ups" value={vm.counts.overdueFollowups} tone="red" onClick={() => onNavigate('followups', undefined, { tab: 'overdue' })} />
         <ActionCountCard label="Today's Visits" value={vm.counts.todayVisits} tone="blue" onClick={() => onNavigate('visits', undefined, { period: 'today' })} />
-        <ActionCountCard label="Negotiations" value={vm.counts.pendingNegotiations || 0} tone="amber" onClick={() => onNavigate('followups')} />
-        <ActionCountCard label="My Pending Tasks" value={vm.counts.myPendingTasks} tone="amber" onClick={() => onNavigate('followups')} />
+        <ActionCountCard label="Negotiations" value={vm.counts.pendingNegotiations || 0} tone="amber" onClick={() => onNavigate('followups', undefined, { tab: 'all', stage: 'Negotiation' })} />
+        <ActionCountCard label="My Pending Tasks" value={vm.counts.myPendingTasks} tone="amber" onClick={() => onNavigate('followups', undefined, { tab: 'all', assignee: 'me' })} />
         <ActionCountCard label="Hot Leads" value={vm.counts.hotLeads} tone="orange" onClick={() => onNavigate('leads', undefined, { quality: 'hot' })} />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <ActionCountCard label="SLA Breaches" value={slaStatus?.summary?.totalBreaches || 0} tone="red" onClick={() => onNavigate('followups')} />
+        <ActionCountCard label="SLA Breaches" value={slaStatus?.summary?.totalBreaches || 0} tone="red" onClick={() => onNavigate('followups', undefined, { tab: 'overdue' })} />
         <ActionCountCard label="First Response Breach" value={slaStatus?.summary?.firstResponseBreaches || 0} tone="amber" onClick={() => onNavigate('leads')} />
         <ActionCountCard label="Missed Visit Outcomes" value={slaStatus?.summary?.missedVisitOutcomes || 0} tone="red" onClick={() => onNavigate('visits')} />
         <ActionCountCard label="Stale Hot Leads" value={slaStatus?.summary?.staleHotLeads || 0} tone="orange" onClick={() => onNavigate('leads', undefined, { quality: 'hot' })} />
@@ -213,9 +213,12 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
           onAction={() => onNavigate('followups')}
           items={vm.overdueFollowups.map((f) => ({
             id: f.id,
-            primary: f.userName || 'Unassigned',
-            secondary: `${normalizeDate(f.date)} • ${f.method}`,
-            onClick: () => onNavigate('followups')
+            primary:
+              leads.find((l) => String(l.id) === String(f.leadId || ''))?.name ||
+              visits.find((v) => String(v.id) === String(f.visitId || ''))?.client_name ||
+              f.userName || 'Auto-generated Follow-up',
+            secondary: `${f.purpose || 'Auto-generated Follow-up'} • ${normalizeDate(f.date)} • ${f.method}`,
+            onClick: () => onNavigate('followups', undefined, { tab: 'overdue', search: leads.find((l) => String(l.id) === String(f.leadId || ''))?.name || '' })
           }))}
         />
 
@@ -238,12 +241,15 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
           icon={<Clock size={16} className="text-amber-600" />}
           emptyText="No pending tasks."
           actionText="Open Follow-ups"
-          onAction={() => onNavigate('followups')}
+          onAction={() => onNavigate('followups', undefined, { tab: 'all', assignee: 'me' })}
           items={vm.myPendingTasks.map((f) => ({
             id: f.id,
-            primary: f.purpose || 'Pending follow-up',
-            secondary: `${normalizeDate(f.date)} • ${f.method}`,
-            onClick: () => onNavigate('followups')
+            primary:
+              leads.find((l) => String(l.id) === String(f.leadId || ''))?.name ||
+              visits.find((v) => String(v.id) === String(f.visitId || ''))?.client_name ||
+              'Pending follow-up',
+            secondary: `${f.purpose || 'Auto-generated Follow-up'} • ${normalizeDate(f.date)} • ${f.method}`,
+            onClick: () => onNavigate('followups', undefined, { tab: 'all', assignee: 'me' })
           }))}
         />
 
@@ -252,12 +258,15 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
           icon={<Target size={16} className="text-amber-600" />}
           emptyText="No pending negotiations."
           actionText="Open Follow-ups"
-          onAction={() => onNavigate('followups')}
+          onAction={() => onNavigate('followups', undefined, { tab: 'all', stage: 'Negotiation' })}
           items={vm.pendingNegotiations.map((f) => ({
             id: f.id,
-            primary: f.userName || 'Unassigned',
+            primary:
+              leads.find((l) => String(l.id) === String(f.leadId || ''))?.name ||
+              visits.find((v) => String(v.id) === String(f.visitId || ''))?.client_name ||
+              f.userName || 'Unassigned',
             secondary: `${f.purpose || 'Negotiation'} • ${normalizeDate(f.date)}`,
-            onClick: () => onNavigate('followups')
+            onClick: () => onNavigate('followups', undefined, { tab: 'all', stage: 'Negotiation' })
           }))}
         />
 

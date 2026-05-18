@@ -130,6 +130,7 @@ export default function App() {
   const [initError, setInitError] = useState<string | null>(null);
   const [activeVisitFilters, setActiveVisitFilters] = useState<VisitFilters | null>(null);
   const [activeLeadFilters, setActiveLeadFilters] = useState<LeadFilters | null>(null);
+  const [activeFollowUpFilters, setActiveFollowUpFilters] = useState<any | null>(null);
   const [followUpPromptData, setFollowUpPromptData] = useState<{ leadId?: string, visitId?: string, projectId: string, clientName: string, mandatory?: boolean } | null>(null);
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [preferredFollowUpMethod, setPreferredFollowUpMethod] = useState<FollowUpMethod>('call');
@@ -514,11 +515,16 @@ export default function App() {
     
     if (page === 'visits') {
       setActiveVisitFilters(filters || null);
+      setActiveFollowUpFilters(null);
     } else if (page === 'leads') {
       setActiveLeadFilters(filters || null);
+      setActiveFollowUpFilters(null);
+    } else if (page === 'followups') {
+      setActiveFollowUpFilters(filters || null);
     } else {
       setActiveVisitFilters(null);
       setActiveLeadFilters(null);
+      setActiveFollowUpFilters(null);
     }
     
     if (page !== 'whatsapp') setGeneratedMessage(null);
@@ -1497,6 +1503,7 @@ export default function App() {
               projects={projects}
               user={user}
               users={users}
+              initialFilters={activeFollowUpFilters}
               onUpdateStatus={(id, status, note) => {
                 handleUpdateFollowUp(id, {
                   status,

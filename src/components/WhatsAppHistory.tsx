@@ -1,8 +1,7 @@
 import React from 'react';
 import { WhatsAppMessage } from '../types';
-import { cn } from '../lib/utils';
+import { cn, formatOperationalDateTime } from '../lib/utils';
 import { MessageSquare, Clock, ArrowRight, ArrowLeft } from 'lucide-react';
-import { format } from 'date-fns';
 
 interface WhatsAppHistoryProps {
   messages: WhatsAppMessage[];
@@ -46,7 +45,7 @@ export default function WhatsAppHistory({ messages }: WhatsAppHistoryProps) {
                </span>
                <div className="flex items-center gap-1.5 text-[9px] font-bold text-[#9A8262] bg-white/50 px-1.5 py-0.5 rounded shadow-inner">
                  <Clock size={10} />
-                 {format(new Date(msg.timestamp), 'dd MMM, hh:mm a')}
+                 {formatOperationalDateTime(msg.timestamp)}
                </div>
              </div>
 

@@ -18,8 +18,7 @@ import {
   History as HistoryIcon
 } from 'lucide-react';
 import { Activity, ActivityType, Remark, CallLog, FollowUp } from '../types';
-import { cn } from '../lib/utils';
-import { format, isToday, isYesterday } from 'date-fns';
+import { cn, formatOperationalDateTime, getTimelineDateSectionLabel } from '../lib/utils';
 
 interface TimelineItem {
   id: string;
@@ -180,22 +179,14 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
 
   // Group by date
   const groupedItems = useMemo(() => {
-    const groups: Record<string, TimelineItem[]> = {
-      'Today': [],
-      'Yesterday': [],
-      'Earlier': []
-    };
-
-    filteredItems.forEach((item, index) => {
-      if (index >= limit) return; 
-
-      const date = new Date(item.timestamp);
-      if (isToday(date)) groups['Today'].push(item);
-      else if (isYesterday(date)) groups['Yesterday'].push(item);
-      else groups['Earlier'].push(item);
-    });
-
-    return groups;
+    const limited = filteredItems.slice(0, limit);
+    const map = new Map<string, TimelineItem[]>();
+    for (const item of limited) {
+      const label = getTimelineDateSectionLabel(item.timestamp);
+      if (!map.has(label)) map.set(label, []);
+      map.get(label)!.push(item);
+    }
+    return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
   }, [filteredItems, limit]);
 
   const hasItems = filteredItems.length > 0;
@@ -229,19 +220,19 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
 
       <div className="relative space-y-8 before:absolute before:left-5 before:top-2 before:bottom-2 before:w-px before:bg-[#E6D8B8]/50">
         {hasItems ? (
-          (['Today', 'Yesterday', 'Earlier'] as const).map(group => (
-            groupedItems[group].length > 0 && (
-              <div key={group} className="space-y-4">
+          groupedItems.map(group => (
+            group.items.length > 0 && (
+              <div key={group.label} className="space-y-4">
                 <div className="flex items-center gap-3 ml-2 mb-6">
                   <div className="h-px bg-[#C9A84C]/30 flex-1" />
                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9A8262] bg-[#FFFDF6] px-3 py-1 rounded-full border border-[#E6D8B8]/50 shadow-sm">
-                    {group}
+                    {group.label}
                   </span>
                   <div className="h-px bg-[#C9A84C]/30 flex-1" />
                 </div>
 
-                <div className="space-y-6">
-                  {groupedItems[group].map((item) => (
+                <div className="space-y-4">
+                  {group.items.map((item) => (
                     <div key={item.id} className="relative pl-12 group/item">
                       <div className={cn(
                         "absolute left-0 top-1 w-10 h-10 rounded-xl border-4 border-[#F2ECD8] flex items-center justify-center transition-all shadow-sm z-10 group-hover/item:scale-110",
@@ -250,8 +241,8 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                         <item.icon size={16} />
                       </div>
 
-                      <div className="bg-white border border-[#E6D8B8] rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="bg-white border border-[#E6D8B8] rounded-xl p-3 shadow-sm">
+                        <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <h4 className={cn("text-[11px] font-black uppercase tracking-wider", getTextClass(item.color, true))}>
@@ -267,8 +258,8 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                             <div className="flex items-center gap-3">
                               <time className="text-[10px] font-bold text-[#9A8262] flex items-center gap-1">
                                 <Clock size={10} />
-                                {new Date(item.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}
-                                {item.lastTimestamp && ` (Last at ${new Date(item.lastTimestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })})`}
+                                {formatOperationalDateTime(item.timestamp)}
+                                {item.lastTimestamp && ` (Last: ${formatOperationalDateTime(item.lastTimestamp)})`}
                               </time>
                               <div className="flex items-center gap-2 text-[10px] font-bold text-[#9A8262]">
                                 <UserIcon size={10} />
@@ -297,7 +288,7 @@ export default function ActivityTimeline({ activities, remarks, callLogs, follow
                                     <div className="flex items-center justify-between gap-2 mb-0.5">
                                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#9A8262]">{sub.title}</p>
                                       <span className="text-[9px] font-bold text-[#9A8262] opacity-50">
-                                        {new Date(sub.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}
+                                        {formatOperationalDateTime(sub.timestamp)}
                                       </span>
                                     </div>
                                     <p className="text-[#2A1C00] text-sm font-medium leading-relaxed">{sub.description}</p>

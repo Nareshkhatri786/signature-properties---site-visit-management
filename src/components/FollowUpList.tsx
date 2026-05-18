@@ -5,7 +5,7 @@ import {
   Download, RefreshCw, Bell, BellRing, ChevronDown, CheckSquare, Users, Edit3, Zap
 } from 'lucide-react';
 import { FollowUp, Lead, Visit, Page, VisitFilters, User as UserType, Project } from '../types';
-import { cn, getLocalDateString, formatDate, formatDateTime } from '../lib/utils';
+import { cn, getLocalDateString, formatDate, formatDateTime, formatOperationalDateTime } from '../lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
@@ -478,7 +478,7 @@ export default function FollowUpList({ followUps, leads, visits, projects, user,
                     <td className="px-4 py-3">
                       {f.lastContactDate ? (
                         <>
-                          <p className="text-xs font-semibold text-[#2A1C00]">{formatDate(f.lastContactDate)}</p>
+                          <p className="text-xs font-semibold text-[#2A1C00]">{formatOperationalDateTime(f.lastContactDate)}</p>
                           <p className="text-[10px] text-[#9A8262]">{differenceInDays(new Date(), new Date(f.lastContactDate!))} days ago</p>
                         </>
                       ) : (

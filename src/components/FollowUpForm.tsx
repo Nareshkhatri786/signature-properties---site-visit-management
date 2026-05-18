@@ -98,8 +98,8 @@ export default function FollowUpForm({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-      <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[95dvh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-3">
+      <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-lg w-full max-w-md overflow-hidden max-h-[95dvh] flex flex-col">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between shrink-0">
@@ -112,7 +112,7 @@ export default function FollowUpForm({
         </div>
         
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 safe-action-pad">
             {/* Client Context Info */}
             <div className="p-3 bg-[#C9A84C]/5 border border-[#C9A84C]/20 rounded-lg">
               <p className="text-[10px] text-[#9A8262] uppercase font-bold tracking-wider mb-0.5">Client Name</p>
@@ -133,10 +133,10 @@ export default function FollowUpForm({
                         key={m.id}
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, method: m.id as FollowUpMethod }))}
-                        className={cn(
-                          "flex items-center justify-center gap-2 p-2.5 border rounded-xl transition-all",
+                    className={cn(
+                          "flex items-center justify-center gap-2 p-2 border rounded-lg transition-colors",
                           formData.method === m.id 
-                            ? "bg-[#C9A84C] border-[#C9A84C] text-white shadow-sm" 
+                            ? "bg-[#C9A84C] border-[#C9A84C] text-white" 
                             : "bg-white border-[#E6D8B8] text-[#9A8262] hover:border-[#C9A84C]/50"
                         )}
                       >
@@ -197,12 +197,12 @@ export default function FollowUpForm({
           </div>
 
           {/* Action Buttons */}
-          <div className="p-4 md:p-6 border-t border-[#E6D8B8] bg-[#FDFAF2] flex flex-col gap-3 shrink-0">
+          <div className="sticky bottom-0 left-0 right-0 p-3 border-t border-[#E6D8B8] bg-[#FDFAF2] flex flex-col gap-2 shrink-0 safe-bottom">
             {!isCompleting && followUp && (
               <button 
                 type="button"
                 onClick={() => setIsCompleting(true)}
-                className="w-full bg-emerald-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 text-sm"
+                className="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-lg shadow-sm hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 text-sm"
               >
                 <CheckCircle2 size={18} /> Mark as Completed
               </button>
@@ -212,14 +212,14 @@ export default function FollowUpForm({
               <button 
                 type="button"
                 onClick={() => isCompleting ? setIsCompleting(false) : onClose()}
-                className="flex-1 px-4 py-3 border border-[#E6D8B8] text-[#9A8262] font-bold rounded-lg hover:bg-gray-50 transition-all text-sm"
+                className="flex-1 px-4 py-2.5 border border-[#E6D8B8] text-[#9A8262] font-bold rounded-lg hover:bg-gray-50 transition-colors text-sm"
               >
                 {isCompleting ? 'Back' : 'Cancel'}
               </button>
               <button 
                 type="submit"
                 className={cn(
-                  "flex-1 font-bold py-3 rounded-lg shadow-md transition-all flex items-center justify-center gap-2 text-sm",
+                  "flex-1 font-bold py-2.5 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 text-sm",
                   isCompleting 
                     ? "bg-emerald-600 text-white hover:bg-emerald-700" 
                     : "bg-[#C9A84C] text-white hover:bg-[#B69741]"

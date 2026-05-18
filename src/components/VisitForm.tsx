@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Save, User, Phone, Calendar, Clock, Share2, UserCheck, Wallet, Home, StickyNote, UserPlus, MessageSquare, Star } from 'lucide-react';
+import { ArrowLeft, Save, User, Phone, Calendar, Clock, Share2, UserCheck, Wallet, Home, StickyNote, UserPlus, MessageSquare, Star, CheckCircle2 } from 'lucide-react';
 import { Visit, Remark, LeadQuality, VisitStatus, Lead, LeadStatus, Settings, User as AppUser } from '../types';
 import { generateId } from '../lib/storage';
 import { toast } from 'react-hot-toast';
@@ -123,7 +123,7 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-4 max-w-5xl mx-auto pb-24">
       <div className="flex items-center justify-between">
         <h2 className="font-['Cormorant_Garamond'] text-2xl font-bold text-[#2A1C00] flex items-center gap-2">
           <UserPlus className="text-[#C9A84C]" />
@@ -137,13 +137,13 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 space-y-4">
           <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2]">
-              <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00]">Client Information</h3>
+            <div className="px-4 py-3 border-b border-[#E6D8B8] bg-[#FDFAF2]">
+              <h3 className="text-base font-bold text-[#2A1C00]">Client Information</h3>
             </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               {leads.length > 0 && (
                 <div className="md:col-span-2 space-y-1.5">
                   <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
@@ -331,10 +331,10 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
           </div>
 
           <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2]">
-              <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00]">Initial Remark</h3>
+            <div className="px-4 py-3 border-b border-[#E6D8B8] bg-[#FDFAF2]">
+              <h3 className="text-base font-bold text-[#2A1C00]">Initial Remark</h3>
             </div>
-            <div className="p-6">
+            <div className="p-4">
               <textarea 
                 name="initial_remark"
                 value={formData.initial_remark}
@@ -347,13 +347,13 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
           </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2]">
-              <h3 className="font-['Cormorant_Garamond'] text-lg font-bold text-[#2A1C00]">Status</h3>
+            <div className="px-4 py-3 border-b border-[#E6D8B8] bg-[#FDFAF2]">
+              <h3 className="text-base font-bold text-[#2A1C00]">Status</h3>
             </div>
-            <div className="p-6 space-y-6">
-              <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-[#E6D8B8]">
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-[#E6D8B8]">
                 <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Priority</label>
                 <div className="flex gap-1">
                   {[1, 2, 3].map((star) => (
@@ -426,26 +426,39 @@ export default function VisitForm({ onSave, onCancel, initialLeadId, leads = [],
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-[#F0FAF5] to-[#E8F8EF] border border-[#A9DFBF] rounded-xl p-6 shadow-sm">
+          <div className="bg-gradient-to-br from-[#F0FAF5] to-[#E8F8EF] border border-[#A9DFBF] rounded-xl p-4 shadow-sm">
             <p className="text-[#1A6B3C] text-sm leading-relaxed mb-6">
               <span className="font-bold flex items-center gap-2 mb-2">
                 <MessageSquare size={16} className="text-[#25D366]" /> WhatsApp Ready
               </span>
               After saving, you can send a personalized welcome message or follow-up directly to the client.
             </p>
-            <button 
+            <p className="text-xs text-[#1A6B3C]">Use the sticky action bar below to save quickly from anywhere in this form.</p>
+          </div>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-[#E6D8B8] bg-[#FDFAF2] p-3 safe-bottom">
+          <div className="max-w-5xl mx-auto flex gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 py-2.5 border border-[#E6D8B8] rounded-lg text-[#9A8262] font-bold text-sm hover:bg-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-gradient-to-r from-[#C9A84C] to-[#E8C97A] text-[#1C1207] font-bold py-3 rounded-lg shadow-md hover:translate-y-[-1px] hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-[1.3] bg-[#C9A84C] text-[#1C1207] font-bold py-2.5 rounded-lg shadow-sm transition-colors active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-[#1C1207]/30 border-t-[#1C1207] rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-[#1C1207]/30 border-t-[#1C1207] rounded-full animate-spin" />
                   Saving...
                 </>
               ) : (
                 <>
-                  <Save size={18} /> Save Visit
+                  <Save size={16} /> Save Visit
                 </>
               )}
             </button>

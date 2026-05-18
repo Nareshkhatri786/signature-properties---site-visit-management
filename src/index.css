@@ -28,11 +28,15 @@
   }
 
   .safe-bottom {
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .safe-action-pad {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
   }
 
   .glass-effect {
-    @apply backdrop-blur-md bg-white/80 border border-white/20;
+    @apply bg-white border border-[#E6D8B8];
   }
 
   /* Custom scrollbar for cleaner mobile look */
@@ -46,4 +50,3 @@
     @apply bg-[#C9A84C]/20 rounded-full;
   }
 }
-

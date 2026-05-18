@@ -26,7 +26,6 @@ import { StatusBadge, VisitBadge } from './Dashboard';
 import { User as UserIcon } from 'lucide-react';
 import { FollowUpStatusBadge } from './FollowUpStatusBadge';
 import { getLeadFollowUp, getFollowUpDisplayStatus } from '../lib/followupUtils';
-import { motion, AnimatePresence } from 'motion/react';
 import VisitKanbanBoard from './VisitKanbanBoard';
 
 interface VisitListProps {
@@ -332,15 +331,12 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
         <div className="bg-[#FFFDF6] border border-[#E6D8B8] rounded-xl shadow-sm overflow-hidden">
         {/* Mobile View: Cards */}
         <div className="md:hidden divide-y divide-[#E6D8B8]/50">
-            {filteredVisits.length > 0 ? filteredVisits.map((v, idx) => {
+            {filteredVisits.length > 0 ? filteredVisits.map((v) => {
               const lead = leads.find(l => l.id === v.leadId);
               const isLost = lead?.status === 'lost';
               return (
-                <motion.div 
+                <div
                   key={v.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(idx * 0.03, 0.3) }}
                   className={cn("p-4 active:bg-[#C9A84C]/5 transition-colors border-l-4", {
                     'border-red-500': v.status === 'hot',
                     'border-orange-500': v.status === 'warm',
@@ -407,7 +403,7 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
                   </button>
                 </div>
               </div>
-                </motion.div>
+                </div>
               );
             }) : (
             <div className="p-10 text-center opacity-30">
@@ -558,15 +554,9 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
       </div>
       )}
 
-      <AnimatePresence>
-        {reschedulingVisit && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[70] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white border border-[#E6D8B8] rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden"
-            >
+      {reschedulingVisit && (
+          <div className="fixed inset-0 bg-black/40 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white border border-[#E6D8B8] rounded-xl shadow-lg w-full max-w-sm overflow-hidden">
               <div className="p-8">
                 <div className="w-16 h-16 bg-[#FDF8E6] text-[#C9A84C] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-[#F2ECD8]">
                   <RefreshCw size={32} />
@@ -616,10 +606,9 @@ export default function VisitList({ visits, remarks, users, projects, leads, fol
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -133,10 +133,10 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[92dvh] flex flex-col mx-auto">
-        <div className="px-6 py-4 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between shrink-0">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden max-h-[92dvh] flex flex-col mx-auto">
+        <div className="px-4 py-3 border-b border-[#E6D8B8] bg-[#FDFAF2] flex items-center justify-between shrink-0">
           <h3 className="font-['Cormorant_Garamond'] text-xl font-bold text-[#2A1C00] flex items-center gap-2">
             <UserPlus className="text-[#C9A84C]" />
             Add New Lead
@@ -147,9 +147,9 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-5 md:p-6 space-y-5">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 safe-action-pad">
             {/* Form Content */}
-            <div className="flex items-center justify-between bg-[#FDFAF2] p-3 rounded-xl border border-[#E6D8B8]">
+            <div className="flex items-center justify-between bg-[#FDFAF2] p-2.5 rounded-lg border border-[#E6D8B8]">
               <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Priority / Stars</label>
               <div className="flex gap-1.5">
                 {[1, 2, 3].map((star) => (
@@ -157,7 +157,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
                     key={star}
                     type="button"
                     onClick={() => setFormData({ ...formData, priority: formData.priority === star ? 0 : star })}
-                    className="transition-transform hover:scale-110 active:scale-95"
+                    className="transition-transform duration-100 hover:scale-105 active:scale-95"
                   >
                     <Star 
                       size={24} 
@@ -224,7 +224,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider">Quality</label>
                 <select 
@@ -276,7 +276,7 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
               </select>
             </div>
 
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 flex gap-2">
               <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
               <p className="text-[10px] text-blue-700 leading-relaxed">
                 <strong>Deduplication:</strong> The system checks if a lead with the same mobile number already exists to prevent duplicates.
@@ -284,18 +284,18 @@ export default function LeadForm({ onSave, onClose, existingLeads, sources, proj
             </div>
           </div>
 
-          <div className="p-4 md:p-6 border-t border-[#E6D8B8] bg-[#FDFAF2] flex gap-3 shrink-0">
+          <div className="sticky bottom-0 left-0 right-0 p-3 border-t border-[#E6D8B8] bg-[#FDFAF2] flex gap-2 shrink-0 safe-bottom">
             <button 
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 text-sm font-bold text-[#9A8262] hover:text-[#2A1C00] transition-colors"
+              className="flex-1 px-3 py-2.5 text-sm font-bold text-[#9A8262] border border-[#E6D8B8] rounded-lg hover:bg-white transition-colors"
             >
               Cancel
             </button>
             <button 
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 bg-gradient-to-r from-[#C9A84C] to-[#E8C97A] text-[#1C1207] font-bold py-3 rounded-xl shadow-lg hover:translate-y-[-1px] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              className="flex-1 bg-[#C9A84C] text-[#1C1207] font-bold py-2.5 rounded-lg shadow-sm transition-colors active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>

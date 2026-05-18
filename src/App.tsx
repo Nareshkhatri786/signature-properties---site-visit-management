@@ -39,7 +39,6 @@ import { apiService } from './lib/api-service';
 import { syncEngine } from './lib/syncEngine';
 import { useAppData, useStats, useSaveData } from './lib/queries';
 import { pushService, urlBase64ToUint8Array } from './lib/push-service';
-import { motion } from 'motion/react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { socketService } from './lib/socket';
 
@@ -381,31 +380,23 @@ export default function App() {
       <div className="min-h-[100dvh] bg-[#1C1207] flex items-center justify-center p-6">
         <div className="flex flex-col items-center gap-8 max-w-sm w-full text-center">
           {initError ? (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-red-500/10 border border-red-500/20 p-8 rounded-[2rem] shadow-2xl"
-            >
+            <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-2xl shadow-lg">
               <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
                 <X size={32} />
               </div>
               <h3 className="text-red-400 font-['Cormorant_Garamond'] text-2xl font-bold mb-4">Connection Failed</h3>
               <p className="text-red-400/70 text-sm mb-8 leading-relaxed">{initError}</p>
-              <button 
+              <button
                 onClick={() => window.location.reload()}
-                className="w-full bg-red-500 text-white py-3.5 rounded-xl font-bold text-sm tracking-widest uppercase hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                className="w-full bg-red-500 text-white py-3 rounded-lg font-bold text-sm tracking-widest uppercase hover:bg-red-600 transition-colors"
               >
                 Retry Connection
               </button>
-            </motion.div>
+            </div>
           ) : (
             <div className="flex flex-col items-center">
               <div className="relative mb-12">
-                <motion.div 
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                  className="w-24 h-24 border-2 border-[#C9A84C]/20 border-t-[#C9A84C] rounded-full shadow-[0_0_40px_rgba(201,168,76,0.15)]"
-                />
+                <div className="w-24 h-24 border-2 border-[#C9A84C]/20 border-t-[#C9A84C] rounded-full animate-spin" />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Home className="text-[#C9A84C]/40" size={24} />
                 </div>
@@ -930,13 +921,9 @@ export default function App() {
   if (isDataLoading) {
     return (
       <div className="fixed inset-0 bg-[#1C1207] flex flex-col items-center justify-center z-[100] p-6 text-center">
-        <motion.div 
-          animate={{ scale: [1, 1.05, 1], opacity: [0.5, 1, 0.5] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="w-20 h-20 bg-gradient-to-br from-[#C9A84C] to-[#E8C97A] rounded-3xl flex items-center justify-center text-[#1C1207] shadow-[0_0_50px_rgba(201,168,76,0.3)] mb-8"
-        >
+        <div className="w-20 h-20 bg-gradient-to-br from-[#C9A84C] to-[#E8C97A] rounded-3xl flex items-center justify-center text-[#1C1207] shadow-md mb-8">
           <Home size={40} />
-        </motion.div>
+        </div>
         <h2 className="font-['Cormorant_Garamond'] text-[#E8C97A] text-2xl font-bold mb-2">Signature Properties</h2>
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 bg-[#C9A84C] rounded-full animate-bounce [animation-delay:-0.3s]" />
@@ -945,19 +932,15 @@ export default function App() {
         </div>
         
         {showEmergencyReset && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-12 space-y-4"
-          >
+          <div className="mt-12 space-y-4">
             <p className="text-[#C9A84C]/60 text-xs max-w-[200px]">Taking longer than usual? Stale data might be causing a conflict.</p>
             <button 
               onClick={handleEmergencyReset}
-              className="bg-white/10 hover:bg-white/20 text-[#E8C97A] border border-[#C9A84C]/30 px-6 py-2 rounded-xl text-xs font-bold transition-all"
+              className="bg-white/10 hover:bg-white/20 text-[#E8C97A] border border-[#C9A84C]/30 px-6 py-2 rounded-xl text-xs font-bold transition-colors"
             >
               Clear Cache & Reset
             </button>
-          </motion.div>
+          </div>
         )}
       </div>
     );
@@ -1006,13 +989,7 @@ export default function App() {
               <p className="text-[10px] font-black text-[#C9A84C] uppercase tracking-[0.2em] animate-pulse">Loading Module...</p>
             </div>
           }>
-            <motion.div
-              key={currentPage + (selectedVisitId || '')}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-            >
+            <div key={currentPage + (selectedVisitId || '')}>
             {currentPage === 'today' && (
             <TodayOverview
               leads={filteredLeads}
@@ -1639,7 +1616,7 @@ export default function App() {
               onNavigate={navigate}
             />
           )}
-          </motion.div>
+          </div>
           </React.Suspense>
         </main>
       </div>
@@ -1662,6 +1639,7 @@ export default function App() {
             });
             logActivity('lead_created', processedLead.id, processedLead.name, `Source: ${processedLead.source}`);
             setIsLeadFormOpen(false);
+            navigate('lead-detail', processedLead.id);
           }}
           onClose={() => setIsLeadFormOpen(false)}
           existingLeads={leads}
@@ -1685,21 +1663,21 @@ export default function App() {
 
       {/* Follow-up Prompt Portal */}
       {followUpPromptData && !isFollowUpModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[60] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-[#E6D8B8] rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-[#FDF8E6] text-[#C9A84C] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-[#F2ECD8]">
+        <div className="fixed inset-0 bg-black/45 z-[60] flex items-center justify-center p-3 overflow-y-auto">
+          <div className="bg-white border border-[#E6D8B8] rounded-xl shadow-lg w-full max-w-sm overflow-hidden">
+            <div className="p-5 text-center">
+              <div className="w-12 h-12 bg-[#FDF8E6] text-[#C9A84C] rounded-xl flex items-center justify-center mx-auto mb-4 border border-[#F2ECD8]">
                 <CalendarCheck size={32} />
               </div>
-              <h3 className="font-['Cormorant_Garamond'] text-2xl font-bold text-[#2A1C00] mb-2">Schedule Next Step?</h3>
-              <p className="text-sm text-[#9A8262] mb-6 leading-relaxed">
+              <h3 className="font-bold text-lg text-[#2A1C00] mb-1">Schedule Next Step?</h3>
+              <p className="text-xs text-[#9A8262] mb-4 leading-relaxed">
                 The follow-up for <span className="font-bold text-[#5C4820]">{followUpPromptData.clientName}</span> is complete. 
                 Would you like to schedule the next follow-up now?
               </p>
 
-              <div className="space-y-3 mb-8">
+              <div className="space-y-2 mb-5">
                 <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider block text-left mb-1">Follow-up Method</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   {[
                     { id: 'call', label: 'Call', icon: Phone },
                     { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
@@ -1708,9 +1686,9 @@ export default function App() {
                       key={m.id}
                       onClick={() => setPreferredFollowUpMethod(m.id as FollowUpMethod)}
                       className={cn(
-                        "flex items-center justify-center gap-2 py-2.5 border rounded-xl transition-all",
+                        "flex items-center justify-center gap-2 py-2 border rounded-lg transition-colors",
                         preferredFollowUpMethod === m.id 
-                          ? "bg-[#C9A84C] border-[#C9A84C] text-white shadow-md shadow-[#C9A84C]/20" 
+                          ? "bg-[#C9A84C] border-[#C9A84C] text-white" 
                           : "bg-white border-[#E6D8B8] text-[#9A8262] hover:border-[#C9A84C]/50"
                       )}
                     >
@@ -1721,10 +1699,10 @@ export default function App() {
                 </div>
               </div>
               
-              <div className="flex flex-col gap-3">
-                <button 
+              <div className="flex flex-col gap-2">
+                <button
                   onClick={() => setIsFollowUpModalOpen(true)}
-                  className="w-full bg-[#C9A84C] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-[#C9A84C]/20 hover:bg-[#B59640] transition-all transform active:scale-95 flex items-center justify-center gap-2"
+                  className="w-full bg-[#C9A84C] text-white font-bold py-2.5 rounded-lg hover:bg-[#B59640] transition-colors active:scale-[0.99] flex items-center justify-center gap-2"
                 >
                   <Plus size={18} /> Schedule Next Follow-up
                 </button>
@@ -1733,13 +1711,13 @@ export default function App() {
                     setFollowUpPromptData(null);
                     setPreferredFollowUpMethod('call');
                   }}
-                  className="w-full bg-white border border-[#E6D8B8] text-[#9A8262] font-semibold py-3 rounded-xl hover:bg-[#FDFAF2] transition-colors"
+                  className="w-full bg-white border border-[#E6D8B8] text-[#9A8262] font-semibold py-2.5 rounded-lg hover:bg-[#FDFAF2] transition-colors"
                 >
                   Not now, maybe later
                 </button>
               </div>
             </div>
-            <div className="bg-[#FAF9F6] px-8 py-4 border-t border-[#F2ECD8] flex justify-center">
+            <div className="bg-[#FAF9F6] px-4 py-2 border-t border-[#F2ECD8] flex justify-center">
               <p className="text-[10px] text-[#9A8262] uppercase font-black tracking-widest opacity-60">Signature CRM Follow-up System</p>
             </div>
           </div>

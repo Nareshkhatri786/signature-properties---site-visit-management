@@ -538,7 +538,7 @@ async function startServer() {
 
       console.log(`[Data Debug] User: ${userFromDb.username}, Role: ${userFromDb.role}, isAdmin: ${isAdmin}`);
 
-      const [users, projects, leads, visits, followups, activities, call_logs, templates, webhook_configs, notifications, attendance, workflows, settingsRow] = await Promise.all([
+      const [users, projects, leads, visits, followups, activities, call_logs, templates, webhook_configs, notifications, attendance, workflows, inventory_units, settingsRow] = await Promise.all([
         // Only fetch columns needed by the frontend — avoids SELECT * overhead
         query("SELECT id, username, name, role, projectId, assignedProjectIds, workingHours, assignedLocation FROM users"),
         query("SELECT id, name, description, location, brochure_link, walkthrough_video, sample_house_video, testimonial_video, google_maps_link, ai_rules FROM projects"),
@@ -552,6 +552,7 @@ async function startServer() {
         query("SELECT id, userId, type, title, message, `read`, createdAt, isAdmin, metadata, date FROM notifications WHERE (userId = ? OR isAdmin = 1) ORDER BY createdAt DESC LIMIT 200", [userFromDb.id]),
         query(isAdmin ? "SELECT id, userId, date, checkIn, checkOut, status FROM attendance ORDER BY date DESC LIMIT 300" : "SELECT id, userId, date, checkIn, checkOut, status FROM attendance WHERE userId = ? ORDER BY date DESC LIMIT 300", isAdmin ? [] : [userFromDb.id]),
         query("SELECT id, name, description, isActive, `trigger`, conditions, actions, createdAt, updatedAt FROM workflows"),
+        query(`SELECT id, projectId, unitCode, unitTitle, inventoryUrl, status, shortlistedByLeadId, shortlistedByVisitId, note, updatedByUserId, updatedByUserName, created_at, updated_at FROM inventory_units ${isAdmin ? "" : "WHERE projectId = ?"} ORDER BY updated_at DESC`, isAdmin ? [] : [userFromDb.projectId]),
         queryOne("SELECT * FROM settings WHERE id = 'main'"),
       ]);
 
@@ -569,6 +570,7 @@ async function startServer() {
         call_logs,
         templates,
         notifications, webhook_configs, settings, workflows,
+        inventory_units,
         currentUser: safeCurrentUser
       });
     } catch (e: any) {
@@ -825,6 +827,27 @@ async function startServer() {
            ON DUPLICATE KEY UPDATE company=VALUES(company),phone=VALUES(phone),address=VALUES(address),sources=VALUES(sources),budgets=VALUES(budgets),propertyInterests=VALUES(propertyInterests)`,
           [d.company||null,d.phone||null,d.address||null,d.sources||null,d.budgets||null,d.propertyInterests||null]
         );
+      } else if (col === "inventory_units") {
+        await pool.execute(
+          `INSERT INTO inventory_units (id,projectId,unitCode,unitTitle,inventoryUrl,status,shortlistedByLeadId,shortlistedByVisitId,note,updatedByUserId,updatedByUserName,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+           ON DUPLICATE KEY UPDATE projectId=VALUES(projectId),unitCode=VALUES(unitCode),unitTitle=VALUES(unitTitle),inventoryUrl=VALUES(inventoryUrl),status=VALUES(status),shortlistedByLeadId=VALUES(shortlistedByLeadId),shortlistedByVisitId=VALUES(shortlistedByVisitId),note=VALUES(note),updatedByUserId=VALUES(updatedByUserId),updatedByUserName=VALUES(updatedByUserName),updated_at=VALUES(updated_at)`,
+          [
+            data.id,
+            cleanSqlId(data.projectId),
+            data.unitCode || null,
+            data.unitTitle || null,
+            data.inventoryUrl || null,
+            normalizeSetValue(data.status, new Set(["available", "shortlisted", "hold", "sold", "booked"]), "shortlisted"),
+            cleanSqlId(data.shortlistedByLeadId),
+            cleanSqlId(data.shortlistedByVisitId),
+            data.note || null,
+            cleanSqlId(data.updatedByUserId),
+            data.updatedByUserName || null,
+            formatMySQLDate(data.created_at || new Date().toISOString()),
+            formatMySQLDate(data.updated_at || new Date().toISOString())
+          ]
+        );
       } else if (col === "templates") {
         await pool.execute(
           `INSERT INTO templates (id,name,type,message,fileData,fileName,fileType,active) VALUES (?,?,?,?,?,?,?,?)
@@ -895,7 +918,8 @@ async function startServer() {
         leads: "leads", visits: "visits", followups: "followups",
         activities: "activities", call_logs: "call_logs", templates: "templates",
         webhook_configs: "webhook_configs", users: "users", projects: "projects",
-        notifications: "notifications", attendance: "attendance", workflows: "workflows"
+        notifications: "notifications", attendance: "attendance", workflows: "workflows",
+        inventory_units: "inventory_units"
       };
       const table = tableMap[col];
       if (!table) return res.status(400).json({ error: "Unknown collection" });
@@ -1971,6 +1995,28 @@ async function startServer() {
     } catch (e) { console.error("[Reminder Maintenance]", e); }
   }
   setInterval(runReminderMaintenance, 10 * 60 * 1000);
+
+  // Ensure inventory table exists for unit shortlist/hold/booked workflow
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS inventory_units (
+      id VARCHAR(100) PRIMARY KEY,
+      projectId VARCHAR(50) NOT NULL,
+      unitCode VARCHAR(100) NOT NULL,
+      unitTitle VARCHAR(255) NULL,
+      inventoryUrl TEXT NULL,
+      status ENUM('available','shortlisted','hold','sold','booked') DEFAULT 'shortlisted',
+      shortlistedByLeadId VARCHAR(100) NULL,
+      shortlistedByVisitId VARCHAR(100) NULL,
+      note TEXT NULL,
+      updatedByUserId INT NULL,
+      updatedByUserName VARCHAR(255) NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_inv_project (projectId),
+      INDEX idx_inv_status (status),
+      INDEX idx_inv_unit (unitCode)
+    ) ENGINE=InnoDB
+  `);
 
   // -- VITE / STATIC SERVE --------------------------------
   if (process.env.NODE_ENV !== "production") {

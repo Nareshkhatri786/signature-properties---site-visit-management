@@ -290,6 +290,28 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
 ) ENGINE=InnoDB;
 
 -- ============================================================
+-- INVENTORY UNITS (Shortlist / Hold / Booked / Sold)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS inventory_units (
+  id                 VARCHAR(100) PRIMARY KEY,
+  projectId          VARCHAR(50) NOT NULL,
+  unitCode           VARCHAR(100) NOT NULL,
+  unitTitle          VARCHAR(255),
+  inventoryUrl       TEXT,
+  status             ENUM('available','shortlisted','hold','sold','booked') DEFAULT 'shortlisted',
+  shortlistedByLeadId VARCHAR(100),
+  shortlistedByVisitId VARCHAR(100),
+  note               TEXT,
+  updatedByUserId    INT,
+  updatedByUserName  VARCHAR(255),
+  created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_inv_project (projectId),
+  INDEX idx_inv_status (status),
+  INDEX idx_inv_unit (unitCode)
+) ENGINE=InnoDB;
+
+-- ============================================================
 -- PUSH SUBSCRIPTIONS (WEB PUSH)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS push_subscriptions (

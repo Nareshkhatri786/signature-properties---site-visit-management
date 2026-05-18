@@ -7,7 +7,7 @@ export type VisitNextStep = 'callback' | 'revisit' | 'negotiation' | 'close_lead
 
 export type TemplateType = 'reminder' | 'welcome' | 'thank_you' | 'follow_up' | 'custom';
 
-export type Page = 'today' | 'dashboard' | 'leads' | 'lead-detail' | 'visits' | 'add-visit' | 'detail' | 'whatsapp' | 'templates' | 'settings' | 'reports' | 'webhooks' | 'followups' | 'hrms' | 'workflow' | 'visit-analysis';
+export type Page = 'today' | 'dashboard' | 'leads' | 'lead-detail' | 'visits' | 'add-visit' | 'detail' | 'whatsapp' | 'templates' | 'settings' | 'reports' | 'webhooks' | 'followups' | 'hrms' | 'workflow' | 'visit-analysis' | 'inventory';
 
 export type CallOutcome = 'answered' | 'not_answered' | 'busy' | 'switched_off';
 
@@ -302,6 +302,24 @@ export interface Workflow {
   }[];
   createdAt: string;
   updatedAt: string;
+}
+
+export type InventoryStatus = 'available' | 'shortlisted' | 'hold' | 'sold' | 'booked';
+
+export interface InventoryUnit {
+  id: string;
+  projectId: string;
+  unitCode: string;
+  unitTitle?: string;
+  inventoryUrl?: string;
+  status: InventoryStatus;
+  shortlistedByLeadId?: string | null;
+  shortlistedByVisitId?: string | null;
+  note?: string | null;
+  updatedByUserId?: number | null;
+  updatedByUserName?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ComplianceUserRow {

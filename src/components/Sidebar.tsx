@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, CalendarCheck, UserPlus, Users, Webhook, MessageSquare, Layers, Settings, LogOut, Home, X, BarChart2, Bell, History as HistoryIcon, UserCheck, Zap, Sun, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, CalendarCheck, UserPlus, Users, Webhook, MessageSquare, Layers, Settings, LogOut, Home, X, BarChart2, Bell, History as HistoryIcon, UserCheck, Zap, Sun, TrendingUp, Building2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Page, User } from '../types';
 
@@ -22,6 +22,7 @@ export default function Sidebar({ isOpen, onClose, currentPage, onNavigate, onLo
     { id: 'hrms', label: 'HRMS & Attendance', icon: UserCheck, section: 'Main' },
     { id: 'followups', label: 'Follow-ups', icon: Bell, section: 'Main' },
     { id: 'visits', label: 'Site Visits', icon: CalendarCheck, section: 'Main' },
+    { id: 'inventory', label: 'Inventory', icon: Building2, section: 'Main' },
     { id: 'visit-analysis', label: 'Visit Analytics', icon: TrendingUp, section: 'Main' },
     { id: 'reports', label: 'Reports & Audit', icon: BarChart2, section: 'Main' },
     { id: 'whatsapp', label: 'WhatsApp Send', icon: MessageSquare, section: 'Communication' },

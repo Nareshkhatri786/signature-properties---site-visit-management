@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { storage } from './lib/storage';
-import { User, Visit, Remark, Template, Settings, Page, CallLog, CallOutcome, Lead, LeadQuality, WebhookConfig, FollowUp, Activity, ActivityType, Project, LeadStatus, VisitStatus, VisitFilters, FollowUpMethod, Workflow } from './types';
+import { User, Visit, Remark, Template, Settings, Page, CallLog, CallOutcome, Lead, LeadQuality, WebhookConfig, FollowUp, Activity, ActivityType, Project, LeadStatus, VisitStatus, VisitFilters, FollowUpMethod, Workflow, InventoryUnit } from './types';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import { Toaster, toast } from 'react-hot-toast';
@@ -24,6 +24,7 @@ const HRMS = React.lazy(() => import('./components/HRMS'));
 const WorkflowBuilder = React.lazy(() => import('./components/WorkflowBuilder'));
 const VisitAnalysis = React.lazy(() => import('./components/VisitAnalysis'));
 const VisitCompletionModal = React.lazy(() => import('./components/VisitCompletionModal'));
+const InventoryModule = React.lazy(() => import('./components/InventoryModule'));
 import TodayOverview from './components/TodayOverview';
 import CallOutcomeModal from './components/CallOutcomeModal';
 import PostCallWhatsAppModal from './components/PostCallWhatsAppModal';
@@ -80,6 +81,7 @@ export default function App() {
   const attendance = appData?.fullData.attendance || [];
   const notifications = appData?.fullData.notifications || [];
   const workflows = appData?.initData.workflows || [];
+  const inventoryUnits = appData?.fullData.inventory_units || [];
   const stats = statsData || null;
 
   // Mutation for saving
@@ -1253,6 +1255,19 @@ export default function App() {
                 toast.success('Visit updated');
               }}
               followUps={followups}
+            />
+          )}
+          {currentPage === 'inventory' && user && (
+            <InventoryModule
+              projects={projects}
+              leads={leads}
+              visits={visits}
+              units={inventoryUnits as InventoryUnit[]}
+              user={user}
+              onSave={(unit) => {
+                api.save('inventory_units', unit);
+                toast.success('Inventory updated');
+              }}
             />
           )}
           {currentPage === 'add-visit' && user && (

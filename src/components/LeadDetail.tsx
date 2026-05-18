@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Lead, Visit, Remark, CallLog, Page, LeadStatus, LeadQuality, FollowUp, CallOutcome, Project, User, RemarkCategory, RemarkSentiment, Activity, ActivityType, WhatsAppMessage, VisitOutcome } from '../types';
-import { cn } from '../lib/utils';
+import { cn, getTimelineDateSectionLabel } from '../lib/utils';
 import { StatusBadge, VisitBadge } from './Dashboard';
 import FollowUpForm from './FollowUpForm';
 import ActivityTimeline from './ActivityTimeline';
@@ -34,7 +34,6 @@ import WhatsAppHistory from './WhatsAppHistory';
 import { toast } from 'react-hot-toast';
 import { generateId } from '../lib/storage';
 import { apiService } from '../lib/api-service';
-import { format, isToday } from 'date-fns';
 import { normalizePhoneNumber } from '../lib/phoneUtils';
 import { getLeadFollowUp, getFollowUpDisplayStatus } from '../lib/followupUtils';
 import { FollowUpStatusBadge } from './FollowUpStatusBadge';
@@ -414,7 +413,7 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
                 <div className="bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-2">
                   <CalendarCheck size={12} className="text-blue-600" />
                   <span className="text-[10px] font-black text-blue-700 uppercase tracking-wider">
-                    Visit: {format(new Date(nextScheduledVisit.visit_date), 'dd MMM')}
+                    Visit: {getTimelineDateSectionLabel(nextScheduledVisit.visit_date)}
                   </span>
                 </div>
               )}
@@ -866,7 +865,7 @@ export default React.memo(function LeadDetail({ user, lead, visits, remarks: ini
                           <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-600">Priority Follow-up</h4>
                         </div>
                         <span className="text-[10px] font-mono text-amber-500 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
-                          Due {isToday(new Date(nextFollowUp.date)) ? 'Today' : format(new Date(nextFollowUp.date), 'dd MMM')}
+                          Due {getTimelineDateSectionLabel(nextFollowUp.date)}
                         </span>
                       </div>
                       <p className="text-sm font-bold text-[#2A1C00] mb-2">{nextFollowUp.purpose || 'Follow-up regarding property interest'}</p>

@@ -34,10 +34,9 @@ import WhatsAppHistory from './WhatsAppHistory';
 import { generateId } from '../lib/storage';
 import { aiService } from '../lib/ai';
 import { toast } from 'react-hot-toast';
-import { cn } from '../lib/utils';
+import { cn, formatDate, formatOperationalDateTime } from '../lib/utils';
 import { apiService } from '../lib/api-service';
 import FollowUpForm from './FollowUpForm';
-import { format } from 'date-fns';
 import { normalizePhoneNumber } from '../lib/phoneUtils';
 import { getLeadFollowUp, getFollowUpDisplayStatus } from '../lib/followupUtils';
 import { FollowUpStatusBadge } from './FollowUpStatusBadge';
@@ -363,7 +362,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
     { 
       icon: Calendar, 
       label: 'Visit Date', 
-      value: new Date(visit.visit_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      value: formatDate(visit.visit_date),
       // visit_date is now read-only once scheduled
     },
     { 
@@ -379,7 +378,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
     ...(visit.completed_at ? [{ 
       icon: CheckCircle2, 
       label: 'Completed On', 
-      value: new Date(visit.completed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) 
+      value: formatOperationalDateTime(visit.completed_at)
     }] : []),
   ];
 
@@ -742,7 +741,7 @@ export default function VisitDetail({ user, visit, lead, remarks: initialRemarks
                           <p className="text-[11px] font-black text-[#2A1C00] uppercase tracking-widest leading-none mb-1">Timestamp</p>
                           <time className="text-[12px] font-bold text-[#9A8262] flex items-center justify-end gap-1.5 px-2 py-0.5 rounded-md bg-[#F5F1E6]">
                             <Clock size={12} className="text-[#C9A84C]" />
-                            {format(new Date(remark.at), 'dd MMM yyyy, hh:mm a')}
+                            {formatOperationalDateTime(remark.at)}
                           </time>
                         </div>
                       </div>

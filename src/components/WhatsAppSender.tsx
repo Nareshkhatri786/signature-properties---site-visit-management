@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, 
+  Search, 
   User, 
   Phone, 
   Calendar, 
@@ -8,15 +9,12 @@ import {
   Send, 
   Download, 
   Paperclip,
-  Info,
-  Image as ImageIcon,
-  Video as VideoIcon,
-  FileText
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { Visit, Template, Page, Project } from '../types';
 import { cn } from '../lib/utils';
 import { toast } from 'react-hot-toast';
-import { apiService } from '../lib/api-service';
 
 interface WhatsAppSenderProps {
   visits: Visit[];
@@ -33,9 +31,6 @@ export default function WhatsAppSender({ visits, projects, templates, initialVis
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [message, setMessage] = useState(initialMessage || '');
   const [manualNumber, setManualNumber] = useState('');
-  const [messageType, setMessageType] = useState<'text' | 'image' | 'video' | 'document'>('text');
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [isSending, setIsSending] = useState(false);
   
   const selectedVisit = visits.find(v => v.id === selectedVisitId);
   const activeTemplates = templates.filter(t => t.active);
@@ -70,77 +65,27 @@ export default function WhatsAppSender({ visits, projects, templates, initialVis
     setMessage(fillVars(t.message, selectedVisit || {}));
   };
 
-  const handleSend = async () => {
+  const handleSend = () => {
     const num = (manualNumber || selectedVisit?.mobile || '').replace(/[^0-9]/g, '');
     if (!num) {
       toast.error('Please select a client or enter a mobile number');
       return;
     }
-    if (messageType === 'text' && !message.trim()) {
+    if (!message.trim()) {
       toast.error('Please enter a message');
       return;
     }
-    if (messageType !== 'text' && !mediaUrl.trim()) {
-      toast.error('Please enter media URL');
-      return;
-    }
 
     const finalNum = num.length === 10 ? `91${num}` : num;
-    try {
-      setIsSending(true);
-      const payload = messageType === 'text'
-        ? {
-            leadId: selectedVisit?.leadId,
-            visitId: selectedVisit?.id,
-            to: finalNum,
-            type: 'text' as const,
-            text: message,
-            projectId: selectedVisit?.projectId
-          }
-        : {
-            leadId: selectedVisit?.leadId,
-            visitId: selectedVisit?.id,
-            to: finalNum,
-            type: messageType,
-            mediaUrl: mediaUrl.trim(),
-            caption: message.trim() || undefined,
-            projectId: selectedVisit?.projectId
-          };
-      await apiService.sendWhatsAppMessage(payload);
-      toast.success(`${messageType === 'text' ? 'Message' : messageType} sent`);
-
-      if (selectedVisit) {
-        if (onLogActivity) {
-          onLogActivity(selectedVisit.id, selectedVisit.client_name, `WhatsApp ${messageType}: ${selectedTemplate?.name || 'Custom'}`);
-        }
-        if (onSaveMessage && messageType === 'text') {
-          onSaveMessage(selectedVisit.leadId || selectedVisit.id, message);
-        }
+    window.open(`https://wa.me/${finalNum}?text=${encodeURIComponent(message)}`, '_blank');
+    
+    if (selectedVisit) {
+      if (onLogActivity) {
+        onLogActivity(selectedVisit.id, selectedVisit.client_name, `Template: ${selectedTemplate?.name || 'Custom'}`);
       }
-    } catch (e: any) {
-      toast.error(e.message || 'Send failed');
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const sendGreeting = async () => {
-    const num = (manualNumber || selectedVisit?.mobile || '').replace(/[^0-9]/g, '');
-    if (!num) return toast.error('Please select a client or enter a mobile number');
-    const finalNum = num.length === 10 ? `91${num}` : num;
-    try {
-      setIsSending(true);
-      const res = await apiService.sendOpenWindowGreeting({
-        leadId: selectedVisit?.leadId,
-        visitId: selectedVisit?.id,
-        to: finalNum
-      });
-      toast.success('Greeting sent in open 24h window');
-      if (res?.greeting) setMessage(res.greeting);
-    } catch (e: any) {
-      toast.error(e.message || 'Greeting failed');
-    } finally {
-      setIsSending(false);
+      if (onSaveMessage) {
+        onSaveMessage(selectedVisit.leadId || selectedVisit.id, message);
+      }
     }
   };
 
@@ -270,29 +215,6 @@ export default function WhatsAppSender({ visits, projects, templates, initialVis
             </div>
             <div className="p-6 space-y-6">
               <div className="space-y-1.5">
-                <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Message Type</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { id: 'text', label: 'Text', icon: MessageSquare },
-                    { id: 'image', label: 'Image', icon: ImageIcon },
-                    { id: 'video', label: 'Video', icon: VideoIcon },
-                    { id: 'document', label: 'Doc', icon: FileText },
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setMessageType(opt.id as any)}
-                      className={cn(
-                        "px-2 py-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-1",
-                        messageType === opt.id ? "border-[#C9A84C] bg-[#C9A84C]/10 text-[#5C4820]" : "border-[#E6D8B8] bg-white text-[#9A8262]"
-                      )}
-                    >
-                      <opt.icon size={13} /> {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Message</label>
                   <span className="text-[10px] text-[#9A8262] font-medium">
@@ -303,46 +225,10 @@ export default function WhatsAppSender({ visits, projects, templates, initialVis
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={8}
-                  placeholder={messageType === 'text' ? "Select a template or type custom message..." : "Caption (optional for media)"}
+                  placeholder="Select a template or type custom message..."
                   className="w-full bg-white border border-[#E6D8B8] rounded-lg py-3 px-4 text-sm focus:outline-none focus:border-[#C9A84C] resize-none"
                 />
               </div>
-
-              {messageType !== 'text' && (
-                <div className="space-y-1.5">
-                  <label className="text-[10.5px] font-bold text-[#9A8262] uppercase tracking-wider">Media URL</label>
-                  <input
-                    type="url"
-                    value={mediaUrl}
-                    onChange={(e) => setMediaUrl(e.target.value)}
-                    placeholder="https://... (public URL)"
-                    className="w-full bg-white border border-[#E6D8B8] rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-[#C9A84C]"
-                  />
-                </div>
-              )}
-
-              {selectedVisit && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <button
-                    onClick={() => { setMessageType('document'); setMediaUrl((projects.find(p => p.id === selectedVisit.projectId)?.brochure_link) || ''); }}
-                    className="px-3 py-2 border border-[#E6D8B8] rounded-lg text-xs font-bold text-[#5C4820] bg-white"
-                  >
-                    Use Brochure Link
-                  </button>
-                  <button
-                    onClick={() => { setMessageType('video'); setMediaUrl((projects.find(p => p.id === selectedVisit.projectId)?.walkthrough_video) || ''); }}
-                    className="px-3 py-2 border border-[#E6D8B8] rounded-lg text-xs font-bold text-[#5C4820] bg-white"
-                  >
-                    Use Walkthrough Link
-                  </button>
-                  <button
-                    onClick={() => { setMessageType('text'); setMessage(`Location link: ${(projects.find(p => p.id === selectedVisit.projectId)?.google_maps_link) || ''}`); }}
-                    className="px-3 py-2 border border-[#E6D8B8] rounded-lg text-xs font-bold text-[#5C4820] bg-white"
-                  >
-                    Use Location Text
-                  </button>
-                </div>
-              )}
 
               {selectedTemplate?.fileData && (
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between">
@@ -381,28 +267,18 @@ export default function WhatsAppSender({ visits, projects, templates, initialVis
 
               <button 
                 onClick={handleSend}
-                disabled={isSending}
-                className="w-full bg-[#25D366] text-white font-bold py-4 rounded-xl shadow-lg hover:translate-y-[-1px] hover:shadow-xl transition-all flex items-center justify-center gap-3 text-lg disabled:opacity-60"
+                className="w-full bg-[#25D366] text-white font-bold py-4 rounded-xl shadow-lg hover:translate-y-[-1px] hover:shadow-xl transition-all flex items-center justify-center gap-3 text-lg"
               >
-                <Send size={20} /> {isSending ? 'Sending...' : 'Send via API'}
-              </button>
-
-              <button
-                onClick={sendGreeting}
-                disabled={isSending}
-                className="w-full bg-white border border-[#E6D8B8] text-[#5C4820] font-bold py-2.5 rounded-xl transition-all disabled:opacity-60"
-              >
-                Send Open-Window Greeting
+                <Send size={20} /> Open WhatsApp & Send
               </button>
 
               <div className="bg-[#F8FFF8] border border-[#A9DFBF] rounded-xl p-4 flex gap-3 items-start">
                 <Info size={18} className="text-[#1A6B3C] shrink-0 mt-0.5" />
                 <div className="text-[12px] text-[#1A6B3C] leading-relaxed">
                   <strong>How it works:</strong><br />
-                  1. Select client and message type<br />
-                  2. For media, paste URL (or use project quick links)<br />
-                  3. Send via API (works only in 24h open window)<br />
-                  4. Use greeting button to send rotating professional morning/opening message.
+                  1. Select client → 2. Pick template → 3. Click Send<br />
+                  4. WhatsApp opens with message pre-filled → hit Send<br />
+                  5. For files — download using the button above and attach in WhatsApp.
                 </div>
               </div>
             </div>

@@ -9,6 +9,22 @@ interface IncomingMessage {
   projectId?: string;
 }
 
+const AI_GREETING_VARIANTS = [
+  "Good morning Sir/Madam",
+  "Namaste Sir/Madam",
+  "Jay Shree Krishna Sir, kem chho?",
+  "Good morning, hope you are doing well",
+  "Namaste ji, aasha hai aap theek honge"
+];
+
+function pickAIGreeting(seed: string) {
+  const dayKey = new Date().toISOString().slice(0, 10);
+  const raw = `${seed}_${dayKey}`;
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+  return AI_GREETING_VARIANTS[Math.abs(hash) % AI_GREETING_VARIANTS.length];
+}
+
 /**
  * Parses the webhook payload. Adapts to Meta/WABA standard structure.
  */
@@ -149,6 +165,9 @@ The JSON must have the following structure:
 Rules:
 - Be polite, concise, and persuasive. Use SIMPLE, SHORT, and CONVERSATIONAL language.
 - Avoid long formal paragraphs. Be direct like a human salesperson on WhatsApp.
+- Greeting style should be professional and natural. Rotate tone naturally across conversations:
+  sometimes "Good morning", sometimes "Namaste", sometimes "Jay Shree Krishna, kem chho?".
+  Do not repeat the exact same greeting pattern in every chat.
 - NEVER violate the 'Strict AI Rules'.
 - If the client asks to talk to a human or schedules a visit, set "action": "ESCALATE_TO_HUMAN" and provide a summary.
 - If the client asks for media (brochure, video, map), set the corresponding "action" to trigger the system to send it.
@@ -166,20 +185,30 @@ Rules:
       // Since this is a direct reply to an incoming message, we are ALLOWED to reply immediately, 
       // even at night, per the requirements ("Client-Initiated Chats: ALLOWED").
       
-      await WhatsAppService.sendSessionMessage(message.from, aiResult.replyText, replyFromPhoneId);
+      let finalReply = String(aiResult.replyText || "").trim();
+      const today = new Date().toISOString().slice(0, 10);
+      const sentToday = await queryOne<any>(
+        "SELECT id FROM whatsapp_messages WHERE leadId = ? AND projectId = ? AND type = 'outgoing' AND DATE(timestamp) = ? LIMIT 1",
+        [lead.id, targetProjectId || null, today]
+      );
+      if (!sentToday) {
+        finalReply = `${pickAIGreeting(String(lead.id || message.from))}\n\n${finalReply}`;
+      }
+
+      await WhatsAppService.sendSessionMessage(message.from, finalReply, replyFromPhoneId);
 
       // Save AI outgoing message to WhatsApp history
       const outMsgId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
       await query(
         "INSERT INTO whatsapp_messages (id, leadId, senderName, senderPhoneNumber, content, type, projectId) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [outMsgId, lead.id, "AI Assistant", message.from, aiResult.replyText, 'outgoing', targetProjectId]
+        [outMsgId, lead.id, "AI Assistant", message.from, finalReply, 'outgoing', targetProjectId]
       );
 
       // Save to Timeline as Automated Remark
       const rmkId = `rmk_${Date.now()}_${Math.random().toString(36).substring(7)}`;
       await query(
         "INSERT INTO remarks (id, targetId, text, `by`, type, category) VALUES (?, ?, ?, ?, ?, ?)",
-        [rmkId, lead.id, aiResult.replyText, "SYSTEM / AUTOMATED", "automated", "ai"]
+        [rmkId, lead.id, finalReply, "SYSTEM / AUTOMATED", "automated", "ai"]
       );
     }
 

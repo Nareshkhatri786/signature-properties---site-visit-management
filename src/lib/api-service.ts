@@ -80,6 +80,9 @@ export const apiService = {
   getPriorityQueue: (limit = 20): Promise<any> =>
     apiFetch(`/api/sales/priority-queue?limit=${limit}`),
 
+  runComplianceBulkFix: (mode: "missed_followups" | "missed_visit_outcomes", limit = 100): Promise<any> =>
+    apiFetch("/api/compliance/bulk-fix", { method: "POST", body: JSON.stringify({ mode, limit }) }),
+
   // -- HEALTH ----------------------------------------------
   health: (): Promise<any> => apiFetch("/api/health"),
 };

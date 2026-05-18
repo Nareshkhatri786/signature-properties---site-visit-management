@@ -149,6 +149,32 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SELECT 'All other indexes done' AS status;
 
 -- =========================================================
+-- SALES MACHINE / SLA HARDENING INDEXES
+-- =========================================================
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+  WHERE table_schema=DATABASE() AND table_name='leads' AND index_name='idx_leads_status_quality_updated');
+SET @sql = IF(@exists=0, 'CREATE INDEX idx_leads_status_quality_updated ON leads (status, quality, updated_at)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+  WHERE table_schema=DATABASE() AND table_name='followups' AND index_name='idx_followups_status_date_lead_visit');
+SET @sql = IF(@exists=0, 'CREATE INDEX idx_followups_status_date_lead_visit ON followups (status, date, leadId, visitId)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+  WHERE table_schema=DATABASE() AND table_name='visits' AND index_name='idx_visits_completed_outcome');
+SET @sql = IF(@exists=0, 'CREATE INDEX idx_visits_completed_outcome ON visits (visit_status, outcome, completed_at)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+  WHERE table_schema=DATABASE() AND table_name='call_logs' AND index_name='idx_calllogs_lead_timestamp_outcome');
+SET @sql = IF(@exists=0, 'CREATE INDEX idx_calllogs_lead_timestamp_outcome ON call_logs (leadId, timestamp, outcome)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SELECT 'Sales machine hardening indexes done' AS status;
+
+-- =========================================================
 -- FINAL VERIFICATION
 -- =========================================================
 SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME 

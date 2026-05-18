@@ -1,8 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AlertCircle, Calendar, CheckCircle2, Clock, Flame, MessageSquare, Phone, TrendingUp, Target } from 'lucide-react';
 import { Lead, Visit, FollowUp, CallLog, User, Page } from '../types';
 import { cn, getLocalDateString } from '../lib/utils';
 import { useComplianceReport, useFunnelReport, usePriorityQueue, useSlaStatus } from '../lib/queries';
+import { apiService } from '../lib/api-service';
+import { toast } from 'react-hot-toast';
 
 interface TodayOverviewProps {
   leads: Lead[];
@@ -30,6 +32,19 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
   const { data: priorityQueue } = usePriorityQueue(10, true);
   const { data: slaStatus } = useSlaStatus('today', true, canSeeComplianceTable);
   const { data: funnelReport } = useFunnelReport('month', true);
+  const [isFixing, setIsFixing] = useState<'missed_followups' | 'missed_visit_outcomes' | null>(null);
+
+  const runBulkFix = async (mode: 'missed_followups' | 'missed_visit_outcomes') => {
+    try {
+      setIsFixing(mode);
+      const res = await apiService.runComplianceBulkFix(mode, 100);
+      toast.success(`Compliance fix completed: ${res.fixed || 0} records updated.`);
+    } catch (e: any) {
+      toast.error(e.message || 'Bulk fix failed');
+    } finally {
+      setIsFixing(null);
+    }
+  };
 
   const vm = useMemo(() => {
     const overdueFollowups = followUps
@@ -256,7 +271,23 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
         <div className="bg-white border border-[#E6D8B8] rounded-xl overflow-hidden">
           <div className="px-3 py-2.5 bg-[#FDFAF2] border-b border-[#E6D8B8] flex items-center justify-between">
             <p className="text-sm font-bold text-[#2A1C00]">Manager Compliance (Today)</p>
-            <button onClick={() => onNavigate('reports')} className="text-[11px] font-bold text-[#C9A84C] hover:underline">Open Reports</button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => runBulkFix('missed_followups')}
+                disabled={isFixing !== null}
+                className="text-[10px] font-bold border border-[#E6D8B8] rounded px-2 py-1 text-[#9A8262] hover:bg-white disabled:opacity-50"
+              >
+                {isFixing === 'missed_followups' ? 'Fixing...' : 'Fix Follow-ups'}
+              </button>
+              <button
+                onClick={() => runBulkFix('missed_visit_outcomes')}
+                disabled={isFixing !== null}
+                className="text-[10px] font-bold border border-[#E6D8B8] rounded px-2 py-1 text-[#9A8262] hover:bg-white disabled:opacity-50"
+              >
+                {isFixing === 'missed_visit_outcomes' ? 'Fixing...' : 'Fix Visit Outcomes'}
+              </button>
+              <button onClick={() => onNavigate('reports')} className="text-[11px] font-bold text-[#C9A84C] hover:underline">Open Reports</button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">

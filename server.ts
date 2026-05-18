@@ -1612,6 +1612,122 @@ async function startServer() {
     }
   });
 
+  app.post("/api/compliance/bulk-fix", authMiddleware, async (req, res) => {
+    try {
+      const u = (req as any).user;
+      const role = String(u?.role || "").toLowerCase();
+      if (!["admin", "adm", "manager"].includes(role)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const mode = String(req.body?.mode || "");
+      const limit = Math.max(1, Math.min(500, Number(req.body?.limit || 100)));
+      const today = new Date().toISOString().slice(0, 10);
+      let fixed = 0;
+
+      if (mode === "missed_followups") {
+        const leads = await query<any>(
+          "SELECT id, name, assignedTo, projectId, status FROM leads WHERE status NOT IN ('closed','lost') ORDER BY updated_at ASC LIMIT ?",
+          [limit * 3]
+        );
+        for (const lead of leads) {
+          const existingPending = await queryOne<any>(
+            "SELECT id FROM followups WHERE leadId = ? AND status = 'pending' LIMIT 1",
+            [lead.id]
+          );
+          if (existingPending) continue;
+
+          if (lead.assignedTo) {
+            await ensurePendingFollowup(lead.id, lead.assignedTo, lead.projectId || null);
+          } else {
+            const fupId = `fup_fix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+            await pool.execute(
+              `INSERT INTO followups (id, leadId, projectId, date, scheduled_at, purpose, method, status, created_at, outcome_note)
+               VALUES (?,?,?,?,?,?,?,?,?,?)`,
+              [
+                fupId,
+                lead.id,
+                lead.projectId || null,
+                today,
+                formatMySQLDate(new Date().toISOString()),
+                "Auto recovery follow-up (compliance fix)",
+                "call",
+                "pending",
+                formatMySQLDate(new Date().toISOString()),
+                "Created by compliance bulk fix"
+              ]
+            );
+          }
+
+          const actId = `act_fix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+          await pool.execute(
+            `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
+            [actId, "followup_scheduled", u.id, u.name || u.username || "System", lead.projectId || null, lead.id, lead.name || "Lead", "Bulk fix: Created pending follow-up for missed follow-up compliance."]
+          );
+          fixed++;
+          if (fixed >= limit) break;
+        }
+      } else if (mode === "missed_visit_outcomes") {
+        const visits = await query<any>(
+          "SELECT id, leadId, client_name, projectId, outcome, visit_status, completed_at, visit_date FROM visits WHERE visit_status = 'completed' ORDER BY COALESCE(completed_at, visit_date) DESC LIMIT ?",
+          [limit * 3]
+        );
+        for (const visit of visits) {
+          const hasOutcome = !!String(visit.outcome || "").trim();
+          if (!hasOutcome) {
+            await pool.execute("UPDATE visits SET outcome = ? WHERE id = ?", ["follow_up_required", visit.id]);
+          }
+          const needsNext = String(visit.outcome || "follow_up_required") === "follow_up_required";
+          let hasPending = false;
+          if (needsNext) {
+            const pending = await queryOne<any>(
+              "SELECT id FROM followups WHERE status = 'pending' AND (visitId = ? OR leadId = ?) LIMIT 1",
+              [visit.id, visit.leadId || null]
+            );
+            hasPending = !!pending;
+          }
+          if (needsNext && !hasPending) {
+            const next = new Date();
+            next.setDate(next.getDate() + 1);
+            const nextDate = next.toISOString().slice(0, 10);
+            const fupId = `fup_fix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+            await pool.execute(
+              `INSERT INTO followups (id, leadId, visitId, projectId, date, scheduled_at, purpose, method, status, created_at, outcome_note)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+              [
+                fupId,
+                visit.leadId || null,
+                visit.id,
+                visit.projectId || null,
+                nextDate,
+                formatMySQLDate(next.toISOString()),
+                "Auto next step after completed visit (compliance fix)",
+                "call",
+                "pending",
+                formatMySQLDate(new Date().toISOString()),
+                "Created by compliance bulk fix"
+              ]
+            );
+          }
+
+          const actId = `act_fix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+          await pool.execute(
+            `INSERT INTO activities (id,type,userId,userName,projectId,targetId,targetName,timestamp,details) VALUES (?,?,?,?,?,?,?,NOW(),?)`,
+            [actId, "visit_completed", u.id, u.name || u.username || "System", visit.projectId || null, visit.id, visit.client_name || "Visit", "Bulk fix: Visit outcome/next action compliance repaired."]
+          );
+          fixed++;
+          if (fixed >= limit) break;
+        }
+      } else {
+        return res.status(400).json({ error: "Invalid mode. Use missed_followups or missed_visit_outcomes." });
+      }
+
+      res.json({ success: true, mode, fixed });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // -- ATTENDANCE MAINTENANCE (every 15 min) --------------
   async function runAttendanceMaintenance() {
     try {

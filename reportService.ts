@@ -41,6 +41,12 @@ const smtpConfig = {
 const transporter = nodemailer.createTransport(smtpConfig);
 const RECIPIENT = (process.env.REPORT_RECIPIENT || "diya9574466663@gmail.com").trim();
 
+const PROJECT_DAILY_MIS_RECIPIENTS: Array<{ projectNameLike: string; email: string }> = [
+  { projectNameLike: "royal rudraksha", email: "ps002448@gmail.com" },
+  { projectNameLike: "shreemad family", email: "pandya.keval91@gmail.com" },
+  { projectNameLike: "devi bungalows", email: "hp8935311@gmail.com" },
+];
+
 // --- Helpers ---
 
 export async function getReportStats() {
@@ -97,12 +103,12 @@ export async function generateDailyMISReport() {
   const today = format(new Date(), 'yyyy-MM-dd');
   const now = new Date();
   const startOfWeek = format(subDays(now, 7), 'yyyy-MM-dd');
-  const startOfMonth = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
+  const monthStart = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
 
   console.log(`[MIS] Generating Detailed Daily Report for ${today}...`);
 
   // 1. Project Stats
-  const projectStats = await sql<any>(`
+  const allProjectStats = await sql<any>(`
     SELECT 
       p.id,
       p.name as projectName,
@@ -118,11 +124,13 @@ export async function generateDailyMISReport() {
       (SELECT COUNT(*) FROM leads l WHERE l.projectId = p.id AND DATE(l.created_at) >= ?) as weeklyNew,
       (SELECT COUNT(*) FROM leads l WHERE l.projectId = p.id AND DATE(l.created_at) >= ?) as monthlyNew
     FROM projects p
-  `, [today, today, today, today, startOfWeek, startOfMonth]);
+  `, [today, today, today, today, startOfWeek, monthStart]);
 
-  // 2. User Stats
-  const userStats = await sql<any>(`
+  // 2. User Stats (all users, all projects)
+  const allUserStats = await sql<any>(`
     SELECT 
+      u.id as userId,
+      u.projectId as userProjectId,
       u.name as userName,
       (SELECT COUNT(*) FROM call_logs c WHERE (c.by = u.name OR c.by = u.username) AND DATE(c.timestamp) = ?) as callsAttempted,
       (SELECT COUNT(*) FROM call_logs c WHERE (c.by = u.name OR c.by = u.username) AND DATE(c.timestamp) = ? AND c.outcome = 'answered') as callsConnected,
@@ -135,9 +143,95 @@ export async function generateDailyMISReport() {
 
   // 3. Summary Stats
   const [weeklyNew] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) >= ?", [startOfWeek]);
-  const [monthlyNew] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) >= ?", [startOfMonth]);
+  const [monthlyNew] = await sql<any>("SELECT COUNT(*) AS c FROM leads WHERE DATE(created_at) >= ?", [monthStart]);
 
-  const aiInsight = await getAIReportInsight('Daily MIS', { projectStats, userStats });
+  const aiInsight = await getAIReportInsight('Daily MIS', { projectStats: allProjectStats, userStats: allUserStats });
+
+  const [projectRows] = [await sql<any>("SELECT id, name FROM projects")];
+
+  // Build project-wise daily mails to specific recipients
+  for (const target of PROJECT_DAILY_MIS_RECIPIENTS) {
+    const matchedProject = projectRows.find((p: any) => String(p.name || "").toLowerCase().includes(target.projectNameLike));
+    if (!matchedProject?.id) continue;
+
+    const projectStats = allProjectStats.filter((p: any) => String(p.id) === String(matchedProject.id));
+    const userStats = allUserStats.filter((u: any) => String(u.userProjectId) === String(matchedProject.id));
+
+    const projectInsight = await getAIReportInsight(`Daily MIS - ${matchedProject.name}`, { projectStats, userStats });
+
+    const projectHtml = `
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 1000px; padding: 20px;">
+      <h2 style="font-size: 18px; margin-bottom: 8px; text-transform: uppercase; color: #C9A84C;">Daily MIS Report - ${today}</h2>
+      <p style="margin-top: 0; font-size: 13px; color: #5C4820;"><b>Project:</b> ${matchedProject.name}</p>
+      
+      <div style="background: #FFF9E6; border: 1px solid #C9A84C; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
+        <h3 style="margin-top: 0; color: #1C1207; font-size: 16px; border-bottom: 1px solid #C9A84C; padding-bottom: 10px;">✨ Signature AI Audit</h3>
+        <div style="font-size: 14px; line-height: 1.6; color: #444;">
+          ${projectInsight.replace(/\n/g, '<br/>')}
+        </div>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; border: 1px solid #ddd;">
+        <thead>
+          <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Project</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">New Leads</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Active Leads</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">V.Sch Today</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">V.Done Today</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Weekly New</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Monthly New</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${projectStats.map((p: any) => `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background: #fdfdfd;">${p.projectName}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.newLeads}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.activeLeads}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.vSchToday}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.vDoneToday}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.weeklyNew}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.monthlyNew}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; border: 1px solid #ddd;">
+        <thead>
+          <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+            <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">User</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Calls Attempted</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Calls Connected</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Leads Handled</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Visits Scheduled</th>
+            <th style="padding: 10px; border: 1px solid #ddd;">Visits Done</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${userStats.map((u: any) => `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background: #fdfdfd;">${u.userName}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.callsAttempted}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.callsConnected}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.leadsHandled}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.visitsSch}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.visitsDone}</td>
+            </tr>
+          `).join('')}
+          ${userStats.length === 0 ? '<tr><td colspan="6" style="padding: 12px; text-align: center; color: #777;">No users mapped to this project.</td></tr>' : ''}
+        </tbody>
+      </table>
+
+      <p style="font-size: 11px; color: #999; margin-top: 40px; border-top: 1px solid #eee; padding-top: 10px;">
+        Sent automatically by Signature Properties CRM — Daily Performance Audit.
+      </p>
+    </div>
+    `;
+
+    await sendEmail(`Daily MIS Report - ${matchedProject.name} - ${today}`, projectHtml, target.email);
+  }
 
   const html = `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 1000px; padding: 20px;">
@@ -170,7 +264,7 @@ export async function generateDailyMISReport() {
           </tr>
         </thead>
         <tbody>
-          ${projectStats.map(p => `
+          ${allProjectStats.map(p => `
             <tr>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background: #fdfdfd;">${p.projectName}</td>
               <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${p.newLeads}</td>
@@ -202,7 +296,7 @@ export async function generateDailyMISReport() {
           </tr>
         </thead>
         <tbody>
-          ${userStats.map(u => `
+          ${allUserStats.map(u => `
             <tr>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background: #fdfdfd;">${u.userName}</td>
               <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${u.callsAttempted}</td>
@@ -221,7 +315,7 @@ export async function generateDailyMISReport() {
     </div>
   `;
 
-  await sendEmail(`Daily MIS Report - ${today}`, html);
+  await sendEmail(`Daily MIS Report (All Projects) - ${today}`, html);
 }
 
 export async function generateWeeklyMISReport() {
@@ -486,15 +580,16 @@ export async function generateMonthlyDetailedMISReport() {
   await sendEmail(`Monthly MIS Report - ${monthName}`, html);
 }
 
-async function sendEmail(subject: string, html: string) {
+async function sendEmail(subject: string, html: string, recipient?: string) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.warn("[MIS] SMTP not configured, printing to console");
     console.log("SUBJECT:", subject);
     return;
   }
   try {
-    await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to: RECIPIENT, subject, html });
-    console.log("[MIS] Email sent to", RECIPIENT);
+    const to = (recipient || RECIPIENT).trim();
+    await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to, subject, html });
+    console.log("[MIS] Email sent to", to);
   } catch (e: any) {
     console.error("[MIS] Email Failed:", e.message);
   }

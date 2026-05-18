@@ -1804,6 +1804,30 @@ export default function App() {
                   // Manual update removed
                   await api.save('followups', f);
                 }
+
+                // 3. Handle Re-visit scheduling as next action
+                if (data.nextStep === 'revisit' && data.nextDate) {
+                  const revisit: Visit = {
+                    id: generateId(),
+                    leadId: updatedLead.id,
+                    client_name: updatedVisit.client_name,
+                    mobile: updatedVisit.mobile,
+                    email: updatedVisit.email,
+                    visit_date: data.nextDate,
+                    visit_time: data.nextTime || '',
+                    purpose: 'Re-visit (auto from visit completion)',
+                    status: updatedLead.quality || 'warm',
+                    visit_status: 'scheduled',
+                    projectId: updatedVisit.projectId,
+                    created_at: new Date().toISOString(),
+                    assigned_to: user.name,
+                    source: updatedVisit.source || 'Revisit',
+                    budget: updatedVisit.budget,
+                    property_interest: updatedVisit.property_interest,
+                    priority: updatedVisit.priority || updatedLead.priority || 0
+                  };
+                  await api.save('visits', revisit);
+                }
               })();
 
               await toast.promise(savePromise, {

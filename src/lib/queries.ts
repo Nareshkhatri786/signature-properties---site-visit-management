@@ -7,6 +7,10 @@ export const queryKeys = {
   all: ['appData'] as const,
   init: ['initData'] as const,
   stats: ['stats'] as const,
+  compliance: ['compliance'] as const,
+  funnel: ['funnel'] as const,
+  sla: ['sla'] as const,
+  priorityQueue: ['priorityQueue'] as const,
   leads: ['leads'] as const,
   visits: ['visits'] as const,
 };
@@ -38,6 +42,42 @@ export function useStats() {
     queryFn: () => apiService.getStats(),
     refetchInterval: 1000 * 60 * 2, // Every 2 mins
     enabled: !!localStorage.getItem('crm_token'),
+  });
+}
+
+export function useComplianceReport(range: 'today' | 'week' = 'today', enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.compliance, range],
+    queryFn: () => apiService.getComplianceReport(range),
+    refetchInterval: 1000 * 60 * 3,
+    enabled: !!localStorage.getItem('crm_token') && enabled,
+  });
+}
+
+export function useFunnelReport(range: 'today' | 'week' | 'month' = 'month', enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.funnel, range],
+    queryFn: () => apiService.getFunnelReport(range),
+    refetchInterval: 1000 * 60 * 5,
+    enabled: !!localStorage.getItem('crm_token') && enabled,
+  });
+}
+
+export function useSlaStatus(range: 'today' | 'week' = 'today', enabled = true, notify = false) {
+  return useQuery({
+    queryKey: [...queryKeys.sla, range],
+    queryFn: () => apiService.getSlaStatus(range, notify),
+    refetchInterval: 1000 * 60 * 2,
+    enabled: !!localStorage.getItem('crm_token') && enabled,
+  });
+}
+
+export function usePriorityQueue(limit = 20, enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.priorityQueue, limit],
+    queryFn: () => apiService.getPriorityQueue(limit),
+    refetchInterval: 1000 * 60 * 3,
+    enabled: !!localStorage.getItem('crm_token') && enabled,
   });
 }
 

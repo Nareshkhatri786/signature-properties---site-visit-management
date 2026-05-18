@@ -68,6 +68,18 @@ export const apiService = {
   triggerReport: (type: "daily" | "weekend"): Promise<any> =>
     apiFetch("/api/reports/trigger", { method: "POST", body: JSON.stringify({ type }) }),
 
+  getComplianceReport: (range: "today" | "week" = "today"): Promise<any> =>
+    apiFetch(`/api/reports/compliance?range=${range}`),
+
+  getFunnelReport: (range: "today" | "week" | "month" = "month"): Promise<any> =>
+    apiFetch(`/api/reports/funnel?range=${range}`),
+
+  getSlaStatus: (range: "today" | "week" = "today", notify = false): Promise<any> =>
+    apiFetch(`/api/sla/status?range=${range}&notify=${notify ? 1 : 0}`),
+
+  getPriorityQueue: (limit = 20): Promise<any> =>
+    apiFetch(`/api/sales/priority-queue?limit=${limit}`),
+
   // -- HEALTH ----------------------------------------------
   health: (): Promise<any> => apiFetch("/api/health"),
 };

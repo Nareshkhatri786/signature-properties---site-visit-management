@@ -28,18 +28,34 @@ export default function Topbar({ user, title, onMenuClick, onNavigate, notificat
   const [isSocketConnected, setIsSocketConnected] = useState(socketService.getSocket()?.connected || false);
 
   useEffect(() => {
-    const socket = socketService.getSocket();
-    if (!socket) return;
+    let cleanup: (() => void) | null = null;
 
-    const onConnect = () => setIsSocketConnected(true);
-    const onDisconnect = () => setIsSocketConnected(false);
+    const wireSocketListeners = () => {
+      const socket = socketService.getSocket();
+      if (!socket) return;
+      const onConnect = () => setIsSocketConnected(true);
+      const onDisconnect = () => setIsSocketConnected(false);
+      setIsSocketConnected(!!socket.connected);
+      socket.on('connect', onConnect);
+      socket.on('disconnect', onDisconnect);
+      cleanup = () => {
+        socket.off('connect', onConnect);
+        socket.off('disconnect', onDisconnect);
+      };
+    };
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
+    // Socket can be created after Topbar mount, so retry briefly.
+    wireSocketListeners();
+    const interval = window.setInterval(() => {
+      if (socketService.getSocket()) {
+        wireSocketListeners();
+        window.clearInterval(interval);
+      }
+    }, 400);
 
     return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
+      window.clearInterval(interval);
+      cleanup?.();
     };
   }, []);
 
@@ -58,7 +74,7 @@ export default function Topbar({ user, title, onMenuClick, onNavigate, notificat
           {title}
         </h1>
         <div className={cn(
-          "flex items-center gap-1.5 px-2 py-0.5 rounded-full border hidden sm:flex transition-all duration-500",
+          "flex items-center gap-1.5 px-2 py-0.5 rounded-full border transition-all duration-200",
           isSocketConnected ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
         )}>
           <span className="relative flex h-2 w-2">

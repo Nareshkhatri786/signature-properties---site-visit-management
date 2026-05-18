@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { AlertCircle, Calendar, CheckCircle2, Clock, Flame, MessageSquare, Phone } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle2, Clock, Flame, MessageSquare, Phone, TrendingUp, Target } from 'lucide-react';
 import { Lead, Visit, FollowUp, CallLog, User, Page } from '../types';
 import { cn, getLocalDateString } from '../lib/utils';
+import { useComplianceReport, useFunnelReport, usePriorityQueue, useSlaStatus } from '../lib/queries';
 
 interface TodayOverviewProps {
   leads: Lead[];
@@ -23,6 +24,12 @@ function normalizeDate(input?: string) {
 
 export default function TodayOverview({ leads, visits, followUps, user, onNavigate }: TodayOverviewProps) {
   const today = getLocalDateString();
+  const role = (user?.role || '').toLowerCase();
+  const canSeeComplianceTable = role === 'admin' || role === 'adm' || role === 'manager';
+  const { data: complianceReport } = useComplianceReport('today', canSeeComplianceTable);
+  const { data: priorityQueue } = usePriorityQueue(10, true);
+  const { data: slaStatus } = useSlaStatus('today', true, canSeeComplianceTable);
+  const { data: funnelReport } = useFunnelReport('month', true);
 
   const vm = useMemo(() => {
     const overdueFollowups = followUps
@@ -43,14 +50,47 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
       .filter((l) => l.quality === 'hot' && l.status !== 'closed' && l.status !== 'lost')
       .slice(0, 8);
 
+    const activeLeads = leads.filter((l) => l.status !== 'closed' && l.status !== 'lost');
+    const pendingLeadIds = new Set(
+      followUps.filter((f) => f.status === 'pending' && f.leadId).map((f) => String(f.leadId))
+    );
+    const missedFollowups = activeLeads
+      .filter((l) => !pendingLeadIds.has(String(l.id)))
+      .slice(0, 8);
+
+    const visitHasPendingFollowup = (visitId?: string, leadId?: string) =>
+      followUps.some((f) =>
+        f.status === 'pending' &&
+        ((visitId && String(f.visitId || '') === String(visitId)) || (leadId && String(f.leadId || '') === String(leadId)))
+      );
+
+    const missedVisitOutcome = visits
+      .filter((v) => v.visit_status === 'completed')
+      .filter((v) => {
+        const hasOutcome = !!String(v.outcome || '').trim();
+        const needsNextAction = v.outcome === 'follow_up_required';
+        const hasNextAction = visitHasPendingFollowup(v.id, v.leadId);
+        return !hasOutcome || (needsNextAction && !hasNextAction);
+      })
+      .slice(0, 8);
+
     const counts = {
       overdueFollowups: followUps.filter((f) => f.status === 'pending' && normalizeDate(f.date) < today).length,
       todayVisits: visits.filter((v) => v.visit_date === today && (v.visit_status === 'scheduled' || v.visit_status === 'rescheduled')).length,
       myPendingTasks: followUps.filter((f) => f.status === 'pending' && f.userName === user.name && normalizeDate(f.date) <= today).length,
-      hotLeads: leads.filter((l) => l.quality === 'hot' && l.status !== 'closed' && l.status !== 'lost').length
+      hotLeads: leads.filter((l) => l.quality === 'hot' && l.status !== 'closed' && l.status !== 'lost').length,
+      missedFollowups: activeLeads.filter((l) => !pendingLeadIds.has(String(l.id))).length,
+      missedVisitOutcome: visits
+        .filter((v) => v.visit_status === 'completed')
+        .filter((v) => {
+          const hasOutcome = !!String(v.outcome || '').trim();
+          const needsNextAction = v.outcome === 'follow_up_required';
+          const hasNextAction = visitHasPendingFollowup(v.id, v.leadId);
+          return !hasOutcome || (needsNextAction && !hasNextAction);
+        }).length
     };
 
-    return { overdueFollowups, todayVisits, myPendingTasks, hotLeads, counts };
+    return { overdueFollowups, todayVisits, myPendingTasks, hotLeads, missedFollowups, missedVisitOutcome, counts };
   }, [followUps, leads, visits, user.name, today]);
 
   return (
@@ -65,6 +105,83 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
         <ActionCountCard label="Today's Visits" value={vm.counts.todayVisits} tone="blue" onClick={() => onNavigate('visits', undefined, { period: 'today' })} />
         <ActionCountCard label="My Pending Tasks" value={vm.counts.myPendingTasks} tone="amber" onClick={() => onNavigate('followups')} />
         <ActionCountCard label="Hot Leads" value={vm.counts.hotLeads} tone="orange" onClick={() => onNavigate('leads', undefined, { quality: 'hot' })} />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <ActionCountCard label="SLA Breaches" value={slaStatus?.summary?.totalBreaches || 0} tone="red" onClick={() => onNavigate('followups')} />
+        <ActionCountCard label="First Response Breach" value={slaStatus?.summary?.firstResponseBreaches || 0} tone="amber" onClick={() => onNavigate('leads')} />
+        <ActionCountCard label="Missed Visit Outcomes" value={slaStatus?.summary?.missedVisitOutcomes || 0} tone="red" onClick={() => onNavigate('visits')} />
+        <ActionCountCard label="Stale Hot Leads" value={slaStatus?.summary?.staleHotLeads || 0} tone="orange" onClick={() => onNavigate('leads', undefined, { quality: 'hot' })} />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <Panel
+          title="Missed Follow-up"
+          icon={<AlertCircle size={16} className="text-red-500" />}
+          emptyText="Great. No missed lead follow-ups."
+          actionText="Open Leads"
+          onAction={() => onNavigate('leads')}
+          items={vm.missedFollowups.map((l) => ({
+            id: l.id,
+            primary: l.name,
+            secondary: `${l.mobile || 'No mobile'} • ${l.assignedToName || 'Unassigned'}`,
+            onClick: () => onNavigate('lead-detail', l.id)
+          }))}
+        />
+
+        <Panel
+          title="Missed Visit Outcome"
+          icon={<Calendar size={16} className="text-red-500" />}
+          emptyText="Great. No missed visit outcomes."
+          actionText="Open Visits"
+          onAction={() => onNavigate('visits')}
+          items={vm.missedVisitOutcome.map((v) => ({
+            id: v.id,
+            primary: v.client_name,
+            secondary: `${v.visit_date} • ${v.outcome ? 'Next action missing' : 'Outcome missing'}`,
+            onClick: () => onNavigate('detail', v.id)
+          }))}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <Panel
+          title="Next Best Lead Queue"
+          icon={<Target size={16} className="text-blue-600" />}
+          emptyText="No leads in priority queue."
+          actionText="Open Leads"
+          onAction={() => onNavigate('leads')}
+          items={(priorityQueue?.queue || []).map((q: any) => ({
+            id: q.leadId,
+            primary: `${q.name} (Score ${q.score})`,
+            secondary: `${q.source || 'Unknown'} • ${(q.reasons || []).join(', ') || 'Review now'}`,
+            onClick: () => onNavigate('lead-detail', q.leadId)
+          }))}
+        />
+
+        <div className="bg-white border border-[#E6D8B8] rounded-xl overflow-hidden">
+          <div className="px-3 py-2.5 bg-[#FDFAF2] border-b border-[#E6D8B8] flex items-center justify-between">
+            <div className="flex items-center gap-2 text-[#2A1C00]">
+              <TrendingUp size={16} className="text-emerald-600" />
+              <p className="text-sm font-bold">Funnel Snapshot ({funnelReport?.range || 'month'})</p>
+            </div>
+            <button onClick={() => onNavigate('reports')} className="text-[11px] font-bold text-[#C9A84C] hover:underline">
+              Open Reports
+            </button>
+          </div>
+          <div className="p-3 text-sm">
+            <div className="grid grid-cols-5 gap-2 text-center">
+              <FunnelMetric label="Leads" value={funnelReport?.overall?.total || 0} />
+              <FunnelMetric label="Contacted" value={funnelReport?.overall?.contacted || 0} />
+              <FunnelMetric label="Visit Sch." value={funnelReport?.overall?.visit_scheduled || 0} />
+              <FunnelMetric label="Visit Done" value={funnelReport?.overall?.visit_done || 0} />
+              <FunnelMetric label="Closed" value={funnelReport?.overall?.closed || 0} />
+            </div>
+            <p className="mt-3 text-xs text-[#9A8262]">
+              Close rate: <span className="font-bold text-[#2A1C00]">{funnelReport?.overall?.close_rate_pct || 0}%</span>
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -134,6 +251,55 @@ export default function TodayOverview({ leads, visits, followUps, user, onNaviga
           <QuickAction label="Hot Leads" icon={<CheckCircle2 size={14} />} onClick={() => onNavigate('leads', undefined, { quality: 'hot' })} />
         </div>
       </div>
+
+      {canSeeComplianceTable && (
+        <div className="bg-white border border-[#E6D8B8] rounded-xl overflow-hidden">
+          <div className="px-3 py-2.5 bg-[#FDFAF2] border-b border-[#E6D8B8] flex items-center justify-between">
+            <p className="text-sm font-bold text-[#2A1C00]">Manager Compliance (Today)</p>
+            <button onClick={() => onNavigate('reports')} className="text-[11px] font-bold text-[#C9A84C] hover:underline">Open Reports</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-[#F2ECD8] text-[10px] uppercase text-[#9A8262]">
+                  <th className="px-3 py-2">User</th>
+                  <th className="px-3 py-2">Lead FU%</th>
+                  <th className="px-3 py-2">Visit Outcome%</th>
+                  <th className="px-3 py-2">Next Action%</th>
+                  <th className="px-3 py-2">Overall%</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#F7F2E6]">
+                {(complianceReport?.rows || []).map((row: any) => (
+                  <tr key={row.userId} className="text-sm">
+                    <td className="px-3 py-2 font-semibold text-[#2A1C00]">{row.userName}</td>
+                    <td className="px-3 py-2">{row.leadFollowupCompliancePct}%</td>
+                    <td className="px-3 py-2">{row.visitOutcomeCompliancePct}%</td>
+                    <td className="px-3 py-2">{row.visitNextActionCompliancePct}%</td>
+                    <td className={cn("px-3 py-2 font-bold", row.overallCompliancePct >= 80 ? "text-green-600" : row.overallCompliancePct >= 60 ? "text-amber-600" : "text-red-600")}>
+                      {row.overallCompliancePct}%
+                    </td>
+                  </tr>
+                ))}
+                {(!complianceReport?.rows || complianceReport.rows.length === 0) && (
+                  <tr>
+                    <td className="px-3 py-4 text-xs text-[#9A8262]" colSpan={5}>No compliance rows available.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FunnelMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="border border-[#F2ECD8] rounded-lg p-2 bg-[#FFFEFA]">
+      <p className="text-[10px] uppercase tracking-wider text-[#9A8262] font-bold">{label}</p>
+      <p className="text-lg font-bold text-[#2A1C00]">{value}</p>
     </div>
   );
 }

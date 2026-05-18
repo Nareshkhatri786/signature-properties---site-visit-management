@@ -22,6 +22,8 @@ interface VisitCompletionModalProps {
 }
 
 export default function VisitCompletionModal({ isOpen, onClose, visit, lead, user, onComplete }: VisitCompletionModalProps) {
+  const role = (user?.role || '').toLowerCase();
+  const canOverrideValidation = role === 'admin' || role === 'adm' || role === 'manager';
   const [data, setData] = useState({
     feedback: '',
     interest: (lead?.quality || 'warm') as LeadQuality,
@@ -34,9 +36,13 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requireNextAction, setRequireNextAction] = useState(true);
+  const nextActionMissing = data.nextStep === 'none' || !data.nextDate;
+  const mustHaveNextAction = requireNextAction || data.outcome === 'follow_up_required';
+  const isValidationBlocked = mustHaveNextAction && nextActionMissing;
 
   const handleSubmit = () => {
-    if (!data.feedback.trim() || isSubmitting) return;
+    if (!data.feedback.trim() || isSubmitting || isValidationBlocked) return;
     setIsSubmitting(true);
     const completedAt = new Date(`${data.visitDate}T${data.visitTime || '00:00'}:00`).toISOString();
     onComplete({ ...data, completedAt });
@@ -141,6 +147,16 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
 
                 {/* Next Step */}
                 <div className="pt-4 border-t border-[#E6D8B8] space-y-4">
+                  {canOverrideValidation && (
+                    <label className="flex items-center gap-2 text-xs text-[#9A8262]">
+                      <input
+                        type="checkbox"
+                        checked={requireNextAction}
+                        onChange={(e) => setRequireNextAction(e.target.checked)}
+                      />
+                      Require next action before completing visit
+                    </label>
+                  )}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-[#9A8262] uppercase tracking-wider flex items-center gap-1.5">
                       <ArrowRightLeft size={12} /> Next Action
@@ -178,6 +194,11 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
                       </div>
                     </div>
                   )}
+                  {isValidationBlocked && (
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-2 py-1.5">
+                      Next action required: select follow-up/revisit and set next date.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -193,7 +214,7 @@ export default function VisitCompletionModal({ isOpen, onClose, visit, lead, use
               <button 
                 type="button"
                 onClick={handleSubmit}
-                disabled={!data.feedback.trim() || !data.outcome || isSubmitting}
+                disabled={!data.feedback.trim() || !data.outcome || isSubmitting || isValidationBlocked}
                 className="flex-[2] bg-[#C9A84C] text-white font-bold py-2.5 rounded-lg shadow-sm hover:bg-[#B59640] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
               >
                 {isSubmitting ? (

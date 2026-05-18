@@ -1179,6 +1179,439 @@ async function startServer() {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  app.get("/api/reports/funnel", authMiddleware, async (req, res) => {
+    try {
+      const u = (req as any).user;
+      const role = (u?.role || "").toLowerCase();
+      const range = String(req.query.range || "month");
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const fromDate = range === "today" ? today : range === "week" ? weekStart.toISOString().slice(0, 10) : monthStart.toISOString().slice(0, 10);
+
+      const [allLeads, users, projects] = await Promise.all([
+        query<any>("SELECT id, name, source, status, projectId, assignedTo, created_at FROM leads WHERE DATE(created_at) >= ?", [fromDate]),
+        query<any>("SELECT id, name FROM users"),
+        query<any>("SELECT id, name FROM projects"),
+      ]);
+
+      const isAdmin = role === "admin" || role === "adm";
+      const visibleLeads = isAdmin
+        ? allLeads
+        : allLeads.filter((l: any) => String(l.projectId || "") === String(u.projectId || "") || String(l.assignedTo || "") === String(u.id || ""));
+
+      const baseCounters = () => ({
+        total: 0,
+        contacted: 0,
+        visit_scheduled: 0,
+        visit_done: 0,
+        closed: 0
+      });
+
+      const bySource: Record<string, any> = {};
+      const byUser: Record<string, any> = {};
+      const byProject: Record<string, any> = {};
+      const userMap = new Map<number, string>(users.map((x: any) => [Number(x.id), x.name || `User ${x.id}`]));
+      const projectMap = new Map<string, string>(projects.map((x: any) => [String(x.id), x.name || x.id]));
+
+      const agg = baseCounters();
+      for (const lead of visibleLeads) {
+        const status = String(lead.status || "new");
+        const source = String(lead.source || "Unknown");
+        const userName = userMap.get(Number(lead.assignedTo || 0)) || "Unassigned";
+        const projectName = projectMap.get(String(lead.projectId || "")) || "Unknown";
+
+        for (const bag of [agg, bySource[source] || (bySource[source] = baseCounters()), byUser[userName] || (byUser[userName] = baseCounters()), byProject[projectName] || (byProject[projectName] = baseCounters())]) {
+          bag.total += 1;
+          if (["contacted", "visit_scheduled", "visit_done", "closed"].includes(status)) bag.contacted += 1;
+          if (["visit_scheduled", "visit_done", "closed"].includes(status)) bag.visit_scheduled += 1;
+          if (["visit_done", "closed"].includes(status)) bag.visit_done += 1;
+          if (status === "closed") bag.closed += 1;
+        }
+      }
+
+      const toRows = (obj: Record<string, any>) =>
+        Object.entries(obj).map(([name, v]: [string, any]) => ({
+          name,
+          ...v,
+          drop_contact_to_visit: Math.max(0, v.contacted - v.visit_scheduled),
+          drop_visit_to_done: Math.max(0, v.visit_scheduled - v.visit_done),
+          drop_done_to_close: Math.max(0, v.visit_done - v.closed),
+          close_rate_pct: v.total > 0 ? Math.round((v.closed / v.total) * 100) : 0
+        })).sort((a: any, b: any) => b.total - a.total);
+
+      res.json({
+        generatedAt: new Date().toISOString(),
+        range,
+        overall: {
+          ...agg,
+          close_rate_pct: agg.total > 0 ? Math.round((agg.closed / agg.total) * 100) : 0
+        },
+        bySource: toRows(bySource),
+        byUser: toRows(byUser),
+        byProject: toRows(byProject)
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/sla/status", authMiddleware, async (req, res) => {
+    try {
+      const u = (req as any).user;
+      const role = (u?.role || "").toLowerCase();
+      const isAdmin = role === "admin" || role === "adm";
+      const isManager = role === "manager";
+      const notify = String(req.query.notify || "0") === "1";
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      const range = String(req.query.range || "today");
+      const fromDate = range === "week" ? weekStart.toISOString().slice(0, 10) : today;
+
+      const [leads, followups, visits, callLogs, users] = await Promise.all([
+        query<any>("SELECT id, name, status, quality, source, projectId, assignedTo, updated_at, created_at FROM leads WHERE status NOT IN ('closed','lost')"),
+        query<any>("SELECT id, leadId, visitId, status, date, created_at FROM followups"),
+        query<any>("SELECT id, leadId, client_name, visit_status, outcome, completed_at, visit_date, assigned_to FROM visits"),
+        query<any>("SELECT id, leadId, outcome, timestamp FROM call_logs"),
+        query<any>("SELECT id, name, role, projectId FROM users"),
+      ]);
+
+      const visibleLeads = (isAdmin || isManager)
+        ? leads
+        : leads.filter((l: any) => String(l.projectId || "") === String(u.projectId || "") || String(l.assignedTo || "") === String(u.id || ""));
+
+      const leadIdSet = new Set<string>(visibleLeads.map((l: any) => String(l.id)));
+      const visibleVisits = visits.filter((v: any) => !v.leadId || leadIdSet.has(String(v.leadId)));
+      const visibleFollowups = followups.filter((f: any) => !f.leadId || leadIdSet.has(String(f.leadId)));
+      const visibleCalls = callLogs.filter((c: any) => !c.leadId || leadIdSet.has(String(c.leadId)));
+
+      const pendingByLead = new Set<string>(
+        visibleFollowups.filter((f: any) => f.status === "pending" && f.leadId).map((f: any) => String(f.leadId))
+      );
+      const pendingByVisit = new Set<string>(
+        visibleFollowups.filter((f: any) => f.status === "pending" && f.visitId).map((f: any) => String(f.visitId))
+      );
+
+      const breaches: any[] = [];
+      for (const lead of visibleLeads) {
+        const created = new Date(lead.created_at);
+        const due = new Date(created.getTime() + 10 * 60 * 1000);
+        const hasFirstTouch =
+          visibleCalls.some((c: any) => String(c.leadId || "") === String(lead.id)) ||
+          visibleFollowups.some((f: any) => String(f.leadId || "") === String(lead.id)) ||
+          visibleVisits.some((v: any) => String(v.leadId || "") === String(lead.id));
+        if (!hasFirstTouch && now > due) {
+          breaches.push({
+            type: "first_response_breach",
+            leadId: lead.id,
+            name: lead.name,
+            assignedTo: lead.assignedTo,
+            detail: "No first touch within SLA 10 minutes",
+            severity: "high"
+          });
+        }
+
+        if (!pendingByLead.has(String(lead.id))) {
+          breaches.push({
+            type: "missed_followup",
+            leadId: lead.id,
+            name: lead.name,
+            assignedTo: lead.assignedTo,
+            detail: "Active lead has no pending follow-up",
+            severity: "medium"
+          });
+        }
+
+        if (String(lead.quality) === "hot") {
+          const updatedAt = new Date(lead.updated_at || lead.created_at);
+          const ageHours = (now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60);
+          if (ageHours >= 24) {
+            breaches.push({
+              type: "stale_hot_lead",
+              leadId: lead.id,
+              name: lead.name,
+              assignedTo: lead.assignedTo,
+              detail: `Hot lead stale for ${Math.floor(ageHours)}h`,
+              severity: "high"
+            });
+          }
+        }
+      }
+
+      for (const v of visibleVisits) {
+        if (String(v.visit_status) !== "completed") continue;
+        const completedDate = String(v.completed_at || v.visit_date || "").slice(0, 10);
+        if (completedDate < fromDate) continue;
+        const hasOutcome = !!String(v.outcome || "").trim();
+        const needsNext = String(v.outcome || "") === "follow_up_required";
+        const hasNext = pendingByVisit.has(String(v.id)) || (v.leadId && pendingByLead.has(String(v.leadId)));
+        if (!hasOutcome || (needsNext && !hasNext)) {
+          breaches.push({
+            type: "missed_visit_outcome",
+            visitId: v.id,
+            leadId: v.leadId,
+            name: v.client_name,
+            detail: !hasOutcome ? "Visit completed without outcome" : "Follow-up required but next action missing",
+            severity: "high"
+          });
+        }
+      }
+
+      const pendingOverdue = visibleFollowups.filter((f: any) => f.status === "pending" && String(f.date || "") < today);
+      for (const f of pendingOverdue.slice(0, 200)) {
+        breaches.push({
+          type: "overdue_followup",
+          followupId: f.id,
+          leadId: f.leadId,
+          detail: `Pending follow-up overdue since ${f.date}`,
+          severity: "medium"
+        });
+      }
+
+      if (notify && (isAdmin || isManager)) {
+        const mgrs = users.filter((x: any) => {
+          const r = String(x.role || "").toLowerCase();
+          return r === "manager" || r === "admin" || r === "adm";
+        });
+        const cnt = breaches.length;
+        for (const m of mgrs) {
+          const notifId = `sla_${today}_${m.id}`;
+          await pool.execute(
+            `INSERT IGNORE INTO notifications (id,userId,type,title,message,\`read\`,createdAt,isAdmin,date) VALUES (?,?,?,?,?,0,?,1,?)`,
+            [notifId, m.id, "SLA_BREACH", "SLA Exceptions Detected", `${cnt} active SLA exceptions need review.`, new Date().toISOString(), today]
+          );
+        }
+      }
+
+      res.json({
+        generatedAt: new Date().toISOString(),
+        range,
+        summary: {
+          totalBreaches: breaches.length,
+          firstResponseBreaches: breaches.filter((b: any) => b.type === "first_response_breach").length,
+          missedFollowups: breaches.filter((b: any) => b.type === "missed_followup").length,
+          missedVisitOutcomes: breaches.filter((b: any) => b.type === "missed_visit_outcome").length,
+          staleHotLeads: breaches.filter((b: any) => b.type === "stale_hot_lead").length,
+          overdueFollowups: breaches.filter((b: any) => b.type === "overdue_followup").length,
+        },
+        breaches: breaches.slice(0, 200)
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/sales/priority-queue", authMiddleware, async (req, res) => {
+    try {
+      const u = (req as any).user;
+      const role = (u?.role || "").toLowerCase();
+      const isAdmin = role === "admin" || role === "adm";
+      const limit = Math.max(1, Math.min(100, Number(req.query.limit || 20)));
+      const now = new Date();
+
+      const [leads, followups, callLogs] = await Promise.all([
+        query<any>("SELECT id, name, mobile, source, quality, status, assignedTo, projectId, created_at, updated_at FROM leads WHERE status NOT IN ('closed','lost')"),
+        query<any>("SELECT id, leadId, status, date, purpose FROM followups"),
+        query<any>("SELECT id, leadId, outcome, timestamp FROM call_logs"),
+      ]);
+
+      const visibleLeads = isAdmin
+        ? leads
+        : leads.filter((l: any) => String(l.projectId || "") === String(u.projectId || "") || String(l.assignedTo || "") === String(u.id || ""));
+
+      const byLeadFollowups = new Map<string, any[]>();
+      for (const f of followups) {
+        const k = String(f.leadId || "");
+        if (!k) continue;
+        const arr = byLeadFollowups.get(k) || [];
+        arr.push(f);
+        byLeadFollowups.set(k, arr);
+      }
+      const byLeadCalls = new Map<string, any[]>();
+      for (const c of callLogs) {
+        const k = String(c.leadId || "");
+        if (!k) continue;
+        const arr = byLeadCalls.get(k) || [];
+        arr.push(c);
+        byLeadCalls.set(k, arr);
+      }
+
+      const sourceBoost = (source: string) => {
+        const s = String(source || "").toLowerCase();
+        if (s.includes("google")) return 12;
+        if (s.includes("meta") || s.includes("facebook") || s.includes("social")) return 10;
+        if (s.includes("reference")) return 8;
+        return 0;
+      };
+
+      const queued = visibleLeads.map((lead: any) => {
+        let score = 0;
+        const reasons: string[] = [];
+        const quality = String(lead.quality || "pending");
+        if (quality === "hot") { score += 40; reasons.push("Hot lead"); }
+        else if (quality === "warm") { score += 25; reasons.push("Warm lead"); }
+        else if (quality === "pending") { score += 12; }
+        else if (quality === "cold") { score += 6; }
+        else if (quality === "disq") { score -= 25; }
+
+        const leadFups = byLeadFollowups.get(String(lead.id)) || [];
+        const pendingFups = leadFups.filter((f: any) => f.status === "pending");
+        if (pendingFups.length === 0) { score += 22; reasons.push("No pending follow-up"); }
+        const overdueFups = pendingFups.filter((f: any) => String(f.date || "") < now.toISOString().slice(0, 10));
+        if (overdueFups.length > 0) { score += 18; reasons.push("Overdue follow-up"); }
+
+        const leadCalls = byLeadCalls.get(String(lead.id)) || [];
+        if (leadCalls.length === 0) { score += 20; reasons.push("No call attempt yet"); }
+        const unanswered = leadCalls.filter((c: any) => ["not_answered", "busy", "switched_off"].includes(String(c.outcome || ""))).length;
+        if (unanswered >= 2) { score += 10; reasons.push("Multiple unanswered calls"); }
+
+        if (String(lead.status) === "new") { score += 15; reasons.push("New lead"); }
+        score += sourceBoost(lead.source);
+
+        const updated = new Date(lead.updated_at || lead.created_at);
+        const ageHours = (now.getTime() - updated.getTime()) / (1000 * 60 * 60);
+        if (ageHours >= 24) { score += 15; reasons.push("Stale lead"); }
+        else if (ageHours >= 6) { score += 8; }
+
+        return {
+          leadId: lead.id,
+          name: lead.name,
+          mobile: lead.mobile,
+          source: lead.source,
+          quality: lead.quality,
+          status: lead.status,
+          score,
+          reasons: reasons.slice(0, 4)
+        };
+      }).sort((a: any, b: any) => b.score - a.score).slice(0, limit);
+
+      res.json({
+        generatedAt: new Date().toISOString(),
+        totalCandidates: visibleLeads.length,
+        queue: queued
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/reports/compliance", authMiddleware, async (req, res) => {
+    try {
+      const u = (req as any).user;
+      const role = (u?.role || "").toLowerCase();
+      if (role !== "admin" && role !== "adm" && role !== "manager") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const range = String(req.query.range || "today");
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      const weekStartStr = weekStart.toISOString().slice(0, 10);
+      const fromDate = range === "week" ? weekStartStr : today;
+
+      const [users, activeLeads, pendingFollowups, completedVisits, pendingVisitFollowups] = await Promise.all([
+        query<any>("SELECT id, name, role FROM users"),
+        query<any>(
+          "SELECT id, assignedTo FROM leads WHERE assignedTo IS NOT NULL AND status NOT IN ('closed', 'lost')"
+        ),
+        query<any>(
+          "SELECT id, leadId FROM followups WHERE status = 'pending'"
+        ),
+        query<any>(
+          "SELECT id, leadId, assigned_to, outcome, completed_at, visit_date FROM visits WHERE visit_status = 'completed' AND (DATE(COALESCE(completed_at, visit_date)) >= ?)",
+          [fromDate]
+        ),
+        query<any>(
+          "SELECT id, visitId, leadId, status FROM followups WHERE status = 'pending'"
+        ),
+      ]);
+
+      const userRows = users
+        .filter((x: any) => {
+          const r = String(x.role || "").toLowerCase();
+          return r !== "admin" && r !== "adm";
+        })
+        .map((x: any) => ({
+          userId: Number(x.id),
+          userName: x.name || `User ${x.id}`,
+          activeLeads: 0,
+          leadsWithPendingFollowup: 0,
+          leadFollowupCompliancePct: 0,
+          visitsCompleted: 0,
+          visitsWithOutcome: 0,
+          visitsWithNextAction: 0,
+          visitOutcomeCompliancePct: 0,
+          visitNextActionCompliancePct: 0,
+          overallCompliancePct: 0,
+        }));
+
+      const byId = new Map<number, any>(userRows.map((r: any) => [r.userId, r]));
+      const pendingLeadIds = new Set<string>(pendingFollowups.map((f: any) => String(f.leadId || "")));
+      const pendingVisitIds = new Set<string>(pendingVisitFollowups.map((f: any) => String(f.visitId || "")));
+      const pendingLeadIdsFromVisitFollowup = new Set<string>(pendingVisitFollowups.map((f: any) => String(f.leadId || "")));
+
+      for (const lead of activeLeads) {
+        const row = byId.get(Number(lead.assignedTo));
+        if (!row) continue;
+        row.activeLeads += 1;
+        if (pendingLeadIds.has(String(lead.id))) row.leadsWithPendingFollowup += 1;
+      }
+
+      for (const visit of completedVisits) {
+        const row = userRows.find((r: any) => r.userName === visit.assigned_to);
+        if (!row) continue;
+        row.visitsCompleted += 1;
+
+        const hasOutcome = !!String(visit.outcome || "").trim();
+        if (hasOutcome) row.visitsWithOutcome += 1;
+
+        const needsNextAction = String(visit.outcome || "") === "follow_up_required";
+        const hasNextAction =
+          pendingVisitIds.has(String(visit.id)) ||
+          (visit.leadId ? pendingLeadIdsFromVisitFollowup.has(String(visit.leadId)) : false);
+        if (!needsNextAction || hasNextAction) row.visitsWithNextAction += 1;
+      }
+
+      for (const row of userRows) {
+        row.leadFollowupCompliancePct = row.activeLeads > 0
+          ? Math.round((row.leadsWithPendingFollowup / row.activeLeads) * 100)
+          : 100;
+        row.visitOutcomeCompliancePct = row.visitsCompleted > 0
+          ? Math.round((row.visitsWithOutcome / row.visitsCompleted) * 100)
+          : 100;
+        row.visitNextActionCompliancePct = row.visitsCompleted > 0
+          ? Math.round((row.visitsWithNextAction / row.visitsCompleted) * 100)
+          : 100;
+        row.overallCompliancePct = Math.round(
+          row.leadFollowupCompliancePct * 0.5 +
+          row.visitOutcomeCompliancePct * 0.25 +
+          row.visitNextActionCompliancePct * 0.25
+        );
+      }
+
+      res.json({
+        generatedAt: new Date().toISOString(),
+        range,
+        totals: {
+          activeLeads: userRows.reduce((a: number, r: any) => a + r.activeLeads, 0),
+          leadsWithPendingFollowup: userRows.reduce((a: number, r: any) => a + r.leadsWithPendingFollowup, 0),
+          visitsCompleted: userRows.reduce((a: number, r: any) => a + r.visitsCompleted, 0),
+          visitsWithOutcome: userRows.reduce((a: number, r: any) => a + r.visitsWithOutcome, 0),
+          visitsWithNextAction: userRows.reduce((a: number, r: any) => a + r.visitsWithNextAction, 0),
+        },
+        rows: userRows.sort((a: any, b: any) => b.overallCompliancePct - a.overallCompliancePct)
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // -- ATTENDANCE MAINTENANCE (every 15 min) --------------
   async function runAttendanceMaintenance() {
     try {

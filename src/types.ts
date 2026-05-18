@@ -299,3 +299,30 @@ export interface Workflow {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ComplianceUserRow {
+  userId: number;
+  userName: string;
+  activeLeads: number;
+  leadsWithPendingFollowup: number;
+  leadFollowupCompliancePct: number;
+  visitsCompleted: number;
+  visitsWithOutcome: number;
+  visitsWithNextAction: number;
+  visitOutcomeCompliancePct: number;
+  visitNextActionCompliancePct: number;
+  overallCompliancePct: number;
+}
+
+export interface ComplianceReportResponse {
+  generatedAt: string;
+  range: string;
+  totals: {
+    activeLeads: number;
+    leadsWithPendingFollowup: number;
+    visitsCompleted: number;
+    visitsWithOutcome: number;
+    visitsWithNextAction: number;
+  };
+  rows: ComplianceUserRow[];
+}

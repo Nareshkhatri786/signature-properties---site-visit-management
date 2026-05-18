@@ -48,7 +48,12 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
 
   // 1. Find the Lead by phone number
   const phoneSuffix = message.from.length > 10 ? message.from.slice(-10) : message.from;
-  let lead = await queryOne<any>("SELECT * FROM leads WHERE mobile LIKE ?", [`%${phoneSuffix}`]);
+  let lead = message.projectId
+    ? await queryOne<any>(
+        "SELECT * FROM leads WHERE mobile LIKE ? AND projectId = ? ORDER BY updated_at DESC LIMIT 1",
+        [`%${phoneSuffix}`, message.projectId]
+      )
+    : await queryOne<any>("SELECT * FROM leads WHERE mobile LIKE ? ORDER BY updated_at DESC LIMIT 1", [`%${phoneSuffix}`]);
   
   if (!lead) {
     console.log(`[WA Bot] Error: Lead should have been created by server.ts already.`);
@@ -60,15 +65,6 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
 
 
 
-  // 4. Fetch recent chat history for context (last 10 messages)
-  const history = await query<any[]>(
-    "SELECT senderName, content, type FROM whatsapp_messages WHERE leadId = ? ORDER BY timestamp DESC LIMIT 10",
-    [lead.id]
-  );
-  history.reverse(); // Chronological order
-
-  const chatTranscript = history.map(h => `${h.type === 'incoming' ? 'Client' : 'AI'}: ${h.content}`).join("\n");
-
   // 3. Get Project Details for AI context
   let projectContext = "";
   let mediaLinks: any = {};
@@ -76,6 +72,17 @@ export const processIncomingWhatsAppMessage = async (body: any) => {
   // CRITICAL: Use the project the client messaged FOR (from the webhook) 
   // instead of the project the lead is assigned to in the CRM.
   const targetProjectId = message.projectId || lead.projectId;
+
+  // 4. Fetch recent chat history for only this project number/context.
+  // A single client may enquire on multiple project WhatsApp numbers; never
+  // leak another project's discussion into the current AI prompt.
+  const history = await query<any[]>(
+    "SELECT senderName, content, type FROM whatsapp_messages WHERE leadId = ? AND projectId = ? ORDER BY timestamp DESC LIMIT 10",
+    [lead.id, targetProjectId]
+  );
+  history.reverse(); // Chronological order
+
+  const chatTranscript = history.map(h => `${h.type === 'incoming' ? 'Client' : 'AI'}: ${h.content}`).join("\n");
 
   if (targetProjectId) {
     const proj = await queryOne<any>("SELECT * FROM projects WHERE id = ?", [targetProjectId]);
@@ -164,8 +171,8 @@ Rules:
       // Save AI outgoing message to WhatsApp history
       const outMsgId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
       await query(
-        "INSERT INTO whatsapp_messages (id, leadId, senderName, senderPhoneNumber, content, type) VALUES (?, ?, ?, ?, ?, ?)",
-        [outMsgId, lead.id, "AI Assistant", message.from, aiResult.replyText, 'outgoing']
+        "INSERT INTO whatsapp_messages (id, leadId, senderName, senderPhoneNumber, content, type, projectId) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [outMsgId, lead.id, "AI Assistant", message.from, aiResult.replyText, 'outgoing', targetProjectId]
       );
 
       // Save to Timeline as Automated Remark

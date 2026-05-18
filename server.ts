@@ -1089,7 +1089,10 @@ async function startServer() {
       const targetUser = await queryOne<any>("SELECT * FROM users WHERE LOWER(name) LIKE ?", [`%${userName.toLowerCase()}%`]);
       const assignedUserId = targetUser?.id || null;
 
-      const existingLead = await queryOne<any>("SELECT * FROM leads WHERE mobile = ?", [normalizedMobile]);
+      const existingLead = await queryOne<any>(
+        "SELECT * FROM leads WHERE mobile = ? AND projectId = ? ORDER BY updated_at DESC LIMIT 1",
+        [normalizedMobile, projectId]
+      );
 
       const msgId = "msg_" + Date.now();
       await pool.execute(
